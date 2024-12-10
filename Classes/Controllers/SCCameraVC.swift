@@ -116,6 +116,38 @@ class SCCameraVC: UIViewController {
     @objc private func capturePhoto() {
         cameraManager.capturePhoto()
     }
+    
+    // Add a method to present captured photo
+    private func presentCapturedPhoto(_ image: UIImage) {
+        let alertController = UIAlertController(title: "Captured Photo", message: nil, preferredStyle: .alert)
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        alertController.view.addSubview(imageView)
+        imageView.snp.makeConstraints { make in
+            make.top.equalTo(alertController.view.snp.top).offset(50)
+            make.centerX.equalTo(alertController.view.snp.centerX)
+            make.width.height.equalTo(200)
+        }
+        
+        let confirmAction = UIAlertAction(title: "确定", style: .default) { [weak self] _ in
+            self?.savePhotoToCollection(image)
+        }
+        alertController.addAction(confirmAction)
+        
+        let cancelAction = UIAlertAction(title: "取消", style: .cancel, handler: nil)
+        alertController.addAction(cancelAction)
+        
+        present(alertController, animated: true, completion: nil)
+    }
+    
+    // Add a method to save photo to collection view
+    private func savePhotoToCollection(_ image: UIImage) {
+        capturedPhotos.append(image)
+        if capturedPhotos.count > 9 {
+            capturedPhotos.removeFirst()
+        }
+        collectionView.reloadData()
+    }
 }
 
 // Conform to UICollectionViewDataSource and UICollectionViewDelegate
