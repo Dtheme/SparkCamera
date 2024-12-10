@@ -38,6 +38,16 @@ class SCCameraVC: UIViewController {
         return collectionView
     }()
     
+    private lazy var captureButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Capture", for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = .systemBlue
+        button.layer.cornerRadius = 25
+        button.addTarget(self, action: #selector(capturePhoto), for: .touchUpInside)
+        return button
+    }()
+    
     // MARK: - Initialization
     init() {
         let defaultConfiguration = SCCameraConfiguration()
@@ -78,6 +88,13 @@ class SCCameraVC: UIViewController {
             make.top.equalTo(photoPreview.snp.bottom)
             make.leading.trailing.bottom.equalToSuperview()
         }
+        
+        view.addSubview(captureButton)
+        captureButton.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-20)
+            make.width.height.equalTo(50)
+        }
     }
     
     private func startCameraSession() {
@@ -94,6 +111,10 @@ class SCCameraVC: UIViewController {
             photoPreview.image = image
             collectionView.reloadData()
         }
+    }
+    
+    @objc private func capturePhoto() {
+        cameraManager.capturePhoto()
     }
 }
 
