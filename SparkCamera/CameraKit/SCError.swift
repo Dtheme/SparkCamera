@@ -7,22 +7,7 @@
 
 import Foundation
 
-public enum SCError: LocalizedError {
+public enum SCError: Error {
     case captureDeviceNotFound
-    case captureError(String)
-    case permissionDenied
-    case setupError(String)
-    
-    public var errorDescription: String? {
-        switch self {
-        case .captureDeviceNotFound:
-            return "未找到可用的相机设备"
-        case .captureError(let message):
-            return message
-        case .permissionDenied:
-            return "相机权限被拒绝"
-        case .setupError(let message):
-            return message
-        }
-    }
+    case error(String)
 }

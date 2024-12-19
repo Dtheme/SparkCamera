@@ -1,9 +1,8 @@
 //
-//  CKPreviewView.swift
-//  CameraKit
+//  SCPreviewView.swift
+//  SparkCamera
 //
-//  Created by Adrian Mateoaea on 08/01/2019.
-//  Copyright © 2019 Wonderkiln. All rights reserved.
+//  Created by dzw on 2024/12/19.
 //
 
 import UIKit
@@ -36,7 +35,7 @@ import AVFoundation
         }
     }
     
-    @objc private(set) public var gridView: SCFGridView? {
+    @objc private(set) public var gridView: SCGridView? {
         didSet {
             oldValue?.removeFromSuperview()
             
@@ -98,7 +97,12 @@ import AVFoundation
             recognizer.scale = self.lastScale
         }
         
-        let zoom = max(1.0, min(10.0, recognizer.scale))
+        var minZoom: CGFloat = 1.0
+        if let session = self.session, session.isWideAngleAvailable {
+            minZoom = 0.5
+        }
+        
+        let zoom = max(minZoom, min(10.0, recognizer.scale))
         self.session?.zoom = Double(zoom)
         
         if recognizer.state == .ended {

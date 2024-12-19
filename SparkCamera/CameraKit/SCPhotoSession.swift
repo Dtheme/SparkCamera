@@ -1,9 +1,8 @@
 //
-//  CKPhotoSession.swift
-//  CameraKit
+//  SCPhotoSession.swift
+//  SparkCamera
 //
-//  Created by Adrian Mateoaea on 08/01/2019.
-//  Copyright © 2019 Wonderkiln. All rights reserved.
+//  Created by dzw on 2024/12/19.
 //
 
 import UIKit
@@ -26,14 +25,13 @@ extension SCSession.FlashMode {
         case none, faces
     }
     
-    @objc public var cameraPosition = CameraPosition.back {
+    @objc public var cameraPosition: CameraPosition = .back {
         didSet {
-            do {
-                let deviceInput = try SCSession.captureDeviceInput(type: self.cameraPosition.deviceType)
-                self.captureDeviceInput = deviceInput
-            } catch let error {
-                print(error.localizedDescription)
+            if cameraPosition == oldValue {
+                return
             }
+            
+            configureInputs()
         }
     }
     
@@ -66,15 +64,10 @@ extension SCSession.FlashMode {
     
     var captureDeviceInput: AVCaptureDeviceInput? {
         didSet {
-            self.faceDetectionBoxes.forEach({ $0.removeFromSuperview() })
-            self.faceDetectionBoxes = []
-            
-            if let oldValue = oldValue {
-                self.session.removeInput(oldValue)
-            }
-            
-            if let captureDeviceInput = self.captureDeviceInput {
-                self.session.addInput(captureDeviceInput)
+            if let device = captureDeviceInput?.device {
+                try? device.lockForConfiguration()
+                device.videoZoomFactor = CGFloat(zoom)
+                device.unlockForConfiguration()
             }
         }
     }
@@ -93,6 +86,7 @@ extension SCSession.FlashMode {
         
         self.session.sessionPreset = .high
         self.session.addOutput(self.photoOutput)
+        configureInputs()
     }
     
     @objc deinit {
@@ -105,12 +99,16 @@ extension SCSession.FlashMode {
     @objc public func capture(_ callback: @escaping (UIImage, AVCaptureResolvedPhotoSettings) -> Void, _ error: @escaping (Error) -> Void) {
         self.captureCallback = callback
         self.errorCallback = error
-        
+
         let settings = AVCapturePhotoSettings()
         settings.flashMode = self.flashMode.captureFlashMode
-        
+
         if let connection = self.photoOutput.connection(with: .video) {
-            connection.videoOrientation = UIDevice.current.orientation.videoOrientation
+            if self.resolution.width > 0, self.resolution.height > 0 {
+                connection.videoOrientation = .portrait
+            } else {
+                connection.videoOrientation = UIDevice.current.orientation.videoOrientation
+            }
         }
         
         self.photoOutput.capturePhoto(with: settings, delegate: self)
@@ -261,5 +259,25 @@ extension SCSession.FlashMode {
                 self.faceDetectionBoxes[i].frame = CGRect.zero
             }
         }
+    }
+    
+    private func configureInputs() {
+        session.beginConfiguration()
+        
+        for input in session.inputs {
+            session.removeInput(input)
+        }
+        
+        do {
+            let deviceInput = try SCSession.captureDeviceInput(type: cameraPosition.deviceType)
+            if session.canAddInput(deviceInput) {
+                session.addInput(deviceInput)
+                self.captureDeviceInput = deviceInput
+            }
+        } catch {
+            print("Error configuring camera input: \(error.localizedDescription)")
+        }
+        
+        session.commitConfiguration()
     }
 }

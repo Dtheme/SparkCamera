@@ -1,9 +1,8 @@
 //
-//  CKSession.swift
-//  CameraKit
+//  SCSession.swift
+//  SparkCamera
 //
-//  Created by Adrian Mateoaea on 08/01/2019.
-//  Copyright © 2019 Wonderkiln. All rights reserved.
+//  Created by dzw on 2024/12/19.
 //
 
 import AVFoundation
@@ -91,24 +90,34 @@ extension SCSession.CameraPosition {
     @objc public var previewLayer: AVCaptureVideoPreviewLayer?
     @objc public var overlayView: UIView?
     
-    @objc public var zoom = 1.0
-    
     @objc public weak var delegate: SCSessionDelegate?
+    
+    @objc public private(set) var isWideAngleAvailable: Bool = false
+    
+    private var videoInput: AVCaptureDeviceInput?
     
     @objc override init() {
         self.session = AVCaptureSession()
+        super.init()
+        setupCamera()
     }
     
     @objc deinit {
-        self.session.stopRunning()
+        DispatchQueue.main.async {  
+            self.session.stopRunning()
+        }
     }
     
     @objc public func start() {
-        self.session.startRunning()
+        DispatchQueue.main.async {
+            self.session.startRunning()
+        }
     }
     
     @objc public func stop() {
-        self.session.stopRunning()
+        DispatchQueue.main.async {
+            self.session.stopRunning()
+        }
     }
     
     @objc public func focus(at point: CGPoint) {
@@ -141,5 +150,51 @@ extension SCSession.CameraPosition {
         }
         
         return nil
+    }
+    
+    private func setupCamera() {
+        // 开始配置前先移除所有现有输入
+        session.beginConfiguration()
+        for input in session.inputs {
+            session.removeInput(input)
+        }
+        
+        if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            isWideAngleAvailable = device.minAvailableVideoZoomFactor <= 0.5
+            
+            do {
+                videoInput = try AVCaptureDeviceInput(device: device)
+                if let videoInput = videoInput {
+                    if session.canAddInput(videoInput) {
+                        session.addInput(videoInput)
+                    }
+                }
+                
+                if isWideAngleAvailable {
+                    try device.lockForConfiguration()
+                    device.videoZoomFactor = 1.0
+                    device.unlockForConfiguration()
+                }
+            } catch {
+                print("Error setting up camera: \(error.localizedDescription)")
+            }
+        }
+        
+        session.commitConfiguration()
+    }
+    
+    @objc public var zoom: Double = 1.0 {
+        didSet {
+            guard let device = videoInput?.device else { return }
+            
+            do {
+                try device.lockForConfiguration()
+                let minZoom = isWideAngleAvailable ? 0.5 : 1.0
+                device.videoZoomFactor = CGFloat(max(minZoom, min(10.0, zoom)))
+                device.unlockForConfiguration()
+            } catch {
+                print("Error setting zoom: \(error.localizedDescription)")
+            }
+        }
     }
 }

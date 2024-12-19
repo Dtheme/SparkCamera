@@ -1,9 +1,8 @@
 //
-//  CKGridView.swift
-//  CameraKit
+//  SCGridView.swift
+//  SparkCamera
 //
-//  Created by Adrian Mateoaea on 18/01/2019.
-//  Copyright © 2019 Wonderkiln. All rights reserved.
+//  Created by dzw on 2024/12/19.
 //
 
 import UIKit

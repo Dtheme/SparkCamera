@@ -1,9 +1,8 @@
 //
 //  SCUtils.swift
-//  CameraKit
+//  SparkCamera
 //
-//  Created by Adrian Mateoaea on 23/01/2019.
-//  Copyright © 2019 Wonderkiln. All rights reserved.
+//  Created by dzw on 2024/12/19.
 //
 
 import UIKit
