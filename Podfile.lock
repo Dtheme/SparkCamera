@@ -1,0 +1,36 @@
+PODS:
+  - RxCocoa (6.8.0):
+    - RxRelay (= 6.8.0)
+    - RxSwift (= 6.8.0)
+  - RxRelay (6.8.0):
+    - RxSwift (= 6.8.0)
+  - RxSwift (6.8.0)
+  - SnapKit (5.7.1)
+  - SwiftMessages (10.0.1):
+    - SwiftMessages/App (= 10.0.1)
+  - SwiftMessages/App (10.0.1)
+
+DEPENDENCIES:
+  - RxCocoa (~> 6.0)
+  - RxSwift (~> 6.0)
+  - SnapKit (~> 5.0)
+  - SwiftMessages
+
+SPEC REPOS:
+  trunk:
+    - RxCocoa
+    - RxRelay
+    - RxSwift
+    - SnapKit
+    - SwiftMessages
+
+SPEC CHECKSUMS:
+  RxCocoa: 2d33c1e1e5d66492052ad46b11024ae287572880
+  RxRelay: 335c78b926a2aea8d863a6d25f1ed3b5ad8e8705
+  RxSwift: 4e28be97cbcfeee614af26d83415febbf2bf6f45
+  SnapKit: d612e99e678a2d3b95bf60b0705ed0a35c03484a
+  SwiftMessages: 759b4a0bf5c3a116a0d7e8a34b098ba83c458625
+
+PODFILE CHECKSUM: 9595404b968b21a3fe4e40b453a65af817e3d8be
+
+COCOAPODS: 1.16.2
