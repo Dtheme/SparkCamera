@@ -109,7 +109,7 @@ extension SCSession.CameraPosition {
     }
     
     @objc public func start() {
-        DispatchQueue.main.async {
+        DispatchQueue.global(qos: .userInitiated).async {
             self.session.startRunning()
         }
     }

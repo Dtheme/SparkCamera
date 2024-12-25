@@ -15,6 +15,8 @@ class SCCameraVC: UIViewController {
     // MARK: - Properties
     private var photoSession: SCPhotoSession!
     private var previewView: SCPreviewView!
+    private let cameraManager = SCCameraManager()
+    private lazy var lensSelectorView = SCLensSelectorView()
     
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -37,6 +39,7 @@ class SCCameraVC: UIViewController {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
         button.tintColor = .white
+        button.addTarget(self, action: #selector(switchCamera), for: .touchUpInside)
         return button
     }()
     
@@ -83,6 +86,7 @@ class SCCameraVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         checkCameraPermission()
+        setupLensSelector()
     }
     
     // MARK: - Setup
@@ -127,10 +131,12 @@ class SCCameraVC: UIViewController {
         view.addSubview(flashButton)
         view.addSubview(gridButton)
         view.addSubview(focusView)
+        view.addSubview(lensSelectorView)
         
-        // 添加��焦指示器
+        // 添加变焦指示器
         view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
+        setupLensSelector()
     }
     
     private func setupConstraints() {
@@ -184,6 +190,50 @@ class SCCameraVC: UIViewController {
         gridButton.addTarget(self, action: #selector(toggleGrid), for: .touchUpInside)
     }
     
+    private func setupLensSelector() {
+        // 获取可用镜头选项
+        let availableLensOptions = cameraManager.getAvailableLensOptions()
+        
+        // 确保有可用的镜头选项
+        guard !availableLensOptions.isEmpty else {
+            print("No available lens options")
+            return
+        }
+        
+        // 打印获取到的镜头信息
+        for lens in availableLensOptions {
+            print("Lens Name: \(lens.name), Type: \(lens.type)")
+        }
+        
+        // 更新 lensSelectorView 的显示内容
+        lensSelectorView.updateLensOptions(availableLensOptions)
+        
+        // 确保 lensSelectorView 和 captureButton 都被添加到 view 中
+        view.addSubview(lensSelectorView)
+        view.addSubview(captureButton) // 确保 captureButton 也在同一个父视图中
+
+        lensSelectorView.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.bottom.equalTo(captureButton.snp.top).offset(-20)
+            make.height.equalTo(50)
+            make.width.equalTo(200)
+        }
+        
+        // 设置镜头选择回调
+        lensSelectorView.onLensSelected = { [weak self] lensName in
+            guard let lens = availableLensOptions.first(where: { $0.name == lensName }) else { return }
+            self?.handleLensSelection(lens)
+        }
+    }
+    
+    private func handleLensSelection(_ lens: SCLensModel) {
+        cameraManager.switchCamera(to: lens) { [weak self] message in
+            DispatchQueue.main.async {
+                self?.showCameraSwitchMessage(message)
+            }
+        }
+    }
+    
     // MARK: - Actions
     @objc private func close() {
         dismiss(animated: true)
@@ -207,7 +257,14 @@ class SCCameraVC: UIViewController {
     }
     
     @objc private func switchCamera() {
-        photoSession.cameraPosition = photoSession.cameraPosition == .front ? .back : .front
+        // 假设我们有一个默认的镜头选项
+        let defaultLens = SCLensModel(name: "1x", type: .builtInWideAngleCamera)
+        
+        cameraManager.switchCamera(to: defaultLens) { [weak self] message in
+            DispatchQueue.main.async {
+                self?.showCameraSwitchMessage(message)
+            }
+        }
     }
     
     @objc private func toggleFlash() {
@@ -289,6 +346,13 @@ class SCCameraVC: UIViewController {
                 self.focusView.isHidden = true
             }
         }
+    }
+    
+    private func showCameraSwitchMessage(_ message: String) {
+        let view = MessageView.viewFromNib(layout: .statusLine)
+        view.configureTheme(.success)
+        view.configureContent(title: "镜头切换", body: message)
+        SwiftMessages.show(view: view)
     }
 }
 
