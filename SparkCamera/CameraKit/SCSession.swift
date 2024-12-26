@@ -94,7 +94,12 @@ extension SCSession.CameraPosition {
     
     @objc public private(set) var isWideAngleAvailable: Bool = false
     
-    private var videoInput: AVCaptureDeviceInput?
+    @objc public var videoInput: AVCaptureDeviceInput?
+    internal var currentLens: SCLensModel? {
+        didSet {
+            // 这里可以添加一些逻辑来处理镜头切换后的操作
+        }
+    }
     
     @objc override init() {
         self.session = AVCaptureSession()
@@ -189,8 +194,14 @@ extension SCSession.CameraPosition {
             
             do {
                 try device.lockForConfiguration()
-                let minZoom = isWideAngleAvailable ? 0.5 : 1.0
-                device.videoZoomFactor = CGFloat(max(minZoom, min(10.0, zoom)))
+                
+                if currentLens?.name == "0.5x" {
+                    device.videoZoomFactor = CGFloat(max(1.0, min(2.0, zoom)))
+                    print("0.5x lens zoom factor set to \(device.videoZoomFactor)")
+                } else {
+                    device.videoZoomFactor = CGFloat(max(1.0, min(15.0, zoom)))
+                }
+                
                 device.unlockForConfiguration()
             } catch {
                 print("Error setting zoom: \(error.localizedDescription)")

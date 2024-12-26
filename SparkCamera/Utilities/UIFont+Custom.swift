@@ -5,7 +5,7 @@ extension UIFont {
     // 定义主要信息展示的字体
     static func mainFont(ofSize size: CGFloat, weight: UIFont.Weight = .regular) -> UIFont {
         // 使用系统圆角字体作为主字体
-        if let roundedFont = UIFont(name: "ProFontForPowerline-Bold", size: size) {
+        if let roundedFont = UIFont(name: ".SFUIText-Rounded", size: size) {
             return roundedFont
         } else {
             return UIFont.systemFont(ofSize: size, weight: weight)

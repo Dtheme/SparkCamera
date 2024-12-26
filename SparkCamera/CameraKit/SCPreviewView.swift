@@ -11,6 +11,8 @@ import AVFoundation
 @objc public class SCPreviewView: UIView {
     
     private var lastScale: CGFloat = 1.0
+    public var currentZoomFactor: CGFloat = 1.0
+    public var maxZoomFactor: CGFloat = 15.0
     
     @objc private(set) public var previewLayer: AVCaptureVideoPreviewLayer? {
         didSet {
@@ -67,6 +69,17 @@ import AVFoundation
         }
     }
     
+    private var zoomLabel: UILabel = {
+        let label = UILabel()
+        label.textColor = .white
+        label.font = UIFont.boldSystemFont(ofSize: 16)
+        label.textAlignment = .center
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        label.layer.cornerRadius = 5
+        label.clipsToBounds = true
+        return label
+    }()
+    
     @objc public override init(frame: CGRect) {
         super.init(frame: frame)
         self.setupView()
@@ -83,6 +96,19 @@ import AVFoundation
         
         let pinchGestureRecognizer = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(recognizer:)))
         self.addGestureRecognizer(pinchGestureRecognizer)
+        
+        // 确保手势识别器的优先级
+        tapGestureRecognizer.require(toFail: pinchGestureRecognizer)
+        
+        // 添加变焦倍数指示器
+        self.addSubview(zoomLabel)
+        zoomLabel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            zoomLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: 10),
+            zoomLabel.centerXAnchor.constraint(equalTo: self.centerXAnchor),
+            zoomLabel.widthAnchor.constraint(equalToConstant: 100),
+            zoomLabel.heightAnchor.constraint(equalToConstant: 30)
+        ])
     }
     
     @objc private func handleTap(recognizer: UITapGestureRecognizer) {
@@ -93,20 +119,56 @@ import AVFoundation
     }
     
     @objc private func handlePinch(recognizer: UIPinchGestureRecognizer) {
-        if recognizer.state == .began {
-            recognizer.scale = self.lastScale
+        guard let device = session?.videoInput?.device else { return }
+        
+        if let lensName = session?.currentLens?.name {
+            print("Current lens name: \(lensName)")
+            switch lensName {
+            case "0.5x":
+                self.maxZoomFactor = 2.0
+                print("0.5x lens maxZoomFactor set to \(self.maxZoomFactor)")
+            default:
+                self.maxZoomFactor = 15.0
+            }
+        } else {
+            print("No current lens set")
         }
         
-        var minZoom: CGFloat = 1.0
-        if let session = self.session, session.isWideAngleAvailable {
-            minZoom = 0.5
-        }
-        
-        let zoom = max(minZoom, min(10.0, recognizer.scale))
-        self.session?.zoom = Double(zoom)
-        
-        if recognizer.state == .ended {
-            self.lastScale = zoom
+        switch recognizer.state {
+        case .began:
+            lastScale = currentZoomFactor
+        case .changed:
+            let scale = recognizer.scale
+            let newZoomFactor = min(self.maxZoomFactor, max(1.0, lastScale * scale))
+            print("Attempting to set new zoom factor: \(newZoomFactor)")
+
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = newZoomFactor
+                device.unlockForConfiguration()
+                print("Device: \(device.localizedName)")
+                print("Type: \(device.deviceType)")
+                print("Position: \(device.position == .front ? "Front" : "Back")")
+                print("Unique ID: \(device.uniqueID)")
+                print("Model ID: \(device.modelID)")
+                print("----------")
+                currentZoomFactor = newZoomFactor
+                DispatchQueue.main.async {
+                    self.zoomLabel.text = String(format: "%.1fx", self.currentZoomFactor)
+                    print("Pinch gesture changed, new zoom factor: \(self.currentZoomFactor)")
+                }
+                
+                session?.delegate?.didChangeValue(session: session!, value: currentZoomFactor, key: "zoom")
+            } catch {
+                print("Error setting zoom: \(error.localizedDescription)")
+            }
+        case .ended:
+            if var lens = session?.currentLens {
+                lens.lastZoomFactor = currentZoomFactor
+                session?.currentLens = lens
+            }
+        default:
+            break
         }
     }
     

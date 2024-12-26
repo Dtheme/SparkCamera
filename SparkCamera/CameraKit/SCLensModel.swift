@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 
 struct SCLensModel {
-    let name: String
-    let type: AVCaptureDevice.DeviceType
-} 
+    var name: String
+    var type: AVCaptureDevice.DeviceType
+    var lastZoomFactor: CGFloat? // 确保 lastZoomFactor 是 var
+}

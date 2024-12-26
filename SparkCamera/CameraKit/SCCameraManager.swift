@@ -37,7 +37,7 @@ class SCCameraManager {
     }
     
     func switchCamera(to lens: SCLensModel, completion: @escaping (String) -> Void) {
-        guard let device = availableDevices.first(where: { $0.deviceType == lens.type && $0.position == (lens.name == "Front" ? .front : .back) }) else {
+        guard let device = availableDevices.first(where: { $0.deviceType == lens.type && $0.position == .back }) else {
             completion("Lens not available")
             return
         }
@@ -54,7 +54,38 @@ class SCCameraManager {
             // Add new input
             if session.session.canAddInput(newInput) {
                 session.session.addInput(newInput)
+                session.videoInput = newInput // 确保更新 session 的 videoInput
                 currentCameraPosition = device.position
+                
+                // 更新 currentLens
+                session.currentLens = lens
+                print("Switched to lens: \(lens.name)")
+                
+                // 确保从 session.previewLayer 的父视图中获取 SCPreviewView
+                if let previewView = session.previewLayer?.superlayer as? SCPreviewView {
+                    // 根据镜头类型设置 maxZoomFactor
+                    switch lens.name {
+                    case "0.5x":
+                        previewView.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 2.0) // 超广角镜头最大变焦值为 2.0x
+                        print("Switching to 0.5x lens, maxZoomFactor set to \(previewView.maxZoomFactor)")
+                    case "1x":
+                        previewView.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 15.0) // 广角镜头最大变焦值为 15.0x
+                    default:
+                        previewView.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 15.0)
+                    }
+                    previewView.currentZoomFactor = 1.0 // 重置为默认变焦值
+                    print("Current zoom factor set to \(previewView.currentZoomFactor)")
+                    
+                    // 立即应用变焦因子
+                    do {
+                        try device.lockForConfiguration()
+                        device.videoZoomFactor = previewView.currentZoomFactor
+                        device.unlockForConfiguration()
+                        print("Applied zoom factor: \(device.videoZoomFactor)")
+                    } catch {
+                        print("Error setting zoom: \(error.localizedDescription)")
+                    }
+                }
                 
                 // 仅在切换到后置镜头时更新 lastSelectedLens
                 if device.position == .back {
