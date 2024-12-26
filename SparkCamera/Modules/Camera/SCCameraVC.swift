@@ -15,7 +15,7 @@ class SCCameraVC: UIViewController {
     // MARK: - Properties
     private var photoSession: SCPhotoSession!
     private var previewView: SCPreviewView!
-    private let cameraManager = SCCameraManager()
+    private var cameraManager: SCCameraManager!
     private lazy var lensSelectorView = SCLensSelectorView()
     
     // MARK: - UI Components
@@ -86,7 +86,6 @@ class SCCameraVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         checkCameraPermission()
-        setupLensSelector()
     }
     
     // MARK: - Setup
@@ -106,6 +105,9 @@ class SCCameraVC: UIViewController {
         // 初始化相机会话
         photoSession = SCPhotoSession()
         
+        // 初始化 cameraManager
+        cameraManager = SCCameraManager(session: photoSession)
+        
         // 创建预览视图
         previewView = SCPreviewView(frame: view.bounds)
         previewView.session = photoSession
@@ -120,6 +122,9 @@ class SCCameraVC: UIViewController {
         
         // 设置代理以处理变焦回调
         photoSession.delegate = self
+        
+        // 设置镜头选择器
+        setupLensSelector()
     }
     
     private func setupUI() {
@@ -205,8 +210,11 @@ class SCCameraVC: UIViewController {
             print("Lens Name: \(lens.name), Type: \(lens.type)")
         }
         
-        // 更新 lensSelectorView 的显示内容
-        lensSelectorView.updateLensOptions(availableLensOptions)
+        // 设置默认选中的镜头为 1.0x
+        let defaultLens = availableLensOptions.first(where: { $0.name == "1x" })
+        
+        // 更新 lensSelectorView 的显示内容并设置默认选中
+        lensSelectorView.updateLensOptions(availableLensOptions, currentLens: defaultLens)
         
         // 确保 lensSelectorView 和 captureButton 都被添加到 view 中
         view.addSubview(lensSelectorView)
@@ -257,12 +265,40 @@ class SCCameraVC: UIViewController {
     }
     
     @objc private func switchCamera() {
-        // 假设我们有一个默认的镜头选项
-        let defaultLens = SCLensModel(name: "1x", type: .builtInWideAngleCamera)
+        let isCurrentlyBackCamera = cameraManager.currentCameraPosition == .back
+        let newLens: SCLensModel
         
-        cameraManager.switchCamera(to: defaultLens) { [weak self] message in
+        if isCurrentlyBackCamera {
+            newLens = SCLensModel(name: "Front", type: .builtInWideAngleCamera)
+        } else {
+            // 切换回后置摄像头时，恢复到前一次选中的镜头
+            newLens = cameraManager.getLastSelectedLens() ?? SCLensModel(name: "1x", type: .builtInWideAngleCamera)
+        }
+        
+        cameraManager.switchCamera(to: newLens) { [weak self] message in
             DispatchQueue.main.async {
                 self?.showCameraSwitchMessage(message)
+                
+                // 触觉反馈
+                let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+                feedbackGenerator.impactOccurred()
+                
+                // 只有在成功切换到前置摄像头时才隐藏 lensSelectorView
+                if newLens.name == "Front" {
+                    UIView.animate(withDuration: 0.3, animations: {
+                        self?.lensSelectorView.alpha = 0
+                        self?.lensSelectorView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+                    }) { _ in
+                        self?.lensSelectorView.isHidden = true
+                    }
+                } else {
+                    UIView.animate(withDuration: 0.3, animations: {
+                        self?.lensSelectorView.alpha = 1
+                        self?.lensSelectorView.transform = .identity
+                    }) { _ in
+                        self?.lensSelectorView.isHidden = false
+                    }
+                }
             }
         }
     }

@@ -12,8 +12,10 @@ class HomeVC: UIViewController {
     
     // MARK: - UI Components
     private lazy var cameraButton: UIButton = {
+
         let button = UIButton(type: .system)
         button.setTitle("打开相机", for: .normal)
+        button.titleLabel?.font = UIFont.mainFont(ofSize: 18, weight: .medium)
         button.setTitleColor(.white, for: .normal)
         button.backgroundColor = .systemBlue
         button.layer.cornerRadius = 25

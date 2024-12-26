@@ -6,23 +6,36 @@ class SCLensSelectorView: UIView {
     private var lensOptions: [SCLensModel] = []
     private var buttons: [UIButton] = []
     private let stackView = UIStackView()
+    private let blurEffectView: UIVisualEffectView
     
     var onLensSelected: ((String) -> Void)?
     
     override init(frame: CGRect) {
+        let blurEffect = UIBlurEffect(style: .light)
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
         super.init(frame: frame)
         setupView()
     }
     
     required init?(coder: NSCoder) {
+        let blurEffect = UIBlurEffect(style: .light)
+        blurEffectView = UIVisualEffectView(effect: blurEffect)
         super.init(coder: coder)
         setupView()
     }
     
     private func setupView() {
-        self.backgroundColor = UIColor(white: 1.0, alpha: 0.3)
+        self.backgroundColor = UIColor.clear
         self.layer.cornerRadius = 20
         self.clipsToBounds = true
+        
+        // 添加高斯模糊效果
+        blurEffectView.layer.cornerRadius = 20
+        blurEffectView.clipsToBounds = true
+        addSubview(blurEffectView)
+        blurEffectView.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
         
         stackView.axis = .horizontal
         stackView.alignment = .center
@@ -35,7 +48,7 @@ class SCLensSelectorView: UIView {
         }
     }
     
-    func updateLensOptions(_ options: [SCLensModel]) {
+    func updateLensOptions(_ options: [SCLensModel], currentLens: SCLensModel?) {
         buttons.forEach { $0.removeFromSuperview() }
         buttons.removeAll()
         
@@ -43,11 +56,19 @@ class SCLensSelectorView: UIView {
             let button = UIButton(type: .system)
             button.setTitle(option.name, for: .normal)
             button.setTitleColor(.white, for: .normal)
+            button.titleLabel?.font = UIFont.profont(ofSize: 16)
             button.backgroundColor = .clear
             button.layer.cornerRadius = 15
             button.addTarget(self, action: #selector(lensButtonTapped(_:)), for: .touchUpInside)
             buttons.append(button)
             stackView.addArrangedSubview(button)
+        }
+        
+        // 根据当前镜头状态设置默认选中
+        if let currentLens = currentLens, let index = options.firstIndex(where: { $0.name == currentLens.name }) {
+            selectButton(buttons[index])
+        } else if let firstButton = buttons.first {
+            selectButton(firstButton)
         }
     }
     
@@ -58,10 +79,25 @@ class SCLensSelectorView: UIView {
         let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
         feedbackGenerator.impactOccurred()
         
+        // 动画效果
+        UIView.animate(withDuration: 0.1, animations: {
+            sender.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            sender.setTitleColor(.yellow, for: .normal)
+        }) { _ in
+            UIView.animate(withDuration: 0.1) {
+                sender.transform = .identity
+            }
+        }
+        
         // 高亮选中按钮
-        buttons.forEach { $0.setTitleColor(.white, for: .normal) }
-        sender.setTitleColor(.yellow, for: .normal)
+        selectButton(sender)
         
         onLensSelected?(title)
     }
+    
+    private func selectButton(_ button: UIButton) {
+        buttons.forEach { $0.setTitleColor(.white, for: .normal) }
+        button.setTitleColor(.yellow, for: .normal)
+    }
+
 } 

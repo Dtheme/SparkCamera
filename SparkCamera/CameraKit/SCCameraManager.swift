@@ -9,10 +9,13 @@ import AVFoundation
 
 class SCCameraManager {
     
-    private var currentCameraPosition: AVCaptureDevice.Position = .back
+    public var currentCameraPosition: AVCaptureDevice.Position = .back
     private var availableDevices: [AVCaptureDevice] = []
+    private var session: SCSession
+    private var lastSelectedLens: SCLensModel? // 保存前一次选中的镜头
     
-    init() {
+    init(session: SCSession) {
+        self.session = session
         self.availableDevices = self.getAvailableDevices()
     }
     
@@ -34,8 +37,54 @@ class SCCameraManager {
     }
     
     func switchCamera(to lens: SCLensModel, completion: @escaping (String) -> Void) {
-        // 根据选择的镜头倍数切换相机
-        // 这里需要实现具体的切换逻辑
-        completion("Switched to \(lens.name)")
+        guard let device = availableDevices.first(where: { $0.deviceType == lens.type && $0.position == (lens.name == "Front" ? .front : .back) }) else {
+            completion("Lens not available")
+            return
+        }
+        
+        do {
+            let newInput = try AVCaptureDeviceInput(device: device)
+            session.session.beginConfiguration()
+            
+            // Remove existing inputs
+            for input in session.session.inputs {
+                session.session.removeInput(input)
+            }
+            
+            // Add new input
+            if session.session.canAddInput(newInput) {
+                session.session.addInput(newInput)
+                currentCameraPosition = device.position
+                
+                // 仅在切换到后置镜头时更新 lastSelectedLens
+                if device.position == .back {
+                    lastSelectedLens = lens
+                }
+                
+                // 打印镜头信息
+                let lensInfo = """
+                Switched to \(lens.name) camera
+                Device: \(device.localizedName)
+                Position: \(device.position == .front ? "Front" : "Back")
+                Focal Length: \(device.activeFormat.videoFieldOfView)mm
+                Aperture: f/\(device.lensAperture)
+                Zoom Range: \(device.minAvailableVideoZoomFactor)x to \(device.maxAvailableVideoZoomFactor)x
+                """
+                print(lensInfo)
+                
+                let lensName = device.position == .front ? "Front" : lens.name
+                completion("镜头已切换至 \(lensName)")
+            } else {
+                completion("Failed to switch lens")
+            }
+            
+            session.session.commitConfiguration()
+        } catch {
+            completion("Error switching lens: \(error.localizedDescription)")
+        }
+    }
+    
+    func getLastSelectedLens() -> SCLensModel? {
+        return lastSelectedLens
     }
 } 

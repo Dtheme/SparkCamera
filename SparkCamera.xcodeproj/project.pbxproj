@@ -7,18 +7,22 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		78579D1C2D1C14980042F0E1 /* SCCameraVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D0C2D1C14980042F0E1 /* SCCameraVC.swift */; };
-		78579D1D2D1C14980042F0E1 /* SCLensSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D0D2D1C14980042F0E1 /* SCLensSelectorView.swift */; };
-		78579D1E2D1C14980042F0E1 /* HomeVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D0F2D1C14980042F0E1 /* HomeVC.swift */; };
-		78579D1F2D1C14980042F0E1 /* SCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D122D1C14980042F0E1 /* SCCameraManager.swift */; };
-		78579D202D1C14980042F0E1 /* SCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D132D1C14980042F0E1 /* SCError.swift */; };
-		78579D212D1C14980042F0E1 /* SCGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D142D1C14980042F0E1 /* SCGridView.swift */; };
-		78579D222D1C14980042F0E1 /* SCLensModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D152D1C14980042F0E1 /* SCLensModel.swift */; };
-		78579D232D1C14980042F0E1 /* SCPhotoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D162D1C14980042F0E1 /* SCPhotoSession.swift */; };
-		78579D242D1C14980042F0E1 /* SCPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D172D1C14980042F0E1 /* SCPreviewView.swift */; };
-		78579D252D1C14980042F0E1 /* SCSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D182D1C14980042F0E1 /* SCSession.swift */; };
-		78579D262D1C14980042F0E1 /* SCUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D192D1C14980042F0E1 /* SCUtils.swift */; };
-		78579D272D1C14980042F0E1 /* SCVideoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78579D1A2D1C14980042F0E1 /* SCVideoSession.swift */; };
+		7817490B2D1D0E3100521F2D /* SCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FA2D1D0E3100521F2D /* SCCameraManager.swift */; };
+		7817490C2D1D0E3100521F2D /* SCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FB2D1D0E3100521F2D /* SCError.swift */; };
+		7817490D2D1D0E3100521F2D /* SCGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FC2D1D0E3100521F2D /* SCGridView.swift */; };
+		7817490E2D1D0E3100521F2D /* SCLensModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FD2D1D0E3100521F2D /* SCLensModel.swift */; };
+		7817490F2D1D0E3100521F2D /* SCPhotoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FE2D1D0E3100521F2D /* SCPhotoSession.swift */; };
+		781749102D1D0E3100521F2D /* SCPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781748FF2D1D0E3100521F2D /* SCPreviewView.swift */; };
+		781749112D1D0E3100521F2D /* SCSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749002D1D0E3100521F2D /* SCSession.swift */; };
+		781749122D1D0E3100521F2D /* SCUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749012D1D0E3100521F2D /* SCUtils.swift */; };
+		781749132D1D0E3100521F2D /* SCVideoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749022D1D0E3100521F2D /* SCVideoSession.swift */; };
+		781749142D1D0E3100521F2D /* SCCameraVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749042D1D0E3100521F2D /* SCCameraVC.swift */; };
+		781749152D1D0E3100521F2D /* SCLensSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749052D1D0E3100521F2D /* SCLensSelectorView.swift */; };
+		781749162D1D0E3100521F2D /* HomeVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749072D1D0E3100521F2D /* HomeVC.swift */; };
+		781749172D1D0E3100521F2D /* TestVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749092D1D0E3100521F2D /* TestVC.swift */; };
+		7817491A2D1D11D300521F2D /* UIFont+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749182D1D11D300521F2D /* UIFont+Custom.swift */; };
+		7817491F2D1D2DE800521F2D /* ProFont-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */; };
+		781749202D1D2DE800521F2D /* ProFont-regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */; };
 		7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7868A90B2D1412D700CBB2FB /* AppDelegate.swift */; };
 		7868A91A2D1412D700CBB2FB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90C2D1412D700CBB2FB /* Assets.xcassets */; };
 		7868A91C2D1412D700CBB2FB /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */; };
@@ -30,18 +34,22 @@
 
 /* Begin PBXFileReference section */
 		5EAAE86D17748F0CE08BF087 /* Pods-SparkCamera.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SparkCamera.debug.xcconfig"; path = "Target Support Files/Pods-SparkCamera/Pods-SparkCamera.debug.xcconfig"; sourceTree = "<group>"; };
-		78579D0C2D1C14980042F0E1 /* SCCameraVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraVC.swift; sourceTree = "<group>"; };
-		78579D0D2D1C14980042F0E1 /* SCLensSelectorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensSelectorView.swift; sourceTree = "<group>"; };
-		78579D0F2D1C14980042F0E1 /* HomeVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeVC.swift; sourceTree = "<group>"; };
-		78579D122D1C14980042F0E1 /* SCCameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraManager.swift; sourceTree = "<group>"; };
-		78579D132D1C14980042F0E1 /* SCError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCError.swift; sourceTree = "<group>"; };
-		78579D142D1C14980042F0E1 /* SCGridView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCGridView.swift; sourceTree = "<group>"; };
-		78579D152D1C14980042F0E1 /* SCLensModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensModel.swift; sourceTree = "<group>"; };
-		78579D162D1C14980042F0E1 /* SCPhotoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoSession.swift; sourceTree = "<group>"; };
-		78579D172D1C14980042F0E1 /* SCPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPreviewView.swift; sourceTree = "<group>"; };
-		78579D182D1C14980042F0E1 /* SCSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCSession.swift; sourceTree = "<group>"; };
-		78579D192D1C14980042F0E1 /* SCUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCUtils.swift; sourceTree = "<group>"; };
-		78579D1A2D1C14980042F0E1 /* SCVideoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCVideoSession.swift; sourceTree = "<group>"; };
+		781748FA2D1D0E3100521F2D /* SCCameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraManager.swift; sourceTree = "<group>"; };
+		781748FB2D1D0E3100521F2D /* SCError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCError.swift; sourceTree = "<group>"; };
+		781748FC2D1D0E3100521F2D /* SCGridView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCGridView.swift; sourceTree = "<group>"; };
+		781748FD2D1D0E3100521F2D /* SCLensModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensModel.swift; sourceTree = "<group>"; };
+		781748FE2D1D0E3100521F2D /* SCPhotoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoSession.swift; sourceTree = "<group>"; };
+		781748FF2D1D0E3100521F2D /* SCPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPreviewView.swift; sourceTree = "<group>"; };
+		781749002D1D0E3100521F2D /* SCSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCSession.swift; sourceTree = "<group>"; };
+		781749012D1D0E3100521F2D /* SCUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCUtils.swift; sourceTree = "<group>"; };
+		781749022D1D0E3100521F2D /* SCVideoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCVideoSession.swift; sourceTree = "<group>"; };
+		781749042D1D0E3100521F2D /* SCCameraVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraVC.swift; sourceTree = "<group>"; };
+		781749052D1D0E3100521F2D /* SCLensSelectorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensSelectorView.swift; sourceTree = "<group>"; };
+		781749072D1D0E3100521F2D /* HomeVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeVC.swift; sourceTree = "<group>"; };
+		781749092D1D0E3100521F2D /* TestVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestVC.swift; sourceTree = "<group>"; };
+		781749182D1D11D300521F2D /* UIFont+Custom.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIFont+Custom.swift"; sourceTree = "<group>"; };
+		7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-Bold.ttf"; sourceTree = "<group>"; };
+		7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-regular.ttf"; sourceTree = "<group>"; };
 		7868A8B92D140E8F00CBB2FB /* SparkCamera.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7868A90B2D1412D700CBB2FB /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7868A90C2D1412D700CBB2FB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -75,46 +83,55 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
-		78579D0E2D1C14980042F0E1 /* Camera */ = {
+		781749032D1D0E3100521F2D /* CameraKit */ = {
 			isa = PBXGroup;
 			children = (
-				78579D0C2D1C14980042F0E1 /* SCCameraVC.swift */,
-				78579D0D2D1C14980042F0E1 /* SCLensSelectorView.swift */,
+				781748FA2D1D0E3100521F2D /* SCCameraManager.swift */,
+				781748FB2D1D0E3100521F2D /* SCError.swift */,
+				781748FC2D1D0E3100521F2D /* SCGridView.swift */,
+				781748FD2D1D0E3100521F2D /* SCLensModel.swift */,
+				781748FE2D1D0E3100521F2D /* SCPhotoSession.swift */,
+				781748FF2D1D0E3100521F2D /* SCPreviewView.swift */,
+				781749002D1D0E3100521F2D /* SCSession.swift */,
+				781749012D1D0E3100521F2D /* SCUtils.swift */,
+				781749022D1D0E3100521F2D /* SCVideoSession.swift */,
+			);
+			path = CameraKit;
+			sourceTree = "<group>";
+		};
+		781749062D1D0E3100521F2D /* Camera */ = {
+			isa = PBXGroup;
+			children = (
+				781749042D1D0E3100521F2D /* SCCameraVC.swift */,
+				781749052D1D0E3100521F2D /* SCLensSelectorView.swift */,
 			);
 			path = Camera;
 			sourceTree = "<group>";
 		};
-		78579D102D1C14980042F0E1 /* Home */ = {
+		781749082D1D0E3100521F2D /* Home */ = {
 			isa = PBXGroup;
 			children = (
-				78579D0F2D1C14980042F0E1 /* HomeVC.swift */,
+				781749072D1D0E3100521F2D /* HomeVC.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
 		};
-		78579D112D1C14980042F0E1 /* Modules */ = {
+		7817490A2D1D0E3100521F2D /* Modules */ = {
 			isa = PBXGroup;
 			children = (
-				78579D0E2D1C14980042F0E1 /* Camera */,
-				78579D102D1C14980042F0E1 /* Home */,
+				781749062D1D0E3100521F2D /* Camera */,
+				781749082D1D0E3100521F2D /* Home */,
+				781749092D1D0E3100521F2D /* TestVC.swift */,
 			);
 			path = Modules;
 			sourceTree = "<group>";
 		};
-		78579D1B2D1C14980042F0E1 /* CameraKit */ = {
+		781749192D1D11D300521F2D /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
-				78579D122D1C14980042F0E1 /* SCCameraManager.swift */,
-				78579D132D1C14980042F0E1 /* SCError.swift */,
-				78579D142D1C14980042F0E1 /* SCGridView.swift */,
-				78579D152D1C14980042F0E1 /* SCLensModel.swift */,
-				78579D162D1C14980042F0E1 /* SCPhotoSession.swift */,
-				78579D172D1C14980042F0E1 /* SCPreviewView.swift */,
-				78579D182D1C14980042F0E1 /* SCSession.swift */,
-				78579D192D1C14980042F0E1 /* SCUtils.swift */,
-				78579D1A2D1C14980042F0E1 /* SCVideoSession.swift */,
+				781749182D1D11D300521F2D /* UIFont+Custom.swift */,
 			);
-			path = CameraKit;
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		7868A8B02D140E8F00CBB2FB = {
@@ -138,14 +155,17 @@
 		7868A9142D1412D700CBB2FB /* SparkCamera */ = {
 			isa = PBXGroup;
 			children = (
-				78579D1B2D1C14980042F0E1 /* CameraKit */,
-				78579D112D1C14980042F0E1 /* Modules */,
+				781749192D1D11D300521F2D /* Utilities */,
+				781749032D1D0E3100521F2D /* CameraKit */,
+				7817490A2D1D0E3100521F2D /* Modules */,
 				7868A90B2D1412D700CBB2FB /* AppDelegate.swift */,
 				7868A90C2D1412D700CBB2FB /* Assets.xcassets */,
 				7868A90D2D1412D700CBB2FB /* Info.plist */,
 				7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */,
 				7868A9112D1412D700CBB2FB /* Main.storyboard */,
 				7868A9122D1412D700CBB2FB /* Podfile */,
+				7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */,
+				7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */,
 				7868A9132D1412D700CBB2FB /* SceneDelegate.swift */,
 			);
 			path = SparkCamera;
@@ -219,8 +239,10 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7817491F2D1D2DE800521F2D /* ProFont-Bold.ttf in Resources */,
 				7868A91E2D1412D700CBB2FB /* Podfile in Resources */,
 				7868A91C2D1412D700CBB2FB /* LaunchScreen.storyboard in Resources */,
+				781749202D1D2DE800521F2D /* ProFont-regular.ttf in Resources */,
 				7868A91A2D1412D700CBB2FB /* Assets.xcassets in Resources */,
 				7868A91D2D1412D700CBB2FB /* Main.storyboard in Resources */,
 			);
@@ -275,20 +297,22 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				78579D262D1C14980042F0E1 /* SCUtils.swift in Sources */,
-				78579D242D1C14980042F0E1 /* SCPreviewView.swift in Sources */,
-				78579D272D1C14980042F0E1 /* SCVideoSession.swift in Sources */,
-				78579D1C2D1C14980042F0E1 /* SCCameraVC.swift in Sources */,
-				78579D222D1C14980042F0E1 /* SCLensModel.swift in Sources */,
-				78579D1E2D1C14980042F0E1 /* HomeVC.swift in Sources */,
-				78579D252D1C14980042F0E1 /* SCSession.swift in Sources */,
-				78579D212D1C14980042F0E1 /* SCGridView.swift in Sources */,
+				7817490F2D1D0E3100521F2D /* SCPhotoSession.swift in Sources */,
+				781749162D1D0E3100521F2D /* HomeVC.swift in Sources */,
+				781749122D1D0E3100521F2D /* SCUtils.swift in Sources */,
+				781749102D1D0E3100521F2D /* SCPreviewView.swift in Sources */,
+				781749142D1D0E3100521F2D /* SCCameraVC.swift in Sources */,
+				781749152D1D0E3100521F2D /* SCLensSelectorView.swift in Sources */,
+				7817490D2D1D0E3100521F2D /* SCGridView.swift in Sources */,
+				7817490E2D1D0E3100521F2D /* SCLensModel.swift in Sources */,
+				781749112D1D0E3100521F2D /* SCSession.swift in Sources */,
+				7817491A2D1D11D300521F2D /* UIFont+Custom.swift in Sources */,
+				7817490C2D1D0E3100521F2D /* SCError.swift in Sources */,
+				781749172D1D0E3100521F2D /* TestVC.swift in Sources */,
 				7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */,
-				78579D232D1C14980042F0E1 /* SCPhotoSession.swift in Sources */,
-				78579D202D1C14980042F0E1 /* SCError.swift in Sources */,
+				7817490B2D1D0E3100521F2D /* SCCameraManager.swift in Sources */,
 				7868A91F2D1412D700CBB2FB /* SceneDelegate.swift in Sources */,
-				78579D1F2D1C14980042F0E1 /* SCCameraManager.swift in Sources */,
-				78579D1D2D1C14980042F0E1 /* SCLensSelectorView.swift in Sources */,
+				781749132D1D0E3100521F2D /* SCVideoSession.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
