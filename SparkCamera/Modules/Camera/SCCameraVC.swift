@@ -9,6 +9,7 @@ import UIKit
 import SnapKit
 import SwiftMessages
 import AVFoundation
+import CoreMotion
 
 class SCCameraVC: UIViewController {
     
@@ -17,6 +18,9 @@ class SCCameraVC: UIViewController {
     private var previewView: SCPreviewView!
     private var cameraManager: SCCameraManager!
     private lazy var lensSelectorView = SCLensSelectorView()
+    private let motionManager = CMMotionManager()
+    private let horizontalIndicator = SCHorizontalIndicatorView()
+    private var isHorizontalIndicatorVisible = true
     
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -86,6 +90,45 @@ class SCCameraVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         checkCameraPermission()
+        setupHorizontalIndicator()
+    }  
+    
+    private func setupHorizontalIndicator() {
+        view.addSubview(horizontalIndicator)
+        view.bringSubviewToFront(horizontalIndicator)
+        horizontalIndicator.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.width.equalTo(200)
+            make.height.equalTo(4)
+        }
+        horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
+        
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(toggleHorizontalIndicator))
+        doubleTapGesture.numberOfTapsRequired = 2
+        view.addGestureRecognizer(doubleTapGesture)
+        
+        if motionManager.isDeviceMotionAvailable {
+            motionManager.deviceMotionUpdateInterval = 0.1
+            motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (motion, error) in
+                guard let motion = motion else { return }
+                let rotation = atan2(motion.gravity.x, motion.gravity.y) - .pi
+                self?.horizontalIndicator.updateRotation(angle: CGFloat(rotation))
+            }
+        }
+    }
+    
+    @objc private func toggleHorizontalIndicator() {
+        isHorizontalIndicatorVisible.toggle()
+        horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
+
+        let message = isHorizontalIndicatorVisible ? "水平仪已开启" : "水平仪已关闭"
+        let view = MessageView.viewFromNib(layout: .statusLine)
+        view.configureTheme(isHorizontalIndicatorVisible ? .success : .warning)
+        view.configureContent(title: "提示", body: message)
+        SwiftMessages.show(view: view)
+        
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        feedbackGenerator.impactOccurred()
     }
     
     // MARK: - Setup
