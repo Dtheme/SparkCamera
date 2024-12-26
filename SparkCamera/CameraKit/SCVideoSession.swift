@@ -54,10 +54,14 @@ extension SCSession.FlashMode {
             
             do {
                 try device.lockForConfiguration()
-                device.videoZoomFactor = CGFloat(self.zoom)
+                
+                let newZoomFactor = CGFloat(max(1.0, min(2.96, zoom)))
+                device.videoZoomFactor = newZoomFactor
+                print("SCVideoSession: Zoom factor set to \(newZoomFactor)")
+                
                 device.unlockForConfiguration()
             } catch {
-                //
+                print("Error setting zoom: \(error.localizedDescription)")
             }
             
             if let delegate = self.delegate {

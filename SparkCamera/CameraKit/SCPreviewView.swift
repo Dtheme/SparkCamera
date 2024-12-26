@@ -33,6 +33,19 @@ import AVFoundation
                 session.previewLayer = self.previewLayer
                 session.overlayView = self
                 session.start()
+                
+                // 初始化时设置 maxZoomFactor
+                if let lensName = session.currentLens?.name {
+                    switch lensName {
+                    case "0.5x":
+                        self.maxZoomFactor = 2.0
+                    case "1x":
+                        self.maxZoomFactor = 2.96
+                    default:
+                        self.maxZoomFactor = 2.96
+                    }
+                    print("Initial maxZoomFactor set to \(self.maxZoomFactor)")
+                }
             }
         }
     }
@@ -127,8 +140,15 @@ import AVFoundation
             case "0.5x":
                 self.maxZoomFactor = 2.0
                 print("0.5x lens maxZoomFactor set to \(self.maxZoomFactor)")
+            case "1x":
+                self.maxZoomFactor = 2.96
+                print("1x lens maxZoomFactor set to \(self.maxZoomFactor)")
+            case "3x":
+                self.maxZoomFactor = 15.0
+                print("3x lens maxZoomFactor set to \(self.maxZoomFactor)")
             default:
                 self.maxZoomFactor = 15.0
+                print("Default lens maxZoomFactor set to \(self.maxZoomFactor)")
             }
         } else {
             print("No current lens set")
@@ -146,12 +166,7 @@ import AVFoundation
                 try device.lockForConfiguration()
                 device.videoZoomFactor = newZoomFactor
                 device.unlockForConfiguration()
-                print("Device: \(device.localizedName)")
-                print("Type: \(device.deviceType)")
-                print("Position: \(device.position == .front ? "Front" : "Back")")
-                print("Unique ID: \(device.uniqueID)")
-                print("Model ID: \(device.modelID)")
-                print("----------")
+                
                 currentZoomFactor = newZoomFactor
                 DispatchQueue.main.async {
                     self.zoomLabel.text = String(format: "%.1fx", self.currentZoomFactor)

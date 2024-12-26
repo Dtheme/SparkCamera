@@ -105,6 +105,12 @@ extension SCSession.CameraPosition {
         self.session = AVCaptureSession()
         super.init()
         setupCamera()
+        
+        // 初始化时设置 currentLens
+        if let defaultLens = getAvailableLensOptions().first(where: { $0.name == "1x" }) {
+            self.currentLens = defaultLens
+            print("Initial lens set to \(defaultLens.name)")
+        }
     }
     
     @objc deinit {
@@ -198,14 +204,28 @@ extension SCSession.CameraPosition {
                 if currentLens?.name == "0.5x" {
                     device.videoZoomFactor = CGFloat(max(1.0, min(2.0, zoom)))
                     print("0.5x lens zoom factor set to \(device.videoZoomFactor)")
+                } else if currentLens?.name == "1x" {
+                    device.videoZoomFactor = CGFloat(max(1.0, min(2.96, zoom)))
+                    print("1x lens zoom factor set to \(device.videoZoomFactor)")
+                } else if currentLens?.name == "3x" {
+                    device.videoZoomFactor = CGFloat(max(1.0, min(15.0, zoom)))
+                    print("3x lens zoom factor set to \(device.videoZoomFactor)")
                 } else {
                     device.videoZoomFactor = CGFloat(max(1.0, min(15.0, zoom)))
                 }
-                
+
                 device.unlockForConfiguration()
             } catch {
                 print("Error setting zoom: \(error.localizedDescription)")
             }
         }
+    }
+    
+    func getAvailableLensOptions() -> [SCLensModel] {
+        return [
+            SCLensModel(name: "0.5x", type: .builtInUltraWideCamera),
+            SCLensModel(name: "1x", type: .builtInWideAngleCamera),
+            SCLensModel(name: "3x", type: .builtInTelephotoCamera)
+        ]
     }
 }
