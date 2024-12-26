@@ -116,12 +116,17 @@ class SCCameraVC: UIViewController {
             }
         }
     }
-    
+
+    override func viewDidLayoutSubviews() {
+        self.view.bringSubviewToFront(horizontalIndicator)
+    }
+
     @objc private func toggleHorizontalIndicator() {
         isHorizontalIndicatorVisible.toggle()
         horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
 
         let message = isHorizontalIndicatorVisible ? "水平仪已开启" : "水平仪已关闭"
+        print(message)
         let view = MessageView.viewFromNib(layout: .statusLine)
         view.configureTheme(isHorizontalIndicatorVisible ? .success : .warning)
         view.configureContent(title: "提示", body: message)
@@ -129,6 +134,8 @@ class SCCameraVC: UIViewController {
         
         let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
         feedbackGenerator.impactOccurred()
+
+//        horizontalIndicator.isHidden = false
     }
     
     // MARK: - Setup
