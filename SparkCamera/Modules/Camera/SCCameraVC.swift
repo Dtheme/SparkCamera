@@ -19,8 +19,12 @@ class SCCameraVC: UIViewController {
     private var cameraManager: SCCameraManager!
     private lazy var lensSelectorView = SCLensSelectorView()
     private let motionManager = CMMotionManager()
-    private let horizontalIndicator = SCHorizontalIndicatorView()
+    private var horizontalIndicator = SCHorizontalIndicatorView()
     private var isHorizontalIndicatorVisible = false
+    private var lastScale: CGFloat = 1.0
+    
+    // 新增属性来存储可用镜头选项
+    private var availableLensOptions: [SCLensModel] = []
     
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -89,31 +93,103 @@ class SCCameraVC: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // 检查相机权限
         checkCameraPermission()
+        
+        // 设置水平指示器和手势
         setupHorizontalIndicator()
+        setupGestures()
     }  
     
     private func setupHorizontalIndicator() {
-        view.addSubview(horizontalIndicator)
-        view.bringSubviewToFront(horizontalIndicator)
-        horizontalIndicator.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.width.equalTo(200)
-            make.height.equalTo(4)
-        }
-        horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
-        
-        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(toggleHorizontalIndicator))
-        doubleTapGesture.numberOfTapsRequired = 2
-        view.addGestureRecognizer(doubleTapGesture)
-        
-        if motionManager.isDeviceMotionAvailable {
-            motionManager.deviceMotionUpdateInterval = 0.1
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.view.addSubview(self.horizontalIndicator)
+            self.view.bringSubviewToFront(self.horizontalIndicator)
+            
+            self.horizontalIndicator.snp.makeConstraints { make in
+                make.centerX.equalToSuperview()
+                make.centerY.equalToSuperview()
+                make.width.equalTo(200)
+                make.height.equalTo(4)
+            }
+            
+            self.horizontalIndicator.isHidden = !self.isHorizontalIndicatorVisible
+            
+            if self.motionManager.isDeviceMotionAvailable {
+                self.motionManager.deviceMotionUpdateInterval = 0.1
+            }
         }
     }
 
-    override func viewDidLayoutSubviews() {
-        self.view.bringSubviewToFront(horizontalIndicator)
+    private func setupGestures() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(self.toggleHorizontalIndicator))
+            doubleTapGesture.numberOfTapsRequired = 2
+            self.view.addGestureRecognizer(doubleTapGesture)
+            
+            let singleTapGesture = UITapGestureRecognizer(target: self, action: #selector(self.handleSingleTap))
+            singleTapGesture.require(toFail: doubleTapGesture)
+            self.view.addGestureRecognizer(singleTapGesture)
+            
+            let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(self.handlePinch))
+            self.view.addGestureRecognizer(pinchGesture)
+        }
+    }
+
+    @objc private func handleSingleTap(recognizer: UITapGestureRecognizer) {
+        let location = recognizer.location(in: view)
+        showFocusAnimation(at: location)
+        
+        if let focusPoint = previewView.previewLayer?.captureDevicePointConverted(fromLayerPoint: location) {
+            photoSession.focus(at: focusPoint)
+        }
+    }
+
+    @objc private func handlePinch(recognizer: UIPinchGestureRecognizer) {
+        guard let device = photoSession.videoInput?.device else { return }
+        
+        switch recognizer.state {
+        case .began:
+            lastScale = previewView.currentZoomFactor
+        case .changed:
+            let scale = recognizer.scale
+            let newZoomFactor = min(previewView.maxZoomFactor, max(1.0, lastScale * scale))
+            print("Attempting to set new zoom factor: \(newZoomFactor)")
+
+            //打印photoSession.videoInput的信息
+            print("videoInput: \(String(describing: photoSession.videoInput))")
+            print("videoInput.device: \(String(describing: photoSession.videoInput?.device))")
+            print("videoInput.device.position: \(String(describing: photoSession.videoInput?.device.position))")
+            print("videoInput.device.focusMode: \(String(describing: photoSession.videoInput?.device.focusMode))")
+            print("videoInput.device.exposureMode: \(String(describing: photoSession.videoInput?.device.exposureMode))")
+            print("videoInput.device.focusPointOfInterest: \(String(describing: photoSession.videoInput?.device.focusPointOfInterest))")
+            print("videoInput.device.exposurePointOfInterest: \(String(describing: photoSession.videoInput?.device.exposurePointOfInterest))")
+            print("videoInput.device.focusMode: \(String(describing: photoSession.videoInput?.device.focusMode))")
+            print("videoInput.device.exposureMode: \(String(describing: photoSession.videoInput?.device.exposureMode))")
+            print("videoInput.device.focusPointOfInterest: \(String(describing: photoSession.videoInput?.device.focusPointOfInterest))")
+            print("videoInput.device.exposurePointOfInterest: \(String(describing: photoSession.videoInput?.device.exposurePointOfInterest))")
+
+            do {
+                try device.lockForConfiguration()
+                device.videoZoomFactor = newZoomFactor
+                device.unlockForConfiguration()
+                
+                previewView.currentZoomFactor = newZoomFactor
+                DispatchQueue.main.async {
+                    self.zoomLabel.text = String(format: "%.1fx", self.previewView.currentZoomFactor)
+                    print("Pinch gesture changed, new zoom factor: \(self.previewView.currentZoomFactor)")
+                }
+                
+                photoSession.delegate?.didChangeValue(session: photoSession, value: previewView.currentZoomFactor, key: "zoom")
+            } catch {
+                print("Error setting zoom: \(error.localizedDescription)")
+            }
+        default:
+            break
+        }
     }
 
     @objc private func toggleHorizontalIndicator() {
@@ -161,30 +237,47 @@ class SCCameraVC: UIViewController {
         photoSession = SCPhotoSession()
         
         // 初始化 cameraManager
-        cameraManager = SCCameraManager(session: photoSession)
+        cameraManager = SCCameraManager(session: photoSession, photoSession: photoSession)
         
         // 创建预览视图
         previewView = SCPreviewView(frame: view.bounds)
         previewView.session = photoSession
         previewView.autorotate = true
         
+        // 设置预览层
+        photoSession.setupPreviewLayer(in: previewView)
+        
         // 启用网格功能
         previewView.showGrid = false
         
-        setupUI()
-        setupConstraints()
-        setupActions()
+        // 添加预览视图
+        view.addSubview(previewView)
+        
+        // 添加水平指示器
+        view.addSubview(horizontalIndicator)
+        view.bringSubviewToFront(horizontalIndicator)
         
         // 设置代理以处理变焦回调
         photoSession.delegate = self
         
         // 设置镜头选择器
         setupLensSelector()
+        // 在预览视图之后添加其他 UI 元素
+        setupUI()
+        setupConstraints()
+        setupActions()
+
+        // 自动对焦到屏幕中心
+        let centerPoint = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        if let focusPoint = previewView.previewLayer?.captureDevicePointConverted(fromLayerPoint: centerPoint) {
+            photoSession.focus(at: focusPoint)
+            previewView.focusBox.animate(to: centerPoint)
+        }
+
     }
     
     private func setupUI() {
-        view.backgroundColor = .black
-        view.addSubview(previewView)
+        // 添加其他 UI 元素
         view.addSubview(closeButton)
         view.addSubview(captureButton)
         view.addSubview(switchCameraButton)
@@ -196,7 +289,6 @@ class SCCameraVC: UIViewController {
         // 添加变焦指示器
         view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
-        setupLensSelector()
     }
     
     private func setupConstraints() {
@@ -252,40 +344,59 @@ class SCCameraVC: UIViewController {
     
     private func setupLensSelector() {
         // 获取可用镜头选项
-        let availableLensOptions = cameraManager.getAvailableLensOptions()
-        
-        // 确保有可用的镜头选项
-        guard !availableLensOptions.isEmpty else {
-            print("No available lens options")
-            return
-        }
-        
-        // 打印获取到的镜头信息
-        for lens in availableLensOptions {
-            print("Lens Name: \(lens.name), Type: \(lens.type)")
-        }
-        
-        // 设置默认选中的镜头为 1.0x
-        let defaultLens = availableLensOptions.first(where: { $0.name == "1x" })
-        
-        // 更新 lensSelectorView 的显示内容并设置默认选中
-        lensSelectorView.updateLensOptions(availableLensOptions, currentLens: defaultLens)
-        
-        // 确保 lensSelectorView 和 captureButton 都被添加到 view 中
-        view.addSubview(lensSelectorView)
-        view.addSubview(captureButton) // 确保 captureButton 也在同一个父视图中
+        cameraManager.getAvailableLensOptions { [weak self] lensOptions in
+            guard let self = self else { return }
+            
+            // 更新 availableLensOptions 属性
+            self.availableLensOptions = lensOptions
+            
+            // 确保有可用的镜头选项
+            guard !self.availableLensOptions.isEmpty else {
+                print("No available lens options")
+                return
+            }
+            
+            // 对镜头选项进行排序：超广角、广角、长焦
+            self.availableLensOptions.sort { (lens1, lens2) -> Bool in
+                let order: [AVCaptureDevice.DeviceType] = [.builtInUltraWideCamera, .builtInWideAngleCamera, .builtInTelephotoCamera]
+                guard let index1 = order.firstIndex(of: lens1.type),
+                      let index2 = order.firstIndex(of: lens2.type) else {
+                    return false
+                }
+                return index1 < index2
+            }
+            
+            // 打印获取到的镜头信息
+            for lens in self.availableLensOptions {
+                print("Lens Name: \(lens.name), Type: \(lens.type)")
+            }
+            
+            // 设置默认选中的镜头为 1.0x
+            let defaultLens = self.availableLensOptions.first(where: { $0.name == "1x" })
+            
+            // 更新 lensSelectorView 的显示内容并设置默认选中
+            self.lensSelectorView.updateLensOptions(self.availableLensOptions, currentLens: defaultLens)
+            
+            // 保证 lensSelectorView 和 captureButton 都被添加到 view 中
+            self.view.addSubview(self.lensSelectorView)
+            self.view.addSubview(self.captureButton) // 确保 captureButton 也在同一个父视图中
 
-        lensSelectorView.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.bottom.equalTo(captureButton.snp.top).offset(-20)
-            make.height.equalTo(50)
-            make.width.equalTo(200)
-        }
-        
-        // 设置镜头选择回调
-        lensSelectorView.onLensSelected = { [weak self] lensName in
-            guard let lens = availableLensOptions.first(where: { $0.name == lensName }) else { return }
-            self?.handleLensSelection(lens)
+            // 确保 translatesAutoresizingMaskIntoConstraints 被设置为 false
+            self.lensSelectorView.translatesAutoresizingMaskIntoConstraints = false
+
+            self.lensSelectorView.snp.makeConstraints { make in
+                make.centerX.equalToSuperview()
+                make.bottom.equalTo(self.captureButton.snp.top).offset(-20)
+                make.height.equalTo(50)
+                make.width.equalTo(200)
+            }
+            
+            // 设置镜头选择回调
+            self.lensSelectorView.onLensSelected = { [weak self] lensName in
+                guard let self = self else { return }
+                guard let lens = self.availableLensOptions.first(where: { $0.name == lensName }) else { return }
+                self.handleLensSelection(lens)
+            }
         }
     }
     
@@ -429,7 +540,7 @@ class SCCameraVC: UIViewController {
         focusView.center = point
         focusView.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
         focusView.isHidden = false
-        
+        print("focusView.isHidden: \(focusView.isHidden)")
         UIView.animate(withDuration: 0.3, animations: {
             self.focusView.transform = .identity
         }) { _ in
@@ -478,3 +589,4 @@ extension SCCameraVC: SCSessionDelegate {
         }
     }
 } 
+

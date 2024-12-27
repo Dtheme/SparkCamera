@@ -13,10 +13,44 @@ class SCCameraManager {
     private var availableDevices: [AVCaptureDevice] = []
     private var session: SCSession
     private var lastSelectedLens: SCLensModel? // 保存前一次选中的镜头
+    private var photoSession: SCPhotoSession
     
-    init(session: SCSession) {
+    init(session: SCSession, photoSession: SCPhotoSession) {
         self.session = session
-        self.availableDevices = self.getAvailableDevices()
+        self.photoSession = photoSession
+        
+        // 使用默认相机初始化
+        if let defaultDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
+            setupCamera(with: defaultDevice)
+        }
+        
+        // 异步获取可用设备
+        DispatchQueue.global(qos: .background).async {
+            self.availableDevices = self.getAvailableDevices()
+        }
+    }
+    
+    private func setupCamera(with device: AVCaptureDevice) {
+        do {
+            let input = try AVCaptureDeviceInput(device: device)
+            session.session.beginConfiguration()
+            
+            // 移除现有输入
+            for input in session.session.inputs {
+                session.session.removeInput(input)
+            }
+            
+            // 添加新输入
+            if session.session.canAddInput(input) {
+                session.session.addInput(input)
+                session.videoInput = input
+                currentCameraPosition = device.position
+            }
+            
+            session.session.commitConfiguration()
+        } catch {
+            print("Error setting up camera: \(error.localizedDescription)")
+        }
     }
     
     private func getAvailableDevices() -> [AVCaptureDevice] {
@@ -28,16 +62,30 @@ class SCCameraManager {
         return discoverySession.devices
     }
     
-    func getAvailableLensOptions() -> [SCLensModel] {
-        return [
-            SCLensModel(name: "0.5x", type: .builtInUltraWideCamera),
-            SCLensModel(name: "1x", type: .builtInWideAngleCamera),
-            SCLensModel(name: "3x", type: .builtInTelephotoCamera)
-        ]
+    func getAvailableLensOptions(completion: @escaping ([SCLensModel]) -> Void) {
+        DispatchQueue.global(qos: .background).async {
+            let devices = self.getAvailableDevices()
+            let lensOptions = devices.filter { $0.position == .back }.map { device in
+                switch device.deviceType {
+                case .builtInUltraWideCamera:
+                    return SCLensModel(name: "0.5x", type: .builtInUltraWideCamera)
+                case .builtInWideAngleCamera:
+                    return SCLensModel(name: "1x", type: .builtInWideAngleCamera)
+                case .builtInTelephotoCamera:
+                    return SCLensModel(name: "3x", type: .builtInTelephotoCamera)
+                default:
+                    return nil
+                }
+            }.compactMap { $0 }
+            
+            DispatchQueue.main.async {
+                completion(lensOptions)
+            }
+        }
     }
     
     func switchCamera(to lens: SCLensModel, completion: @escaping (String) -> Void) {
-        guard let device = availableDevices.first(where: { $0.deviceType == lens.type && $0.position == .back }) else {
+        guard let device = availableDevices.first(where: { $0.deviceType == lens.type && $0.position == (lens.name == "Front" ? .front : .back) }) else {
             completion("Lens not available")
             return
         }
@@ -61,7 +109,9 @@ class SCCameraManager {
                 session.currentLens = lens
                 print("Switched to lens: \(lens.name)")
                 
-                if let previewView = session.previewLayer?.superlayer as? SCPreviewView {
+                if let previewLayer = session.previewLayer,
+                   let superlayer = previewLayer.superlayer,
+                   let previewView = superlayer.delegate as? SCPreviewView {
                     switch lens.name {
                     case "0.5x":
                         previewView.maxZoomFactor = min(device.activeFormat.videoMaxZoomFactor, 2.0)

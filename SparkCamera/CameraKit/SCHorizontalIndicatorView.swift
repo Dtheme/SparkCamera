@@ -24,7 +24,7 @@ class SCHorizontalIndicatorView: UIView {
     private var lastHighlightTime: TimeInterval = 0
     private let highlightInterval: TimeInterval = 1.0 // 1秒的间隔
     private var isHighlighted = false
-    private let verticalThreshold: CGFloat = 0.15 // 误差范围
+    private var verticalThreshold: CGFloat = 3.0 // 水平仪吸附范围的阈值
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -58,9 +58,15 @@ class SCHorizontalIndicatorView: UIView {
     func updateRotation(angle: CGFloat) {
         self.transform = CGAffineTransform(rotationAngle: angle)
         
+        // 将角度转换为 0 到 360 的范围
+        var degrees = angle * 180 / .pi
+        if degrees < 0 {
+            degrees += 360
+        }
+
+        
         // 检测是否接近垂直方向，增加吸附范围
-        let normalizedAngle = angle.truncatingRemainder(dividingBy: .pi)
-        if abs(normalizedAngle) < verticalThreshold || abs(normalizedAngle - .pi) < verticalThreshold {
+        if (degrees >= 360 - verticalThreshold || degrees <= verticalThreshold) || (degrees >= 180 - verticalThreshold && degrees <= 180 + verticalThreshold) {
             if !isHighlighted {
                 triggerHighlightAnimation()
                 isHighlighted = true
@@ -74,7 +80,7 @@ class SCHorizontalIndicatorView: UIView {
     }
     
     private func triggerHighlightAnimation() {
-        // 高亮动画
+        // 实现高亮动画
         UIView.animate(withDuration: 0.2) {
             self.indicatorLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)
             self.verticalLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)

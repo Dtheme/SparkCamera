@@ -132,7 +132,37 @@ extension SCSession.CameraPosition {
     }
     
     @objc public func focus(at point: CGPoint) {
-        //
+        guard let device = videoInput?.device else {
+            print("Error: No video input device available.")
+            return
+        }
+        
+        do {
+            try device.lockForConfiguration()
+            print("Device locked for configuration.")
+            
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = point
+                device.focusMode = .autoFocus
+                print("Focus point set to: \(point)")
+            } else {
+                print("Focus point of interest not supported.")
+            }
+            
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = point
+                device.exposureMode = .autoExpose
+                print("Exposure point set to: \(point)")
+            } else {
+                print("Exposure point of interest not supported.")
+            }
+            
+            device.unlockForConfiguration()
+            print("Device unlocked after configuration.")
+        } catch {
+            print("Error setting focus: \(error.localizedDescription)")
+            device.unlockForConfiguration() // 确保设备解锁
+        }
     }
     
     @objc public static func captureDeviceInput(type: DeviceType) throws -> AVCaptureDeviceInput {
@@ -171,8 +201,6 @@ extension SCSession.CameraPosition {
         }
         
         if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) {
-            isWideAngleAvailable = device.minAvailableVideoZoomFactor <= 0.5
-            
             do {
                 videoInput = try AVCaptureDeviceInput(device: device)
                 if let videoInput = videoInput {
@@ -181,11 +209,10 @@ extension SCSession.CameraPosition {
                     }
                 }
                 
-                if isWideAngleAvailable {
-                    try device.lockForConfiguration()
-                    device.videoZoomFactor = 1.0
-                    device.unlockForConfiguration()
-                }
+                try device.lockForConfiguration()
+                device.videoZoomFactor = 1.0
+                device.unlockForConfiguration()
+                
             } catch {
                 print("Error setting up camera: \(error.localizedDescription)")
             }
@@ -227,5 +254,12 @@ extension SCSession.CameraPosition {
             SCLensModel(name: "1x", type: .builtInWideAngleCamera),
             SCLensModel(name: "3x", type: .builtInTelephotoCamera)
         ]
+    }
+    
+    func setupPreviewLayer(in view: SCPreviewView) {
+        self.previewLayer = AVCaptureVideoPreviewLayer(session: self.session)
+        self.previewLayer?.videoGravity = .resizeAspectFill
+        self.previewLayer?.frame = view.bounds
+        view.layer.insertSublayer(self.previewLayer!, at: 0)
     }
 }
