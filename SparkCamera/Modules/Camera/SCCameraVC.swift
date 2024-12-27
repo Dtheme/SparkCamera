@@ -20,7 +20,7 @@ class SCCameraVC: UIViewController {
     private lazy var lensSelectorView = SCLensSelectorView()
     private let motionManager = CMMotionManager()
     private let horizontalIndicator = SCHorizontalIndicatorView()
-    private var isHorizontalIndicatorVisible = true
+    private var isHorizontalIndicatorVisible = false
     
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -109,11 +109,6 @@ class SCCameraVC: UIViewController {
         
         if motionManager.isDeviceMotionAvailable {
             motionManager.deviceMotionUpdateInterval = 0.1
-            motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (motion, error) in
-                guard let motion = motion else { return }
-                let rotation = atan2(motion.gravity.x, motion.gravity.y) - .pi
-                self?.horizontalIndicator.updateRotation(angle: CGFloat(rotation))
-            }
         }
     }
 
@@ -125,6 +120,18 @@ class SCCameraVC: UIViewController {
         isHorizontalIndicatorVisible.toggle()
         horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
 
+        if isHorizontalIndicatorVisible {
+            // 开启水平仪时开始更新
+            motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (motion, error) in
+                guard let motion = motion else { return }
+                let rotation = atan2(motion.gravity.x, motion.gravity.y) - .pi
+                self?.horizontalIndicator.updateRotation(angle: CGFloat(rotation))
+            }
+        } else {
+            // 关闭水平仪时停止更新
+            motionManager.stopDeviceMotionUpdates()
+        }
+
         let message = isHorizontalIndicatorVisible ? "水平仪已开启" : "水平仪已关闭"
         print(message)
         let view = MessageView.viewFromNib(layout: .statusLine)
@@ -134,8 +141,6 @@ class SCCameraVC: UIViewController {
         
         let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
         feedbackGenerator.impactOccurred()
-
-//        horizontalIndicator.isHidden = false
     }
     
     // MARK: - Setup

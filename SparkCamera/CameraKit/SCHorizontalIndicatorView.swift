@@ -1,4 +1,5 @@
 import UIKit
+import SnapKit
 
 class SCHorizontalIndicatorView: UIView {
     
@@ -10,6 +11,13 @@ class SCHorizontalIndicatorView: UIView {
         line.layer.shadowOpacity = 0.2
         line.layer.shadowOffset = CGSize(width: 0, height: 1)
         line.layer.shadowRadius = 2
+        return line
+    }()
+    
+    private let verticalLine: UIView = {
+        let line = UIView()
+        line.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.0) // 初始透明
+        line.layer.cornerRadius = 1
         return line
     }()
     
@@ -30,20 +38,29 @@ class SCHorizontalIndicatorView: UIView {
     
     private func setupView() {
         self.addSubview(indicatorLine)
-        indicatorLine.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            indicatorLine.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-            indicatorLine.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-            indicatorLine.widthAnchor.constraint(equalTo: self.widthAnchor, multiplier: 0.6),
-            indicatorLine.heightAnchor.constraint(equalToConstant: 3)
-        ])
+        self.addSubview(verticalLine)
+        
+        indicatorLine.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.equalToSuperview().multipliedBy(0.6)
+            make.height.equalTo(3)
+        }
+        
+        verticalLine.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.equalTo(2)
+            make.height.equalToSuperview().multipliedBy(3) // 增高竖线的高度
+        }
     }
     
     func updateRotation(angle: CGFloat) {
         self.transform = CGAffineTransform(rotationAngle: angle)
         
         // 检测是否接近垂直方向，增加吸附范围
-        if abs(angle) < verticalThreshold || abs(angle - .pi) < verticalThreshold {
+        let normalizedAngle = angle.truncatingRemainder(dividingBy: .pi)
+        if abs(normalizedAngle) < verticalThreshold || abs(normalizedAngle - .pi) < verticalThreshold {
             if !isHighlighted {
                 triggerHighlightAnimation()
                 isHighlighted = true
@@ -60,6 +77,7 @@ class SCHorizontalIndicatorView: UIView {
         // 高亮动画
         UIView.animate(withDuration: 0.2) {
             self.indicatorLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)
+            self.verticalLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)
         }
         
         // 触觉反馈
@@ -71,6 +89,7 @@ class SCHorizontalIndicatorView: UIView {
         // 恢复正常状态
         UIView.animate(withDuration: 0.2) {
             self.indicatorLine.backgroundColor = UIColor.white.withAlphaComponent(0.7)
+            self.verticalLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.0)
         }
     }
 } 
