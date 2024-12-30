@@ -37,14 +37,25 @@ class SCLensSelectorView: UIView {
             make.edges.equalToSuperview()
         }
         
+        // 确保 translatesAutoresizingMaskIntoConstraints 被设置为 false
+        translatesAutoresizingMaskIntoConstraints = false
+        
+        // 设置 stackView
         stackView.axis = .horizontal
         stackView.alignment = .center
         stackView.distribution = .fillEqually
         stackView.spacing = 10
         addSubview(stackView)
         
+        // 使用 SnapKit 设置约束
         stackView.snp.makeConstraints { make in
             make.edges.equalToSuperview().inset(10)
+        }
+        
+        // 设置明确的宽度和高度约束
+        snp.makeConstraints { make in
+            make.height.equalTo(50)
+            make.width.equalTo(200)
         }
     }
     

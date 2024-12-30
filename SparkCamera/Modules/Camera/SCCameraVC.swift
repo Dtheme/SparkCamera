@@ -414,17 +414,40 @@ class SCCameraVC: UIViewController {
     }
     
     @objc private func capturePhoto() {
-        // 添加拍照动画
-        UIView.animate(withDuration: 0.1, animations: {
-            self.captureButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-        }) { _ in
-            UIView.animate(withDuration: 0.1) {
-                self.captureButton.transform = .identity
+        // 拍照并处理结果
+        self.photoSession.capture({ [weak self] image, _ in
+            guard let self = self else { return }
+            
+            // 在拍照完成后执行按钮的缩放动画
+            UIView.animate(withDuration: 0.1, animations: {
+                self.captureButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            }) { _ in
+                UIView.animate(withDuration: 0.1) {
+                    self.captureButton.transform = .identity
+                }
             }
-        }
-        
-        photoSession.capture({ [weak self] image, _ in
-            self?.handleCapturedImage(image)
+            
+            // 创建一个白色的闪光视图
+            let flashView = UIView(frame: self.view.bounds)
+            flashView.backgroundColor = .white
+            flashView.alpha = 0
+            self.view.addSubview(flashView)
+            
+            // 淡入淡出和缩放动画
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut], animations: {
+                flashView.alpha = 0.8
+                flashView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            }) { _ in
+                UIView.animate(withDuration: 0.2, delay: 0.1, options: [.curveEaseInOut], animations: {
+                    flashView.alpha = 0
+                    flashView.transform = .identity
+                }) { _ in
+                    flashView.removeFromSuperview()
+                    
+                    // 跳转到预览页
+                    self.handleCapturedImage(image)
+                }
+            }
         }, { [weak self] error in
             self?.showError(error)
         })
@@ -490,8 +513,17 @@ class SCCameraVC: UIViewController {
     
     // MARK: - Helpers
     private func handleCapturedImage(_ image: UIImage) {
-        // 保存照片到相册
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        let photoPreviewVC = SCPhotoPreviewVC(image: image)
+        photoPreviewVC.modalPresentationStyle = .fullScreen
+        
+        // 使用自定义转场动画
+        let transition = CATransition()
+        transition.duration = 0.5
+        transition.type = .fade
+        transition.subtype = .fromRight
+        view.window?.layer.add(transition, forKey: kCATransition)
+        
+        present(photoPreviewVC, animated: false)
     }
     
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {

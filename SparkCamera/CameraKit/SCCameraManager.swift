@@ -108,7 +108,7 @@ class SCCameraManager {
                 // 更新 currentLens
                 session.currentLens = lens
                 print("Switched to lens: \(lens.name)")
-                
+
                 if let previewLayer = session.previewLayer,
                    let superlayer = previewLayer.superlayer,
                    let previewView = superlayer.delegate as? SCPreviewView {
