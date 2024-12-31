@@ -256,10 +256,7 @@ extension SCSession.CameraPosition {
         ]
     }
     
-    func setupPreviewLayer(in view: SCPreviewView) {
-        self.previewLayer = AVCaptureVideoPreviewLayer(session: self.session)
-        self.previewLayer?.videoGravity = .resizeAspectFill
-        self.previewLayer?.frame = view.bounds
-        view.layer.insertSublayer(self.previewLayer!, at: 0)
+    func setupPreviewLayer(in view: UIView, completion: (() -> Void)? = nil) {
+        // 基类的默认实现为空
     }
 }

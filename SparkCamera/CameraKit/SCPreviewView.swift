@@ -86,17 +86,7 @@ import AVFoundation
             }
         }
     }
-    
-    private var zoomLabel: UILabel = {
-        let label = UILabel()
-        label.textColor = .white
-        label.font = UIFont.boldSystemFont(ofSize: 16)
-        label.textAlignment = .center
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        label.layer.cornerRadius = 5
-        label.clipsToBounds = true
-        return label
-    }()
+
     
     internal let focusBox = SCFocusBoxView()
 
@@ -111,16 +101,6 @@ import AVFoundation
     }
     
     private func setupView() {
-        // 添加变焦倍数指示器
-        self.addSubview(zoomLabel)
-        zoomLabel.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            zoomLabel.topAnchor.constraint(equalTo: self.topAnchor, constant: 10),
-            zoomLabel.centerXAnchor.constraint(equalTo: self.centerXAnchor),
-            zoomLabel.widthAnchor.constraint(equalToConstant: 100),
-            zoomLabel.heightAnchor.constraint(equalToConstant: 30)
-        ])
-        
         // 添加对焦框
         self.addSubview(focusBox)
         self.bringSubviewToFront(focusBox)

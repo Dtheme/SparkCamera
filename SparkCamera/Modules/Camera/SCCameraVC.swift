@@ -26,11 +26,15 @@ class SCCameraVC: UIViewController {
     // 新增属性来存储可用镜头选项
     private var availableLensOptions: [SCLensModel] = []
     
+    private var loadingView: SCLoadingView?
+    private var isConfiguring = false
+    
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "xmark"), for: .normal)
         button.tintColor = .white
+        button.addTarget(self, action: #selector(close), for: .touchUpInside)
         return button
     }()
     
@@ -48,20 +52,6 @@ class SCCameraVC: UIViewController {
         button.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
         button.tintColor = .white
         button.addTarget(self, action: #selector(switchCamera), for: .touchUpInside)
-        return button
-    }()
-    
-    private lazy var flashButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "bolt.slash.fill"), for: .normal)
-        button.tintColor = .white
-        return button
-    }()
-    
-    private lazy var gridButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "grid"), for: .normal)
-        button.tintColor = .white
         return button
     }()
     
@@ -85,9 +75,26 @@ class SCCameraVC: UIViewController {
     private lazy var zoomLabel: UILabel = {
         let label = UILabel()
         label.textColor = .white
-        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.font = .systemFont(ofSize: 16, weight: .bold)
         label.textAlignment = .center
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        label.layer.cornerRadius = 15
+        label.clipsToBounds = true
         return label
+    }()
+    
+    private lazy var livePhotoButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "livephoto"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(toggleLivePhoto), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var toolBar: SCCameraToolBar = {
+        let toolBar = SCCameraToolBar()
+        toolBar.delegate = self
+        return toolBar
     }()
     
     // MARK: - Lifecycle
@@ -100,7 +107,18 @@ class SCCameraVC: UIViewController {
         // 设置水平指示器和手势
         setupHorizontalIndicator()
         setupGestures()
-    }  
+        self.view.backgroundColor = UIColor.black
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        photoSession?.startSession()
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        photoSession?.stopSession()
+    }
     
     private func setupHorizontalIndicator() {
         DispatchQueue.main.async { [weak self] in
@@ -222,10 +240,18 @@ class SCCameraVC: UIViewController {
     // MARK: - Setup
     private func checkCameraPermission() {
         AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
-            DispatchQueue.main.async {
-                if granted {
+            if granted {
+                DispatchQueue.main.async {
                     self?.setupCamera()
-                } else {
+                    // 等待布局完成后再启动会话
+                    self?.view.layoutIfNeeded()
+                    // 在后台线程启动会话
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self?.photoSession?.session.startRunning()
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
                     self?.showPermissionDeniedAlert()
                 }
             }
@@ -233,65 +259,74 @@ class SCCameraVC: UIViewController {
     }
     
     private func setupCamera() {
-        // 初始化相机会话
-        photoSession = SCPhotoSession()
+        showLoading()
         
-        // 初始化 cameraManager
-        cameraManager = SCCameraManager(session: photoSession, photoSession: photoSession)
+        let startTime = Date()
+        print("⏱️ [Camera Setup] Started at: \(startTime)")
         
-        // 创建预览视图
-        previewView = SCPreviewView(frame: view.bounds)
-        previewView.session = photoSession
-        previewView.autorotate = true
+        // 1. 创建和配置预览视图
+        previewView = SCPreviewView()
         
-        // 设置预览层
-        photoSession.setupPreviewLayer(in: previewView)
-        
-        // 启用网格功能
-        previewView.showGrid = false
-        
-        // 添加预览视图
-        view.addSubview(previewView)
-        
-        // 添加水平指示器
-        view.addSubview(horizontalIndicator)
-        view.bringSubviewToFront(horizontalIndicator)
-        
-        // 设置代理以处理变焦回调
-        photoSession.delegate = self
-        
-        // 设置镜头选择器
-        setupLensSelector()
-        // 在预览视图之后添加其他 UI 元素
+        // 2. 添加到视图层级并设置约束
         setupUI()
         setupConstraints()
-        setupActions()
-
-        // 自动对焦到屏幕中心
-        let centerPoint = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
-        if let focusPoint = previewView.previewLayer?.captureDevicePointConverted(fromLayerPoint: centerPoint) {
-            photoSession.focus(at: focusPoint)
-            previewView.focusBox.animate(to: centerPoint)
+        print("⏱️ [Camera Setup] UI and constraints set: +\(Date().timeIntervalSince(startTime))s")
+        
+        // 3. 在后台线程配置相机
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // 初始化相机会话
+            self.photoSession = SCPhotoSession()
+            print("⏱️ [Camera Setup] PhotoSession initialized: +\(Date().timeIntervalSince(startTime))s")
+            
+            // 初始化 cameraManager
+            self.cameraManager = SCCameraManager(session: self.photoSession, photoSession: self.photoSession)
+            print("⏱️ [Camera Setup] CameraManager initialized: +\(Date().timeIntervalSince(startTime))s")
+            
+            // 在主线程设置预览视图和其他 UI
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                
+                self.previewView.session = self.photoSession
+                self.previewView.autorotate = true
+                
+                // 设置其他功能
+                self.photoSession.delegate = self
+                self.setupLensSelector()
+                self.setupActions()
+                
+                // 等待布局完成
+                self.view.layoutIfNeeded()
+                
+                // 设置预览层并启动会话
+                self.photoSession.setupPreviewLayer(in: self.previewView) { [weak self] in
+                    guard let self = self else { return }
+                    // 预览层设置完成后的回调
+                    print("⏱️ [Camera Setup] All setup completed: +\(Date().timeIntervalSince(startTime))s")
+                    self.hideLoading()
+                }
+            }
         }
-
     }
     
     private func setupUI() {
-        // 添加其他 UI 元素
+        // 添加所有 UI 元素到视图层级
+        view.addSubview(previewView)
         view.addSubview(closeButton)
         view.addSubview(captureButton)
         view.addSubview(switchCameraButton)
-        view.addSubview(flashButton)
-        view.addSubview(gridButton)
         view.addSubview(focusView)
-        view.addSubview(lensSelectorView)
-        
-        // 添加变焦指示器
         view.addSubview(zoomIndicatorView)
+        view.addSubview(livePhotoButton)
+        view.addSubview(horizontalIndicator)
+        view.addSubview(toolBar)
+        
         zoomIndicatorView.addSubview(zoomLabel)
     }
     
     private func setupConstraints() {
+        // 1. 基础控制按钮
         closeButton.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.left.equalTo(view.safeAreaLayoutGuide).offset(20)
@@ -310,18 +345,29 @@ class SCCameraVC: UIViewController {
             make.width.height.equalTo(44)
         }
         
-        flashButton.snp.makeConstraints { make in
-            make.left.equalTo(view.safeAreaLayoutGuide).offset(20)
+        // 2. 工具栏 - 调整位置到预览视图和拍照按钮之间
+        toolBar.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(captureButton.snp.top).offset(-20)
+            make.height.equalTo(90)
+        }
+        
+        // 3. 预览视图 - 调整约束，与工具栏对接
+        previewView.snp.makeConstraints { make in
+            make.top.equalTo(closeButton.snp.bottom).offset(20)
+            make.left.equalToSuperview().offset(10)
+            make.right.equalToSuperview().offset(-10)
+            make.bottom.equalTo(toolBar.snp.top).offset(-10) // 与工具栏保持10点间距
+        }
+        
+        // 4. 功能按钮
+        switchCameraButton.snp.makeConstraints { make in
+            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
             make.centerY.equalTo(captureButton)
             make.width.height.equalTo(44)
         }
         
-        gridButton.snp.makeConstraints { make in
-            make.top.equalTo(closeButton)
-            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
-            make.width.height.equalTo(44)
-        }
-        
+        // 5. 指示器
         zoomIndicatorView.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
@@ -330,7 +376,14 @@ class SCCameraVC: UIViewController {
         }
         
         zoomLabel.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.edges.equalToSuperview().inset(UIEdgeInsets(top: 0, left: 5, bottom: 0, right: 5))
+        }
+        
+        // 6. 水平指示器 - 移除与主视图的约束，只与预览视图关联
+        horizontalIndicator.snp.remakeConstraints { make in
+            make.center.equalTo(previewView) 
+            make.width.equalTo(200)
+            make.height.equalTo(4)
         }
     }
     
@@ -338,13 +391,15 @@ class SCCameraVC: UIViewController {
         closeButton.addTarget(self, action: #selector(close), for: .touchUpInside)
         captureButton.addTarget(self, action: #selector(capturePhoto), for: .touchUpInside)
         switchCameraButton.addTarget(self, action: #selector(switchCamera), for: .touchUpInside)
-        flashButton.addTarget(self, action: #selector(toggleFlash), for: .touchUpInside)
-        gridButton.addTarget(self, action: #selector(toggleGrid), for: .touchUpInside)
+        livePhotoButton.addTarget(self, action: #selector(toggleLivePhoto), for: .touchUpInside)
     }
     
     private func setupLensSelector() {
-        // 获取可用镜头选项
+        let startTime = Date()
+        print("⏱️ [Lens Setup] Started at: \(startTime)")
+        
         cameraManager.getAvailableLensOptions { [weak self] lensOptions in
+            print("⏱️ [Lens Setup] Options received: +\(Date().timeIntervalSince(startTime))s")
             guard let self = self else { return }
             
             // 更新 availableLensOptions 属性
@@ -352,7 +407,7 @@ class SCCameraVC: UIViewController {
             
             // 确保有可用的镜头选项
             guard !self.availableLensOptions.isEmpty else {
-                print("No available lens options")
+                print("⏱️ [Lens Setup] No available options: +\(Date().timeIntervalSince(startTime))s")
                 return
             }
             
@@ -365,10 +420,11 @@ class SCCameraVC: UIViewController {
                 }
                 return index1 < index2
             }
+            print("⏱️ [Lens Setup] Options sorted: +\(Date().timeIntervalSince(startTime))s")
             
             // 打印获取到的镜头信息
             for lens in self.availableLensOptions {
-                print("Lens Name: \(lens.name), Type: \(lens.type)")
+                print("⏱️ [Lens Setup] Found lens: \(lens.name), Type: \(lens.type)")
             }
             
             // 设置默认选中的镜头为 1.0x
@@ -376,20 +432,17 @@ class SCCameraVC: UIViewController {
             
             // 更新 lensSelectorView 的显示内容并设置默认选中
             self.lensSelectorView.updateLensOptions(self.availableLensOptions, currentLens: defaultLens)
+            print("⏱️ [Lens Setup] UI updated: +\(Date().timeIntervalSince(startTime))s")
             
-            // 保证 lensSelectorView 和 captureButton 都被添加到 view 中
+            // 更新布局
             self.view.addSubview(self.lensSelectorView)
-            self.view.addSubview(self.captureButton) // 确保 captureButton 也在同一个父视图中
-
-            // 确保 translatesAutoresizingMaskIntoConstraints 被设置为 false
-            self.lensSelectorView.translatesAutoresizingMaskIntoConstraints = false
-
             self.lensSelectorView.snp.makeConstraints { make in
                 make.centerX.equalToSuperview()
-                make.bottom.equalTo(self.captureButton.snp.top).offset(-20)
+                make.bottom.equalTo(self.previewView.snp.bottom).offset(-20)
                 make.height.equalTo(50)
                 make.width.equalTo(200)
             }
+            print("⏱️ [Lens Setup] Layout completed: +\(Date().timeIntervalSince(startTime))s")
             
             // 设置镜头选择回调
             self.lensSelectorView.onLensSelected = { [weak self] lensName in
@@ -492,23 +545,13 @@ class SCCameraVC: UIViewController {
         }
     }
     
-    @objc private func toggleFlash() {
-        switch photoSession.flashMode {
-        case .off:
-            photoSession.flashMode = .on
-            flashButton.setImage(UIImage(systemName: "bolt.fill"), for: .normal)
-        case .on:
-            photoSession.flashMode = .auto
-            flashButton.setImage(UIImage(systemName: "bolt"), for: .normal)
-        case .auto:
-            photoSession.flashMode = .off
-            flashButton.setImage(UIImage(systemName: "bolt.slash.fill"), for: .normal)
-        }
-    }
-    
-    @objc private func toggleGrid() {
-        previewView.showGrid = !previewView.showGrid
-        gridButton.tintColor = previewView.showGrid ? .yellow : .white
+    @objc private func toggleLivePhoto() {
+        // 实现实况照片功能
+        let item = SCCameraToolItem(type: .livePhoto, state: LivePhotoMode.off)
+        let view = MessageView.viewFromNib(layout: .statusLine)
+        view.configureTheme(.info)
+        view.configureContent(title: "提示", body: "Live Photo 功能待开发")
+        SwiftMessages.show(view: view)
     }
     
     // MARK: - Helpers
@@ -588,6 +631,29 @@ class SCCameraVC: UIViewController {
         view.configureContent(title: "镜头切换", body: message)
         SwiftMessages.show(view: view)
     }
+    
+    // 禁用所有控件
+    private func setControlsEnabled(_ enabled: Bool) {
+        [captureButton, switchCameraButton, livePhotoButton].forEach {
+            $0.isEnabled = enabled
+            $0.alpha = enabled ? 1.0 : 0.5
+        }
+    }
+    
+    private func showLoading() {
+        loadingView = SCLoadingView(message: "Camera configuration loading...")
+        loadingView?.show(in: view)
+        setControlsEnabled(false)
+        // 保持关闭按钮可用
+        closeButton.isEnabled = true
+        closeButton.alpha = 1.0
+    }
+    
+    private func hideLoading() {
+        loadingView?.dismiss()
+        loadingView = nil
+        setControlsEnabled(true)
+    }
 }
 
 // MARK: - SCSessionDelegate
@@ -619,6 +685,64 @@ extension SCCameraVC: SCSessionDelegate {
         } completion: { _ in
             self.zoomIndicatorView.isHidden = true
         }
+    }
+}
+
+// MARK: - SCCameraToolBarDelegate
+extension SCCameraVC: SCCameraToolBarDelegate {
+    func toolBar(_ toolBar: SCCameraToolBar, didSelect item: SCCameraToolItem) {
+        switch item.type {
+        case .flash:
+            // 闪光灯功能
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "闪光灯功能待开发")
+            SwiftMessages.show(view: view)
+            
+        case .livePhoto:
+            // 实况照片功能
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "Live Photo 功能待开发")
+            SwiftMessages.show(view: view)
+            
+        case .ratio:
+            // 比例功能
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "比例功能待开发")
+            SwiftMessages.show(view: view)
+            
+        case .whiteBalance:
+            // 白平衡功能
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "白平衡功能待开发")
+            SwiftMessages.show(view: view)
+            
+        case .mute:
+            // 静音功能
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "静音功能待开发")
+            SwiftMessages.show(view: view)
+        }
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, willAnimate item: SCCameraToolItem) {
+        // 动画即将开始时的处理
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, didExpand item: SCCameraToolItem) {
+        // 工具栏展开后的处理
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, didCollapse item: SCCameraToolItem) {
+        // 工具栏收起后的处理
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, didFinishAnimate item: SCCameraToolItem) {
+        // 动画完成后的处理
     }
 } 
 

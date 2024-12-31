@@ -76,6 +76,9 @@ extension SCSession.FlashMode {
     
     var faceDetectionBoxes: [UIView] = []
     
+    private var isPreviewLayerSetup = false
+    private var isSessionRunning = false
+    
     @objc public init(position: CameraPosition = .back, detection: CameraDetection = .none) {
         super.init()
         
@@ -279,5 +282,74 @@ extension SCSession.FlashMode {
         }
         
         session.commitConfiguration()
+    }
+
+    override func setupPreviewLayer(in view: UIView, completion: (() -> Void)? = nil) {
+        guard !isPreviewLayerSetup else { return }
+        
+        let startTime = Date()
+        print("⏱️ [Preview Setup] Started at: \(startTime)")
+        
+        // 1. 创建预览层
+        let previewLayer = AVCaptureVideoPreviewLayer(session: self.session)
+        print("⏱️ [Preview Setup] Preview layer created: +\(Date().timeIntervalSince(startTime))s")
+        
+        // 2. 在主线程设置UI
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            previewLayer.videoGravity = .resizeAspectFill
+            previewLayer.frame = view.bounds
+            view.layer.insertSublayer(previewLayer, at: 0)
+            self.previewLayer = previewLayer
+            self.isPreviewLayerSetup = true
+            print("⏱️ [Preview Setup] Preview layer configured: +\(Date().timeIntervalSince(startTime))s")
+            
+            // 3. 在后台线程启动会话
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+                if !self.isSessionRunning {
+                    print("⏱️ [Preview Setup] Starting session: +\(Date().timeIntervalSince(startTime))s")
+                    self.session.startRunning()
+                    self.isSessionRunning = true
+                    print("⏱️ [Preview Setup] Session started: +\(Date().timeIntervalSince(startTime))s")
+                    
+                    DispatchQueue.main.async {
+                        print("⏱️ [Preview Setup] Setup completed: +\(Date().timeIntervalSince(startTime))s")
+                        completion?()
+                    }
+                }
+            }
+        }
+    }
+
+    func startSession() {
+        let startTime = Date()
+        print("⏱️ [Session] Start requested at: \(startTime)")
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            if !self.isSessionRunning {
+                print("⏱️ [Session] Starting session: +\(Date().timeIntervalSince(startTime))s")
+                self.session.startRunning()
+                self.isSessionRunning = true
+                print("⏱️ [Session] Session started: +\(Date().timeIntervalSince(startTime))s")
+            }
+        }
+    }
+    
+    func stopSession() {
+        let startTime = Date()
+        print("⏱️ [Session] Stop requested at: \(startTime)")
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            if self.isSessionRunning {
+                print("⏱️ [Session] Stopping session: +\(Date().timeIntervalSince(startTime))s")
+                self.session.stopRunning()
+                self.isSessionRunning = false
+                print("⏱️ [Session] Session stopped: +\(Date().timeIntervalSince(startTime))s")
+            }
+        }
     }
 }
