@@ -14,6 +14,9 @@ class SCCameraSettingsManager {
     private init() {
         // 配置 Realm
         let config = Realm.Configuration(
+            fileURL: try! FileManager.default
+                .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                .appendingPathComponent("SparkCamera.realm"),
             schemaVersion: 1,
             migrationBlock: { migration, oldSchemaVersion in
                 // 处理未来可能的数据库迁移

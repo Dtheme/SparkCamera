@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		780D51042D27C0AC0014A9E1 /* SCSVGImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780D51032D27C0AC0014A9E1 /* SCSVGImageLoader.swift */; };
 		780DDC222D267B66000CA610 /* UIFont+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDC202D267B66000CA610 /* UIFont+Custom.swift */; };
 		780DDCD12D268365000CA610 /* SCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCA92D268365000CA610 /* SCCameraManager.swift */; };
 		780DDCD22D268365000CA610 /* SCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAA2D268365000CA610 /* SCError.swift */; };
@@ -49,6 +50,7 @@
 
 /* Begin PBXFileReference section */
 		5EAAE86D17748F0CE08BF087 /* Pods-SparkCamera.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SparkCamera.debug.xcconfig"; path = "Target Support Files/Pods-SparkCamera/Pods-SparkCamera.debug.xcconfig"; sourceTree = "<group>"; };
+		780D51032D27C0AC0014A9E1 /* SCSVGImageLoader.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCSVGImageLoader.swift; sourceTree = "<group>"; };
 		780DDC202D267B66000CA610 /* UIFont+Custom.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIFont+Custom.swift"; sourceTree = "<group>"; };
 		780DDCA92D268365000CA610 /* SCCameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraManager.swift; sourceTree = "<group>"; };
 		780DDCAA2D268365000CA610 /* SCError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCError.swift; sourceTree = "<group>"; };
@@ -113,9 +115,17 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
+		780D50FB2D27BC090014A9E1 /* Resource */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resource;
+			sourceTree = "<group>";
+		};
 		780DDC212D267B66000CA610 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				780D51032D27C0AC0014A9E1 /* SCSVGImageLoader.swift */,
 				780DDC202D267B66000CA610 /* UIFont+Custom.swift */,
 			);
 			path = Utilities;
@@ -253,6 +263,7 @@
 				780DDC212D267B66000CA610 /* Utilities */,
 				7868A90B2D1412D700CBB2FB /* AppDelegate.swift */,
 				7868A90C2D1412D700CBB2FB /* Assets.xcassets */,
+				780D50FB2D27BC090014A9E1 /* Resource */,
 				7868A90D2D1412D700CBB2FB /* Info.plist */,
 				7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */,
 				7868A9112D1412D700CBB2FB /* Main.storyboard */,
@@ -407,6 +418,7 @@
 				780DDCD52D268365000CA610 /* SCHorizontalIndicatorView.swift in Sources */,
 				780DDD162D26876D000CA610 /* SCCameraToolCell.swift in Sources */,
 				780DDD132D26876D000CA610 /* SCCameraSettingsManager.swift in Sources */,
+				780D51042D27C0AC0014A9E1 /* SCSVGImageLoader.swift in Sources */,
 				7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */,
 				780DDCD72D268365000CA610 /* SCPhotoSession.swift in Sources */,
 				780DDD182D26876D000CA610 /* SCLoadingView.swift in Sources */,

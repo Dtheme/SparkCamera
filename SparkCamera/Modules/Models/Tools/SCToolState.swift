@@ -77,41 +77,65 @@ public enum SCLivePhotoState: SCToolState {
 }
 
 // MARK: - Ratio State
-public enum SCRatioState: SCToolState {
-    case ratio4_3
-    case ratio1_1
-    case ratio16_9
-    
-    public var icon: UIImage? {
-        return UIImage(systemName: "rectangle")
-    }
+public enum SCRatioState: Int {
+    case ratio4_3 = 0
+    case ratio1_1 = 1
+    case ratio16_9 = 2
     
     public var title: String {
         switch self {
-        case .ratio4_3: return "4:3"
-        case .ratio1_1: return "1:1"
-        case .ratio16_9: return "16:9"
+        case .ratio4_3:
+            return "4:3"
+        case .ratio1_1:
+            return "1:1"
+        case .ratio16_9:
+            return "16:9"
         }
     }
     
-    public func nextState() -> SCRatioState { return self }
+    public var icon: UIImage? {
+        switch self {
+        case .ratio4_3:
+            return SCSVGImageLoader.loadSVG(named: "icon_4v3", size: CGSize(width: 24, height: 24))
+        case .ratio1_1:
+            return SCSVGImageLoader.loadSVG(named: "icon_1v1", size: CGSize(width: 24, height: 24))
+        case .ratio16_9:
+            return SCSVGImageLoader.loadSVG(named: "icon_16v9", size: CGSize(width: 24, height: 24))
+        }
+    }
     
     public var aspectRatio: CGFloat {
         switch self {
-        case .ratio4_3: return 4.0/3.0
-        case .ratio1_1: return 1.0
-        case .ratio16_9: return 16.0/9.0
+        case .ratio4_3:
+            return 4.0 / 3.0
+        case .ratio1_1:
+            return 1.0
+        case .ratio16_9:
+            return 16.0 / 9.0
+        }
+    }
+}
+
+extension SCRatioState: SCToolState {
+    public func nextState() -> SCRatioState {
+        switch self {
+        case .ratio4_3:
+            return .ratio1_1
+        case .ratio1_1:
+            return .ratio16_9
+        case .ratio16_9:
+            return .ratio4_3
         }
     }
 }
 
 // MARK: - WhiteBalance State
-public enum SCWhiteBalanceState: SCToolState {
-    case auto
-    case sunny
-    case cloudy
-    case fluorescent
-    case incandescent
+public enum SCWhiteBalanceState: Int {
+    case auto = 0
+    case sunny = 1
+    case cloudy = 2
+    case fluorescent = 3
+    case incandescent = 4
     
     public var icon: UIImage? {
         return UIImage(systemName: "circle.lefthalf.filled")
@@ -139,6 +163,8 @@ public enum SCWhiteBalanceState: SCToolState {
         }
     }
 }
+
+extension SCWhiteBalanceState: SCToolState {}
 
 // MARK: - Exposure State
 public enum SCExposureState: SCToolState {
@@ -211,11 +237,11 @@ public enum SCISOState: SCToolState {
 }
 
 // MARK: - Timer State
-public enum SCTimerState: SCToolState {
-    case off
-    case threeSeconds
-    case fiveSeconds
-    case tenSeconds
+public enum SCTimerState: Int {
+    case off = 0
+    case threeSeconds = 1
+    case fiveSeconds = 2
+    case tenSeconds = 3
     
     public var icon: UIImage? {
         let baseIcon = UIImage(systemName: "timer")
@@ -246,4 +272,6 @@ public enum SCTimerState: SCToolState {
         case .tenSeconds: return 10
         }
     }
-} 
+}
+
+extension SCTimerState: SCToolState {} 

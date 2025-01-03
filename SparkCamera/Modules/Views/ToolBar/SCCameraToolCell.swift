@@ -177,15 +177,21 @@ class SCCameraToolCell: UICollectionViewCell {
     func configure(with item: SCToolItem) {
         self.item = item
         
-        iconView.image = item.state?.icon
-        titleLabel.text = item.state?.title
+        iconView.image = item.icon
+        titleLabel.text = item.title
+        selectedIndicator.isHidden = !item.isSelected
+        
+        // 更新启用/禁用状态
+        containerView.alpha = item.isEnabled ? 1.0 : 0.5
+        titleLabel.alpha = item.isEnabled ? 1.0 : 0.5
+        isUserInteractionEnabled = item.isEnabled
         
         // 更新选中状态
         if item.isSelected {
-            contentView.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
+            containerView.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
             titleLabel.textColor = .yellow
         } else {
-            contentView.backgroundColor = .clear
+            containerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
             titleLabel.textColor = .white
         }
         
