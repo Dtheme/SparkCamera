@@ -30,10 +30,18 @@ import AVFoundation
             oldValue?.stop()
             
             if let session = session {
-                self.previewLayer = AVCaptureVideoPreviewLayer(session: session.session)
+                if previewLayer == nil {
+                    setupPreviewLayer()
+                }
+                
+                previewLayer?.session = session.session
                 session.previewLayer = self.previewLayer
                 session.overlayView = self
-                session.start()
+                
+                // 确保在主线程启动会话
+                DispatchQueue.main.async {
+                    session.start()
+                }
                 
                 // 初始化时设置 maxZoomFactor
                 if let lensName = session.currentLens?.name {
@@ -104,6 +112,35 @@ import AVFoundation
         // 添加对焦框
         self.addSubview(focusBox)
         self.bringSubviewToFront(focusBox)
+    }
+    
+    // MARK: - Setup
+    private func setupPreviewLayer() {
+        previewLayer = AVCaptureVideoPreviewLayer()
+        previewLayer?.videoGravity = .resizeAspectFill
+        
+        if let previewLayer = previewLayer {
+            layer.insertSublayer(previewLayer, at: 0)
+            previewLayer.frame = bounds
+            print("Preview layer setup completed: \(previewLayer.frame)")
+        }
+    }
+    
+    @objc public override func layoutSubviews() {
+        super.layoutSubviews()
+        previewLayer?.frame = bounds
+    }
+    
+    // MARK: - Configuration
+    public func setSession(_ session: AVCaptureSession) {
+        previewLayer?.session = session
+        
+        if previewLayer?.superlayer == nil {
+            if let previewLayer = previewLayer {
+                layer.addSublayer(previewLayer)
+                previewLayer.frame = bounds
+            }
+        }
     }
 }
 

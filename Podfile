@@ -12,6 +12,7 @@ target 'SparkCamera' do
   pod 'RxSwift', '~> 6.0'
   pod 'RxCocoa', '~> 6.0'
   pod 'SwiftMessages'
+  pod 'RealmSwift', '~> 10.45.0'
 
   # 添加这个配置来处理签名问题
   post_install do |installer|

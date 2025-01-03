@@ -10,16 +10,17 @@ import SnapKit
 import SwiftMessages
 
 protocol SCCameraToolOptionsViewDelegate: AnyObject {
-    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: String, for type: SCCameraToolType)
+    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType)
 }
 
 class SCCameraToolOptionsView: UIView {
     
     // MARK: - Properties
     weak var delegate: SCCameraToolOptionsViewDelegate?
-    private var type: SCCameraToolType
-    private var options: [String]
+    private var type: SCToolType
+    private var options: [SCToolOption]
     private var selectedIndex: Int = 0
+    private var gradientLayer: CAGradientLayer?
     
     // MARK: - UI Components
     private lazy var blurView: UIVisualEffectView = {
@@ -55,7 +56,7 @@ class SCCameraToolOptionsView: UIView {
     }()
     
     // MARK: - Initialization
-    init(type: SCCameraToolType, options: [String]) {
+    init(type: SCToolType, options: [SCToolOption]) {
         self.type = type
         self.options = options
         super.init(frame: .zero)
@@ -140,7 +141,8 @@ extension SCCameraToolOptionsView: UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "OptionCell", for: indexPath) as! OptionCell
-        cell.configure(with: options[indexPath.item], isSelected: indexPath.item == selectedIndex)
+        let option = options[indexPath.item]
+        cell.configure(with: option.title, isSelected: indexPath.item == selectedIndex)
         return cell
     }
 }
@@ -154,13 +156,9 @@ extension SCCameraToolOptionsView: UICollectionViewDelegate {
         // 更新选中状态
         collectionView.reloadItems(at: [IndexPath(item: previousIndex, section: 0), indexPath])
         
-//        // 添加选中动画
-//        if let cell = collectionView.cellForItem(at: indexPath) as? OptionCell {
-//            cell.animateSelection()
-//        }
-        
         // 通知代理，让代理处理所有动画逻辑
-        delegate?.optionsView(self, didSelect: options[indexPath.item], for: type)
+        let selectedOption = options[indexPath.item]
+        delegate?.optionsView(self, didSelect: selectedOption, for: type)
     }
 }
 
@@ -207,14 +205,4 @@ private class OptionCell: UICollectionViewCell {
         attributes.frame = CGRect(origin: attributes.frame.origin, size: size)
         return attributes
     }
-    
-//    func animateSelection() {
-//        UIView.animate(withDuration: 0.15, animations: {
-//            self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-//        }) { _ in
-//            UIView.animate(withDuration: 0.15) {
-//                self.transform = .identity
-//            }
-//        }
-//    }
-} 
+}

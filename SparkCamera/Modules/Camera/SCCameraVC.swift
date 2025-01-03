@@ -101,18 +101,42 @@ class SCCameraVC: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        // 检查相机权限
-        checkCameraPermission()
+        self.view.backgroundColor = UIColor.black
+        
+        // 显示加载状态
+        showLoading()
+        
+        // 初始化预览视图
+        previewView = SCPreviewView(frame: view.bounds)
+        view.addSubview(previewView)
+        
+        // 设置 UI
+        setupUI()
+        setupConstraints()
         
         // 设置水平指示器和手势
         setupHorizontalIndicator()
         setupGestures()
-        self.view.backgroundColor = UIColor.black
+        
+        // 设置按钮事件
+        setupActions()
+        
+        // 检查相机权限
+        checkCameraPermission()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        photoSession?.startSession()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 在视图完全显示后启动会话
+        if photoSession?.session.isRunning == false {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.photoSession?.startSession()
+            }
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -123,17 +147,16 @@ class SCCameraVC: UIViewController {
     private func setupHorizontalIndicator() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.view.addSubview(self.horizontalIndicator)
-            self.view.bringSubviewToFront(self.horizontalIndicator)
             
-            self.horizontalIndicator.snp.makeConstraints { make in
-                make.centerX.equalToSuperview()
-                make.centerY.equalToSuperview()
+            // 确保水平指示器在最上层
+            self.previewView.bringSubviewToFront(self.horizontalIndicator)
+            
+            // 更新约束
+            self.horizontalIndicator.snp.remakeConstraints { make in
+                make.center.equalToSuperview()  // 相对于预览视图居中
                 make.width.equalTo(200)
                 make.height.equalTo(4)
             }
-            
-            self.horizontalIndicator.isHidden = !self.isHorizontalIndicatorVisible
             
             if self.motionManager.isDeviceMotionAvailable {
                 self.motionManager.deviceMotionUpdateInterval = 0.1
@@ -243,12 +266,6 @@ class SCCameraVC: UIViewController {
             if granted {
                 DispatchQueue.main.async {
                     self?.setupCamera()
-                    // 等待布局完成后再启动会话
-                    self?.view.layoutIfNeeded()
-                    // 在后台线程启动会话
-                    DispatchQueue.global(qos: .userInitiated).async {
-                        self?.photoSession?.session.startRunning()
-                    }
                 }
             } else {
                 DispatchQueue.main.async {
@@ -259,70 +276,87 @@ class SCCameraVC: UIViewController {
     }
     
     private func setupCamera() {
-        showLoading()
-        
         let startTime = Date()
-        print("⏱️ [Camera Setup] Started at: \(startTime)")
+        print("⏱️ [Camera Setup] Starting camera setup")
         
-        // 1. 创建和配置预览视图
-        previewView = SCPreviewView()
+        // 1. 初始化相机会话
+        photoSession = SCPhotoSession()
+        photoSession.delegate = self
+        print("⏱️ [Camera Setup] PhotoSession initialized: +\(Date().timeIntervalSince(startTime))s")
         
-        // 2. 添加到视图层级并设置约束
-        setupUI()
-        setupConstraints()
-        print("⏱️ [Camera Setup] UI and constraints set: +\(Date().timeIntervalSince(startTime))s")
+        // 2. 初始化相机管理器
+        cameraManager = SCCameraManager(session: photoSession, photoSession: photoSession)
+        print("⏱️ [Camera Setup] CameraManager initialized: +\(Date().timeIntervalSince(startTime))s")
         
-        // 3. 在后台线程配置相机
+        // 3. 配置预览视图
+        previewView.session = photoSession
+        previewView.autorotate = true
+        print("⏱️ [Camera Setup] PreviewView configured: +\(Date().timeIntervalSince(startTime))s")
+        
+        // 4. 设置镜头选择器
+        setupLensSelector()
+        print("⏱️ [Camera Setup] Lens selector setup: +\(Date().timeIntervalSince(startTime))s")
+        
+        // 5. 启动相机会话
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
+            self.photoSession.startSession()
             
-            // 初始化相机会话
-            self.photoSession = SCPhotoSession()
-            print("⏱️ [Camera Setup] PhotoSession initialized: +\(Date().timeIntervalSince(startTime))s")
-            
-            // 初始化 cameraManager
-            self.cameraManager = SCCameraManager(session: self.photoSession, photoSession: self.photoSession)
-            print("⏱️ [Camera Setup] CameraManager initialized: +\(Date().timeIntervalSince(startTime))s")
-            
-            // 在主线程设置预览视图和其他 UI
-            DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
-                
-                self.previewView.session = self.photoSession
-                self.previewView.autorotate = true
-                
-                // 设置其他功能
-                self.photoSession.delegate = self
-                self.setupLensSelector()
-                self.setupActions()
-                
-                // 等待布局完成
-                self.view.layoutIfNeeded()
-                
-                // 设置预览层并启动会话
-                self.photoSession.setupPreviewLayer(in: self.previewView) { [weak self] in
-                    guard let self = self else { return }
-                    // 预览层设置完成后的回调
-                    print("⏱️ [Camera Setup] All setup completed: +\(Date().timeIntervalSince(startTime))s")
-                    self.hideLoading()
-                }
+            // 确保在主线程更新 UI
+            DispatchQueue.main.async {
+                self.hideLoading()
+                print("⏱️ [Camera Setup] Setup completed: +\(Date().timeIntervalSince(startTime))s")
             }
         }
     }
     
     private func setupUI() {
-        // 添加所有 UI 元素到视图层级
+        // 1. 添加预览视图
         view.addSubview(previewView)
+        
+        // 2. 添加关闭按钮
         view.addSubview(closeButton)
-        view.addSubview(captureButton)
-        view.addSubview(switchCameraButton)
-        view.addSubview(focusView)
-        view.addSubview(zoomIndicatorView)
-        view.addSubview(livePhotoButton)
-        view.addSubview(horizontalIndicator)
+        
+        // 3. 添加工具栏
         view.addSubview(toolBar)
         
+        // 初始化工具栏项目
+        let toolItems: [SCToolItem] = [
+            SCToolItem(type: .flash),
+            SCToolItem(type: .ratio),
+            SCToolItem(type: .whiteBalance),
+            SCToolItem(type: .exposure),
+            SCToolItem(type: .iso),
+            SCToolItem(type: .timer)
+        ]
+        toolBar.setItems(toolItems)
+        
+        // 4. 添加切换相机按钮
+        view.addSubview(switchCameraButton)
+        
+        // 5. 添加实况照片按钮
+        view.addSubview(livePhotoButton)
+        
+        // 6. 添加拍照按钮
+        view.addSubview(captureButton)
+        
+        // 7. 添加变焦指示器和标签
+        view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
+        
+        // 8. 添加对焦框
+        view.addSubview(focusView)
+        
+        // 9. 添加镜头选择器
+        view.addSubview(lensSelectorView)
+        
+        // 10. 添加水平指示器 - 确保添加到预览视图上
+        previewView.addSubview(horizontalIndicator)
+        
+        // 设置初始状态
+        zoomIndicatorView.isHidden = true
+        focusView.isHidden = true
+        horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
     }
     
     private func setupConstraints() {
@@ -345,24 +379,27 @@ class SCCameraVC: UIViewController {
             make.width.height.equalTo(44)
         }
         
-        // 2. 工具栏 - 调整位置到预览视图和拍照按钮之间
+        // 2. 工具栏
         toolBar.snp.makeConstraints { make in
-            make.left.right.equalToSuperview()
+            make.centerX.equalToSuperview()
             make.bottom.equalTo(captureButton.snp.top).offset(-20)
-            make.height.equalTo(90)
+            make.width.equalTo(UIScreen.main.bounds.width)
+            make.height.equalTo(80)
         }
         
-        // 3. 预览视图 - 调整约束，与工具栏对接
+        // 3. 预览视图
         previewView.snp.makeConstraints { make in
             make.top.equalTo(closeButton.snp.bottom).offset(20)
             make.left.equalToSuperview().offset(10)
             make.right.equalToSuperview().offset(-10)
-            make.bottom.equalTo(toolBar.snp.top).offset(-10) // 与工具栏保持10点间距
+            make.bottom.equalTo(toolBar.snp.top).offset(-10)
+            // 设置 4:3 比例
+            make.height.equalTo(previewView.snp.width).multipliedBy(4.0/3.0).priority(.high)
         }
         
         // 4. 功能按钮
-        switchCameraButton.snp.makeConstraints { make in
-            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
+        livePhotoButton.snp.makeConstraints { make in
+            make.left.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.centerY.equalTo(captureButton)
             make.width.height.equalTo(44)
         }
@@ -379,9 +416,9 @@ class SCCameraVC: UIViewController {
             make.edges.equalToSuperview().inset(UIEdgeInsets(top: 0, left: 5, bottom: 0, right: 5))
         }
         
-        // 6. 水平指示器 - 移除与主视图的约束，只与预览视图关联
-        horizontalIndicator.snp.remakeConstraints { make in
-            make.center.equalTo(previewView) 
+        // 6. 水平指示器
+        horizontalIndicator.snp.makeConstraints { make in
+            make.center.equalTo(previewView)
             make.width.equalTo(200)
             make.height.equalTo(4)
         }
@@ -547,7 +584,7 @@ class SCCameraVC: UIViewController {
     
     @objc private func toggleLivePhoto() {
         // 实现实况照片功能
-        let item = SCCameraToolItem(type: .livePhoto, state: LivePhotoMode.off)
+        let item = SCToolItem(type: .livePhoto)
         let view = MessageView.viewFromNib(layout: .statusLine)
         view.configureTheme(.info)
         view.configureContent(title: "提示", body: "Live Photo 功能待开发")
@@ -615,7 +652,6 @@ class SCCameraVC: UIViewController {
         focusView.center = point
         focusView.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
         focusView.isHidden = false
-        print("focusView.isHidden: \(focusView.isHidden)")
         UIView.animate(withDuration: 0.3, animations: {
             self.focusView.transform = .identity
         }) { _ in
@@ -654,6 +690,43 @@ class SCCameraVC: UIViewController {
         loadingView = nil
         setControlsEnabled(true)
     }
+    
+    // MARK: - Animation Helpers
+    private func animateToolBarExpand() {
+        UIView.animate(withDuration: 0.3, animations: {
+            self.toolBar.transform = .identity
+            self.toolBar.alpha = 1
+        })
+    }
+    
+    private func animateToolBarCollapse() {
+        UIView.animate(withDuration: 0.3, animations: {
+            self.toolBar.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.toolBar.alpha = 0
+        })
+    }
+    
+    private func animateControlsForToolBarExpand() {
+        UIView.animate(withDuration: 0.3, animations: {
+            self.captureButton.transform = .identity
+            self.switchCameraButton.transform = .identity
+            self.livePhotoButton.transform = .identity
+            self.captureButton.alpha = 1
+            self.switchCameraButton.alpha = 1
+            self.livePhotoButton.alpha = 1
+        })
+    }
+    
+    private func animateControlsForToolBarCollapse() {
+        UIView.animate(withDuration: 0.3, animations: {
+            self.captureButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.switchCameraButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.livePhotoButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.captureButton.alpha = 0
+            self.switchCameraButton.alpha = 0
+            self.livePhotoButton.alpha = 0
+        })
+    }
 }
 
 // MARK: - SCSessionDelegate
@@ -690,59 +763,151 @@ extension SCCameraVC: SCSessionDelegate {
 
 // MARK: - SCCameraToolBarDelegate
 extension SCCameraVC: SCCameraToolBarDelegate {
-    func toolBar(_ toolBar: SCCameraToolBar, didSelect item: SCCameraToolItem) {
+    func toolBar(_ toolBar: SCCameraToolBar, didSelect item: SCToolItem) {
+        // 处理工具项选择
         switch item.type {
         case .flash:
-            // 闪光灯功能
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.info)
-            view.configureContent(title: "提示", body: "闪光灯功能待开发")
-            SwiftMessages.show(view: view)
-            
+            if let flashState = item.state as? SCFlashState {
+                photoSession.setFlashMode(flashState.avFlashMode)
+            }
         case .livePhoto:
-            // 实况照片功能
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.info)
-            view.configureContent(title: "提示", body: "Live Photo 功能待开发")
-            SwiftMessages.show(view: view)
-            
-        case .ratio:
-            // 比例功能
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.info)
-            view.configureContent(title: "提示", body: "比例功能待开发")
-            SwiftMessages.show(view: view)
-            
-        case .whiteBalance:
-            // 白平衡功能
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.info)
-            view.configureContent(title: "提示", body: "白平衡功能待开发")
-            SwiftMessages.show(view: view)
-            
-        case .mute:
-            // 静音功能
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.info)
-            view.configureContent(title: "提示", body: "静音功能待开发")
-            SwiftMessages.show(view: view)
+            // 实况照片功能待实现
+            SwiftMessages.showInfoMessage("实况照片功能待开发")
+        default:
+            break
         }
     }
     
-    func toolBar(_ toolBar: SCCameraToolBar, willAnimate item: SCCameraToolItem) {
-        // 动画即将开始时的处理
+    func toolBar(_ toolBar: SCCameraToolBar, didExpand item: SCToolItem) {
+        // 处理工具项展开
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+            // 隐藏拍照按钮和其他控制按钮
+            self.captureButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.switchCameraButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            self.livePhotoButton.transform = CGAffineTransform(translationX: 0, y: 100)
+            
+            self.captureButton.alpha = 0
+            self.switchCameraButton.alpha = 0
+            self.livePhotoButton.alpha = 0
+        })
     }
     
-    func toolBar(_ toolBar: SCCameraToolBar, didExpand item: SCCameraToolItem) {
-        // 工具栏展开后的处理
+    func toolBar(_ toolBar: SCCameraToolBar, didCollapse item: SCToolItem) {
+        // 处理工具项收起
+        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
+            // 显示拍照按钮和其他控制按钮
+            self.captureButton.transform = .identity
+            self.switchCameraButton.transform = .identity
+            self.livePhotoButton.transform = .identity
+            
+            self.captureButton.alpha = 1
+            self.switchCameraButton.alpha = 1
+            self.livePhotoButton.alpha = 1
+        })
     }
     
-    func toolBar(_ toolBar: SCCameraToolBar, didCollapse item: SCCameraToolItem) {
-        // 工具栏收起后的处理
+    func toolBar(_ toolBar: SCCameraToolBar, willAnimate item: SCToolItem) {
+        // 处理工具项动画开始
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
     }
     
-    func toolBar(_ toolBar: SCCameraToolBar, didFinishAnimate item: SCCameraToolItem) {
-        // 动画完成后的处理
+    func toolBar(_ toolBar: SCCameraToolBar, didFinishAnimate item: SCToolItem) {
+        // 处理工具项动画结束
+        // 可以在这里添加额外的动画完成后的逻辑
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, didSelect option: String, for item: SCToolItem) {
+        // 处理选项选择
+        switch item.type {
+        case .flash:
+            if let flashState = item.state as? SCFlashState {
+                photoSession.setFlashMode(flashState.avFlashMode)
+                SwiftMessages.showInfoMessage("闪光灯模式：\(option)")
+            }
+        case .livePhoto:
+            // 实况照片功能待实现
+            SwiftMessages.showInfoMessage("实况照片功能待开发")
+        case .ratio:
+            if let ratioState = item.state as? SCRatioState {
+                // 设置预览比例
+                UIView.animate(withDuration: 0.3) {
+                    self.previewView.snp.updateConstraints { make in
+                        make.height.equalTo(self.previewView.snp.width).multipliedBy(ratioState.aspectRatio).priority(.high)
+                    }
+                    self.view.layoutIfNeeded()
+                }
+                SwiftMessages.showInfoMessage("预览比例：\(option)")
+            }
+        case .whiteBalance:
+            if let whiteBalanceState = item.state as? SCWhiteBalanceState {
+                // 设置白平衡
+                guard let device = photoSession.videoInput?.device else { return }
+                do {
+                    try device.lockForConfiguration()
+                    if device.isWhiteBalanceModeSupported(.locked) {
+                        let whiteBalanceGains = try device.deviceWhiteBalanceGains(for: AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(temperature: whiteBalanceState.temperature, tint: 0))
+                        device.setWhiteBalanceModeLocked(with: whiteBalanceGains)
+                    }
+                    device.unlockForConfiguration()
+                    SwiftMessages.showInfoMessage("白平衡：\(option)")
+                } catch {
+                    print("设置白平衡失败: \(error)")
+                }
+            }
+        case .exposure:
+            if let exposureState = item.state as? SCExposureState {
+                // 设置曝光补偿
+                guard let device = photoSession.videoInput?.device else { return }
+                do {
+                    try device.lockForConfiguration()
+                    device.setExposureTargetBias(exposureState.value)
+                    device.unlockForConfiguration()
+                    SwiftMessages.showInfoMessage("曝光补偿：\(option)")
+                } catch {
+                    print("设置曝光补偿失败: \(error)")
+                }
+            }
+        case .iso:
+            if let isoState = item.state as? SCISOState {
+                // 设置 ISO
+                guard let device = photoSession.videoInput?.device else { return }
+                do {
+                    try device.lockForConfiguration()
+                    if isoState.value == 0 {
+                        device.exposureMode = .continuousAutoExposure
+                    } else {
+                        let minISO = device.activeFormat.minISO
+                        let maxISO = device.activeFormat.maxISO
+                        let clampedISO = max(minISO, min(maxISO, isoState.value))
+                        device.setExposureModeCustom(duration: device.exposureDuration, iso: clampedISO)
+                    }
+                    device.unlockForConfiguration()
+                    SwiftMessages.showInfoMessage("ISO：\(option)")
+                } catch {
+                    print("设置 ISO 失败: \(error)")
+                }
+            }
+        case .timer:
+            if let timerState = item.state as? SCTimerState {
+                SwiftMessages.showInfoMessage("定时器：\(option)")
+            }
+        }
+    }
+    
+    func toolBar(_ toolBar: SCCameraToolBar, didToggleState item: SCToolItem) {
+        // 处理状态切换
+        switch item.type {
+        case .flash:
+            if let flashState = item.state as? SCFlashState {
+                photoSession.setFlashMode(flashState.avFlashMode)
+                SwiftMessages.showInfoMessage("闪光灯模式：\(flashState.title)")
+            }
+        case .livePhoto:
+            // 实况照片功能待实现
+            SwiftMessages.showInfoMessage("实况照片功能待开发")
+        default:
+            break
+        }
     }
 } 
 

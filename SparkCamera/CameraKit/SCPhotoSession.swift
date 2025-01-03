@@ -72,7 +72,7 @@ extension SCSession.FlashMode {
         }
     }
     
-    let photoOutput = AVCapturePhotoOutput()
+    var photoOutput = AVCapturePhotoOutput()
     
     var faceDetectionBoxes: [UIView] = []
     
@@ -323,33 +323,82 @@ extension SCSession.FlashMode {
         }
     }
 
-    func startSession() {
-        let startTime = Date()
-        print("⏱️ [Session] Start requested at: \(startTime)")
+    // MARK: - Session Setup
+    private func setupSession() {
+        session.beginConfiguration()
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            if !self.isSessionRunning {
-                print("⏱️ [Session] Starting session: +\(Date().timeIntervalSince(startTime))s")
-                self.session.startRunning()
-                self.isSessionRunning = true
-                print("⏱️ [Session] Session started: +\(Date().timeIntervalSince(startTime))s")
+        // 设置会话质量
+        session.sessionPreset = .photo
+        
+        // 设置视频输入
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
+            print("无法获取相机设备")
+            session.commitConfiguration()
+            return
+        }
+        
+        do {
+            videoInput = try AVCaptureDeviceInput(device: device)
+            if session.canAddInput(videoInput!) {
+                session.addInput(videoInput!)
+            }
+        } catch {
+            print("设置视频输入失败: \(error)")
+            session.commitConfiguration()
+            return
+        }
+        
+        // 设置照片输出
+        photoOutput = AVCapturePhotoOutput()
+        if session.canAddOutput(photoOutput) {
+            session.addOutput(photoOutput)
+        }
+        
+        session.commitConfiguration()
+    }
+    
+    // MARK: - Session Control
+    func startSession() {
+        if !session.isRunning {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.session.startRunning()
             }
         }
     }
     
     func stopSession() {
-        let startTime = Date()
-        print("⏱️ [Session] Stop requested at: \(startTime)")
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            if self.isSessionRunning {
-                print("⏱️ [Session] Stopping session: +\(Date().timeIntervalSince(startTime))s")
-                self.session.stopRunning()
-                self.isSessionRunning = false
-                print("⏱️ [Session] Session stopped: +\(Date().timeIntervalSince(startTime))s")
-            }
+        if session.isRunning {
+            session.stopRunning()
         }
+    }
+
+    // MARK: - Flash Control
+    func setFlashMode(_ mode: AVCaptureDevice.FlashMode) -> Bool {
+        guard let device = captureDeviceInput?.device else { return false }
+        
+        do {
+            try device.lockForConfiguration()
+            if device.hasFlash && device.isFlashAvailable {
+                device.flashMode = mode
+                device.unlockForConfiguration()
+                return true
+            } else {
+                device.unlockForConfiguration()
+                return false
+            }
+            print("设置闪光灯模式为：\(mode)")
+        } catch {
+            print("设置闪光灯失败: \(error)")
+            return false
+        }
+    }
+    
+    var isFlashAvailable: Bool {
+        guard let device = captureDeviceInput?.device else { return false }
+        return device.hasFlash && device.isFlashAvailable
+    }
+    
+    var currentFlashMode: AVCaptureDevice.FlashMode? {
+        return captureDeviceInput?.device.flashMode
     }
 }

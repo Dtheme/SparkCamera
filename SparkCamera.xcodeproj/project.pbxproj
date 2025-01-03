@@ -7,56 +7,79 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7817491A2D1D11D300521F2D /* UIFont+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 781749182D1D11D300521F2D /* UIFont+Custom.swift */; };
+		780DDC222D267B66000CA610 /* UIFont+Custom.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDC202D267B66000CA610 /* UIFont+Custom.swift */; };
+		780DDCD12D268365000CA610 /* SCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCA92D268365000CA610 /* SCCameraManager.swift */; };
+		780DDCD22D268365000CA610 /* SCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAA2D268365000CA610 /* SCError.swift */; };
+		780DDCD32D268365000CA610 /* SCFocusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAB2D268365000CA610 /* SCFocusBoxView.swift */; };
+		780DDCD42D268365000CA610 /* SCGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAC2D268365000CA610 /* SCGridView.swift */; };
+		780DDCD52D268365000CA610 /* SCHorizontalIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAD2D268365000CA610 /* SCHorizontalIndicatorView.swift */; };
+		780DDCD62D268365000CA610 /* SCLensModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAE2D268365000CA610 /* SCLensModel.swift */; };
+		780DDCD72D268365000CA610 /* SCPhotoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCAF2D268365000CA610 /* SCPhotoSession.swift */; };
+		780DDCD82D268365000CA610 /* SCPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCB02D268365000CA610 /* SCPreviewView.swift */; };
+		780DDCD92D268365000CA610 /* SCSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCB12D268365000CA610 /* SCSession.swift */; };
+		780DDCDA2D268365000CA610 /* SCUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCB22D268365000CA610 /* SCUtils.swift */; };
+		780DDCDB2D268365000CA610 /* SCVideoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCB32D268365000CA610 /* SCVideoSession.swift */; };
+		780DDD092D26876D000CA610 /* SCCameraVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCEF2D26876D000CA610 /* SCCameraVC.swift */; };
+		780DDD0A2D26876D000CA610 /* SCLensSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF02D26876D000CA610 /* SCLensSelectorView.swift */; };
+		780DDD0B2D26876D000CA610 /* SCPhotoPreviewVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF12D26876D000CA610 /* SCPhotoPreviewVC.swift */; };
+		780DDD0C2D26876D000CA610 /* SwiftMessages+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF32D26876D000CA610 /* SwiftMessages+Extension.swift */; };
+		780DDD0D2D26876D000CA610 /* HomeVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF52D26876D000CA610 /* HomeVC.swift */; };
+		780DDD0E2D26876D000CA610 /* SCToolItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF72D26876D000CA610 /* SCToolItem.swift */; };
+		780DDD0F2D26876D000CA610 /* SCToolOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF82D26876D000CA610 /* SCToolOption.swift */; };
+		780DDD102D26876D000CA610 /* SCToolState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCF92D26876D000CA610 /* SCToolState.swift */; };
+		780DDD112D26876D000CA610 /* SCToolType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCFA2D26876D000CA610 /* SCToolType.swift */; };
+		780DDD122D26876D000CA610 /* SCCameraSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCFC2D26876D000CA610 /* SCCameraSettings.swift */; };
+		780DDD132D26876D000CA610 /* SCCameraSettingsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCFD2D26876D000CA610 /* SCCameraSettingsManager.swift */; };
+		780DDD142D26876D000CA610 /* SCCameraToolBarDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDCFF2D26876D000CA610 /* SCCameraToolBarDelegate.swift */; };
+		780DDD152D26876D000CA610 /* SCCameraToolBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDD012D26876D000CA610 /* SCCameraToolBar.swift */; };
+		780DDD162D26876D000CA610 /* SCCameraToolCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDD022D26876D000CA610 /* SCCameraToolCell.swift */; };
+		780DDD172D26876D000CA610 /* SCCameraToolOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDD032D26876D000CA610 /* SCCameraToolOptionsView.swift */; };
+		780DDD182D26876D000CA610 /* SCLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDD052D26876D000CA610 /* SCLoadingView.swift */; };
+		780DDD192D26876D000CA610 /* TestVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 780DDD072D26876D000CA610 /* TestVC.swift */; };
 		7817491F2D1D2DE800521F2D /* ProFont-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */; };
 		781749202D1D2DE800521F2D /* ProFont-regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */; };
-		782A118A2D239A50007A6D78 /* SCCameraVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11792D239A50007A6D78 /* SCCameraVC.swift */; };
-		782A118B2D239A50007A6D78 /* SCLensSelectorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A117A2D239A50007A6D78 /* SCLensSelectorView.swift */; };
-		782A118C2D239A50007A6D78 /* SCPhotoPreviewVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A117B2D239A50007A6D78 /* SCPhotoPreviewVC.swift */; };
-		782A118D2D239A50007A6D78 /* HomeVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A117D2D239A50007A6D78 /* HomeVC.swift */; };
-		782A11932D239A50007A6D78 /* SCLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11862D239A50007A6D78 /* SCLoadingView.swift */; };
-		782A11942D239A50007A6D78 /* TestVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11882D239A50007A6D78 /* TestVC.swift */; };
-		782A119B2D239A76007A6D78 /* SCCameraToolBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11952D239A76007A6D78 /* SCCameraToolBar.swift */; };
-		782A119C2D239A76007A6D78 /* SCCameraToolBarDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11962D239A76007A6D78 /* SCCameraToolBarDelegate.swift */; };
-		782A119D2D239A76007A6D78 /* SCCameraToolCell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11972D239A76007A6D78 /* SCCameraToolCell.swift */; };
-		782A119E2D239A76007A6D78 /* SCCameraToolItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11982D239A76007A6D78 /* SCCameraToolItem.swift */; };
-		782A119F2D239A76007A6D78 /* SCCameraToolOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A11992D239A76007A6D78 /* SCCameraToolOptionsView.swift */; };
 		7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7868A90B2D1412D700CBB2FB /* AppDelegate.swift */; };
 		7868A91A2D1412D700CBB2FB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90C2D1412D700CBB2FB /* Assets.xcassets */; };
 		7868A91C2D1412D700CBB2FB /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */; };
 		7868A91D2D1412D700CBB2FB /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7868A9112D1412D700CBB2FB /* Main.storyboard */; };
 		7868A91E2D1412D700CBB2FB /* Podfile in Resources */ = {isa = PBXBuildFile; fileRef = 7868A9122D1412D700CBB2FB /* Podfile */; };
 		7868A91F2D1412D700CBB2FB /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7868A9132D1412D700CBB2FB /* SceneDelegate.swift */; };
-		786F781B2D22A5230027FDA3 /* SCCameraManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F78072D22A5230027FDA3 /* SCCameraManager.swift */; };
-		786F781C2D22A5230027FDA3 /* SCError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F78082D22A5230027FDA3 /* SCError.swift */; };
-		786F781D2D22A5230027FDA3 /* SCFocusBoxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F78092D22A5230027FDA3 /* SCFocusBoxView.swift */; };
-		786F781E2D22A5230027FDA3 /* SCGridView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780A2D22A5230027FDA3 /* SCGridView.swift */; };
-		786F781F2D22A5230027FDA3 /* SCHorizontalIndicatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780B2D22A5230027FDA3 /* SCHorizontalIndicatorView.swift */; };
-		786F78202D22A5230027FDA3 /* SCLensModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780C2D22A5230027FDA3 /* SCLensModel.swift */; };
-		786F78212D22A5230027FDA3 /* SCPhotoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780D2D22A5230027FDA3 /* SCPhotoSession.swift */; };
-		786F78222D22A5230027FDA3 /* SCPreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780E2D22A5230027FDA3 /* SCPreviewView.swift */; };
-		786F78232D22A5230027FDA3 /* SCSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F780F2D22A5230027FDA3 /* SCSession.swift */; };
-		786F78242D22A5230027FDA3 /* SCUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F78102D22A5230027FDA3 /* SCUtils.swift */; };
-		786F78252D22A5230027FDA3 /* SCVideoSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 786F78112D22A5230027FDA3 /* SCVideoSession.swift */; };
 		EF358B93AFDB670D408BB2BD /* Pods_SparkCamera.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7C103E5C423F592342A2FB6 /* Pods_SparkCamera.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		5EAAE86D17748F0CE08BF087 /* Pods-SparkCamera.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SparkCamera.debug.xcconfig"; path = "Target Support Files/Pods-SparkCamera/Pods-SparkCamera.debug.xcconfig"; sourceTree = "<group>"; };
-		781749182D1D11D300521F2D /* UIFont+Custom.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIFont+Custom.swift"; sourceTree = "<group>"; };
+		780DDC202D267B66000CA610 /* UIFont+Custom.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIFont+Custom.swift"; sourceTree = "<group>"; };
+		780DDCA92D268365000CA610 /* SCCameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraManager.swift; sourceTree = "<group>"; };
+		780DDCAA2D268365000CA610 /* SCError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCError.swift; sourceTree = "<group>"; };
+		780DDCAB2D268365000CA610 /* SCFocusBoxView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCFocusBoxView.swift; sourceTree = "<group>"; };
+		780DDCAC2D268365000CA610 /* SCGridView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCGridView.swift; sourceTree = "<group>"; };
+		780DDCAD2D268365000CA610 /* SCHorizontalIndicatorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCHorizontalIndicatorView.swift; sourceTree = "<group>"; };
+		780DDCAE2D268365000CA610 /* SCLensModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensModel.swift; sourceTree = "<group>"; };
+		780DDCAF2D268365000CA610 /* SCPhotoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoSession.swift; sourceTree = "<group>"; };
+		780DDCB02D268365000CA610 /* SCPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPreviewView.swift; sourceTree = "<group>"; };
+		780DDCB12D268365000CA610 /* SCSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCSession.swift; sourceTree = "<group>"; };
+		780DDCB22D268365000CA610 /* SCUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCUtils.swift; sourceTree = "<group>"; };
+		780DDCB32D268365000CA610 /* SCVideoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCVideoSession.swift; sourceTree = "<group>"; };
+		780DDCEF2D26876D000CA610 /* SCCameraVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraVC.swift; sourceTree = "<group>"; };
+		780DDCF02D26876D000CA610 /* SCLensSelectorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensSelectorView.swift; sourceTree = "<group>"; };
+		780DDCF12D26876D000CA610 /* SCPhotoPreviewVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoPreviewVC.swift; sourceTree = "<group>"; };
+		780DDCF32D26876D000CA610 /* SwiftMessages+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "SwiftMessages+Extension.swift"; sourceTree = "<group>"; };
+		780DDCF52D26876D000CA610 /* HomeVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeVC.swift; sourceTree = "<group>"; };
+		780DDCF72D26876D000CA610 /* SCToolItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCToolItem.swift; sourceTree = "<group>"; };
+		780DDCF82D26876D000CA610 /* SCToolOption.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCToolOption.swift; sourceTree = "<group>"; };
+		780DDCF92D26876D000CA610 /* SCToolState.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCToolState.swift; sourceTree = "<group>"; };
+		780DDCFA2D26876D000CA610 /* SCToolType.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCToolType.swift; sourceTree = "<group>"; };
+		780DDCFC2D26876D000CA610 /* SCCameraSettings.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraSettings.swift; sourceTree = "<group>"; };
+		780DDCFD2D26876D000CA610 /* SCCameraSettingsManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraSettingsManager.swift; sourceTree = "<group>"; };
+		780DDCFF2D26876D000CA610 /* SCCameraToolBarDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolBarDelegate.swift; sourceTree = "<group>"; };
+		780DDD012D26876D000CA610 /* SCCameraToolBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolBar.swift; sourceTree = "<group>"; };
+		780DDD022D26876D000CA610 /* SCCameraToolCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolCell.swift; sourceTree = "<group>"; };
+		780DDD032D26876D000CA610 /* SCCameraToolOptionsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolOptionsView.swift; sourceTree = "<group>"; };
+		780DDD052D26876D000CA610 /* SCLoadingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLoadingView.swift; sourceTree = "<group>"; };
+		780DDD072D26876D000CA610 /* TestVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestVC.swift; sourceTree = "<group>"; };
 		7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-Bold.ttf"; sourceTree = "<group>"; };
 		7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-regular.ttf"; sourceTree = "<group>"; };
-		782A11792D239A50007A6D78 /* SCCameraVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraVC.swift; sourceTree = "<group>"; };
-		782A117A2D239A50007A6D78 /* SCLensSelectorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensSelectorView.swift; sourceTree = "<group>"; };
-		782A117B2D239A50007A6D78 /* SCPhotoPreviewVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoPreviewVC.swift; sourceTree = "<group>"; };
-		782A117D2D239A50007A6D78 /* HomeVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = HomeVC.swift; sourceTree = "<group>"; };
-		782A11862D239A50007A6D78 /* SCLoadingView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLoadingView.swift; sourceTree = "<group>"; };
-		782A11882D239A50007A6D78 /* TestVC.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = TestVC.swift; sourceTree = "<group>"; };
-		782A11952D239A76007A6D78 /* SCCameraToolBar.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolBar.swift; sourceTree = "<group>"; };
-		782A11962D239A76007A6D78 /* SCCameraToolBarDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolBarDelegate.swift; sourceTree = "<group>"; };
-		782A11972D239A76007A6D78 /* SCCameraToolCell.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolCell.swift; sourceTree = "<group>"; };
-		782A11982D239A76007A6D78 /* SCCameraToolItem.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolItem.swift; sourceTree = "<group>"; };
-		782A11992D239A76007A6D78 /* SCCameraToolOptionsView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraToolOptionsView.swift; sourceTree = "<group>"; };
 		7868A8B92D140E8F00CBB2FB /* SparkCamera.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7868A90B2D1412D700CBB2FB /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7868A90C2D1412D700CBB2FB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -65,17 +88,6 @@
 		7868A9102D1412D700CBB2FB /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		7868A9122D1412D700CBB2FB /* Podfile */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Podfile; sourceTree = "<group>"; };
 		7868A9132D1412D700CBB2FB /* SceneDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		786F78072D22A5230027FDA3 /* SCCameraManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCCameraManager.swift; sourceTree = "<group>"; };
-		786F78082D22A5230027FDA3 /* SCError.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCError.swift; sourceTree = "<group>"; };
-		786F78092D22A5230027FDA3 /* SCFocusBoxView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCFocusBoxView.swift; sourceTree = "<group>"; };
-		786F780A2D22A5230027FDA3 /* SCGridView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCGridView.swift; sourceTree = "<group>"; };
-		786F780B2D22A5230027FDA3 /* SCHorizontalIndicatorView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCHorizontalIndicatorView.swift; sourceTree = "<group>"; };
-		786F780C2D22A5230027FDA3 /* SCLensModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCLensModel.swift; sourceTree = "<group>"; };
-		786F780D2D22A5230027FDA3 /* SCPhotoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoSession.swift; sourceTree = "<group>"; };
-		786F780E2D22A5230027FDA3 /* SCPreviewView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPreviewView.swift; sourceTree = "<group>"; };
-		786F780F2D22A5230027FDA3 /* SCSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCSession.swift; sourceTree = "<group>"; };
-		786F78102D22A5230027FDA3 /* SCUtils.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCUtils.swift; sourceTree = "<group>"; };
-		786F78112D22A5230027FDA3 /* SCVideoSession.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCVideoSession.swift; sourceTree = "<group>"; };
 		8DEB818EFD478EA8CA72924F /* Pods-SparkCamera.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SparkCamera.release.xcconfig"; path = "Target Support Files/Pods-SparkCamera/Pods-SparkCamera.release.xcconfig"; sourceTree = "<group>"; };
 		E7C103E5C423F592342A2FB6 /* Pods_SparkCamera.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SparkCamera.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -101,62 +113,118 @@
 			path = Pods;
 			sourceTree = "<group>";
 		};
-		781749192D1D11D300521F2D /* Utilities */ = {
+		780DDC212D267B66000CA610 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
-				781749182D1D11D300521F2D /* UIFont+Custom.swift */,
+				780DDC202D267B66000CA610 /* UIFont+Custom.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
 		};
-		782A117C2D239A50007A6D78 /* Camera */ = {
+		780DDCB42D268365000CA610 /* CameraKit */ = {
 			isa = PBXGroup;
 			children = (
-				782A11792D239A50007A6D78 /* SCCameraVC.swift */,
-				782A117A2D239A50007A6D78 /* SCLensSelectorView.swift */,
-				782A117B2D239A50007A6D78 /* SCPhotoPreviewVC.swift */,
+				780DDCA92D268365000CA610 /* SCCameraManager.swift */,
+				780DDCAA2D268365000CA610 /* SCError.swift */,
+				780DDCAB2D268365000CA610 /* SCFocusBoxView.swift */,
+				780DDCAC2D268365000CA610 /* SCGridView.swift */,
+				780DDCAD2D268365000CA610 /* SCHorizontalIndicatorView.swift */,
+				780DDCAE2D268365000CA610 /* SCLensModel.swift */,
+				780DDCAF2D268365000CA610 /* SCPhotoSession.swift */,
+				780DDCB02D268365000CA610 /* SCPreviewView.swift */,
+				780DDCB12D268365000CA610 /* SCSession.swift */,
+				780DDCB22D268365000CA610 /* SCUtils.swift */,
+				780DDCB32D268365000CA610 /* SCVideoSession.swift */,
+			);
+			path = CameraKit;
+			sourceTree = "<group>";
+		};
+		780DDCF22D26876D000CA610 /* Camera */ = {
+			isa = PBXGroup;
+			children = (
+				780DDCEF2D26876D000CA610 /* SCCameraVC.swift */,
+				780DDCF02D26876D000CA610 /* SCLensSelectorView.swift */,
+				780DDCF12D26876D000CA610 /* SCPhotoPreviewVC.swift */,
 			);
 			path = Camera;
 			sourceTree = "<group>";
 		};
-		782A117E2D239A50007A6D78 /* Home */ = {
+		780DDCF42D26876D000CA610 /* Extensions */ = {
 			isa = PBXGroup;
 			children = (
-				782A117D2D239A50007A6D78 /* HomeVC.swift */,
+				780DDCF32D26876D000CA610 /* SwiftMessages+Extension.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		780DDCF62D26876D000CA610 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				780DDCF52D26876D000CA610 /* HomeVC.swift */,
 			);
 			path = Home;
 			sourceTree = "<group>";
 		};
-		782A11872D239A50007A6D78 /* Views */ = {
+		780DDCFB2D26876D000CA610 /* Tools */ = {
 			isa = PBXGroup;
 			children = (
-				782A119A2D239A76007A6D78 /* ToolBar */,
-				782A11862D239A50007A6D78 /* SCLoadingView.swift */,
+				780DDCF72D26876D000CA610 /* SCToolItem.swift */,
+				780DDCF82D26876D000CA610 /* SCToolOption.swift */,
+				780DDCF92D26876D000CA610 /* SCToolState.swift */,
+				780DDCFA2D26876D000CA610 /* SCToolType.swift */,
+			);
+			path = Tools;
+			sourceTree = "<group>";
+		};
+		780DDCFE2D26876D000CA610 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				780DDCFB2D26876D000CA610 /* Tools */,
+				780DDCFC2D26876D000CA610 /* SCCameraSettings.swift */,
+				780DDCFD2D26876D000CA610 /* SCCameraSettingsManager.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		780DDD002D26876D000CA610 /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				780DDCFF2D26876D000CA610 /* SCCameraToolBarDelegate.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		780DDD042D26876D000CA610 /* ToolBar */ = {
+			isa = PBXGroup;
+			children = (
+				780DDD012D26876D000CA610 /* SCCameraToolBar.swift */,
+				780DDD022D26876D000CA610 /* SCCameraToolCell.swift */,
+				780DDD032D26876D000CA610 /* SCCameraToolOptionsView.swift */,
+			);
+			path = ToolBar;
+			sourceTree = "<group>";
+		};
+		780DDD062D26876D000CA610 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				780DDD042D26876D000CA610 /* ToolBar */,
+				780DDD052D26876D000CA610 /* SCLoadingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
 		};
-		782A11892D239A50007A6D78 /* Modules */ = {
+		780DDD082D26876D000CA610 /* Modules */ = {
 			isa = PBXGroup;
 			children = (
-				782A117C2D239A50007A6D78 /* Camera */,
-				782A117E2D239A50007A6D78 /* Home */,
-				782A11872D239A50007A6D78 /* Views */,
-				782A11882D239A50007A6D78 /* TestVC.swift */,
+				780DDCF22D26876D000CA610 /* Camera */,
+				780DDCF42D26876D000CA610 /* Extensions */,
+				780DDCF62D26876D000CA610 /* Home */,
+				780DDCFE2D26876D000CA610 /* Models */,
+				780DDD002D26876D000CA610 /* Protocols */,
+				780DDD062D26876D000CA610 /* Views */,
+				780DDD072D26876D000CA610 /* TestVC.swift */,
 			);
 			path = Modules;
-			sourceTree = "<group>";
-		};
-		782A119A2D239A76007A6D78 /* ToolBar */ = {
-			isa = PBXGroup;
-			children = (
-				782A11952D239A76007A6D78 /* SCCameraToolBar.swift */,
-				782A11962D239A76007A6D78 /* SCCameraToolBarDelegate.swift */,
-				782A11972D239A76007A6D78 /* SCCameraToolCell.swift */,
-				782A11982D239A76007A6D78 /* SCCameraToolItem.swift */,
-				782A11992D239A76007A6D78 /* SCCameraToolOptionsView.swift */,
-			);
-			path = ToolBar;
 			sourceTree = "<group>";
 		};
 		7868A8B02D140E8F00CBB2FB = {
@@ -180,9 +248,9 @@
 		7868A9142D1412D700CBB2FB /* SparkCamera */ = {
 			isa = PBXGroup;
 			children = (
-				782A11892D239A50007A6D78 /* Modules */,
-				786F78122D22A5230027FDA3 /* CameraKit */,
-				781749192D1D11D300521F2D /* Utilities */,
+				780DDD082D26876D000CA610 /* Modules */,
+				780DDCB42D268365000CA610 /* CameraKit */,
+				780DDC212D267B66000CA610 /* Utilities */,
 				7868A90B2D1412D700CBB2FB /* AppDelegate.swift */,
 				7868A90C2D1412D700CBB2FB /* Assets.xcassets */,
 				7868A90D2D1412D700CBB2FB /* Info.plist */,
@@ -194,24 +262,6 @@
 				7868A9132D1412D700CBB2FB /* SceneDelegate.swift */,
 			);
 			path = SparkCamera;
-			sourceTree = "<group>";
-		};
-		786F78122D22A5230027FDA3 /* CameraKit */ = {
-			isa = PBXGroup;
-			children = (
-				786F78072D22A5230027FDA3 /* SCCameraManager.swift */,
-				786F78082D22A5230027FDA3 /* SCError.swift */,
-				786F78092D22A5230027FDA3 /* SCFocusBoxView.swift */,
-				786F780A2D22A5230027FDA3 /* SCGridView.swift */,
-				786F780B2D22A5230027FDA3 /* SCHorizontalIndicatorView.swift */,
-				786F780C2D22A5230027FDA3 /* SCLensModel.swift */,
-				786F780D2D22A5230027FDA3 /* SCPhotoSession.swift */,
-				786F780E2D22A5230027FDA3 /* SCPreviewView.swift */,
-				786F780F2D22A5230027FDA3 /* SCSession.swift */,
-				786F78102D22A5230027FDA3 /* SCUtils.swift */,
-				786F78112D22A5230027FDA3 /* SCVideoSession.swift */,
-			);
-			path = CameraKit;
 			sourceTree = "<group>";
 		};
 		88AE9370E3F73C4E988C86BC /* Frameworks */ = {
@@ -340,31 +390,37 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				782A118C2D239A50007A6D78 /* SCPhotoPreviewVC.swift in Sources */,
-				782A118A2D239A50007A6D78 /* SCCameraVC.swift in Sources */,
-				782A119B2D239A76007A6D78 /* SCCameraToolBar.swift in Sources */,
-				786F78242D22A5230027FDA3 /* SCUtils.swift in Sources */,
-				782A118D2D239A50007A6D78 /* HomeVC.swift in Sources */,
-				786F78222D22A5230027FDA3 /* SCPreviewView.swift in Sources */,
-				782A119D2D239A76007A6D78 /* SCCameraToolCell.swift in Sources */,
-				782A11942D239A50007A6D78 /* TestVC.swift in Sources */,
-				786F78252D22A5230027FDA3 /* SCVideoSession.swift in Sources */,
-				786F781E2D22A5230027FDA3 /* SCGridView.swift in Sources */,
-				786F78202D22A5230027FDA3 /* SCLensModel.swift in Sources */,
-				7817491A2D1D11D300521F2D /* UIFont+Custom.swift in Sources */,
-				782A118B2D239A50007A6D78 /* SCLensSelectorView.swift in Sources */,
-				782A119F2D239A76007A6D78 /* SCCameraToolOptionsView.swift in Sources */,
-				782A11932D239A50007A6D78 /* SCLoadingView.swift in Sources */,
-				786F78232D22A5230027FDA3 /* SCSession.swift in Sources */,
-				786F781F2D22A5230027FDA3 /* SCHorizontalIndicatorView.swift in Sources */,
-				782A119C2D239A76007A6D78 /* SCCameraToolBarDelegate.swift in Sources */,
+				780DDD0B2D26876D000CA610 /* SCPhotoPreviewVC.swift in Sources */,
+				780DDD092D26876D000CA610 /* SCCameraVC.swift in Sources */,
+				780DDCDA2D268365000CA610 /* SCUtils.swift in Sources */,
+				780DDD0C2D26876D000CA610 /* SwiftMessages+Extension.swift in Sources */,
+				780DDCD82D268365000CA610 /* SCPreviewView.swift in Sources */,
+				780DDCDB2D268365000CA610 /* SCVideoSession.swift in Sources */,
+				780DDCD42D268365000CA610 /* SCGridView.swift in Sources */,
+				780DDD142D26876D000CA610 /* SCCameraToolBarDelegate.swift in Sources */,
+				780DDD172D26876D000CA610 /* SCCameraToolOptionsView.swift in Sources */,
+				780DDCD62D268365000CA610 /* SCLensModel.swift in Sources */,
+				780DDC222D267B66000CA610 /* UIFont+Custom.swift in Sources */,
+				780DDD122D26876D000CA610 /* SCCameraSettings.swift in Sources */,
+				780DDD0A2D26876D000CA610 /* SCLensSelectorView.swift in Sources */,
+				780DDCD92D268365000CA610 /* SCSession.swift in Sources */,
+				780DDCD52D268365000CA610 /* SCHorizontalIndicatorView.swift in Sources */,
+				780DDD162D26876D000CA610 /* SCCameraToolCell.swift in Sources */,
+				780DDD132D26876D000CA610 /* SCCameraSettingsManager.swift in Sources */,
 				7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */,
-				786F78212D22A5230027FDA3 /* SCPhotoSession.swift in Sources */,
-				786F781B2D22A5230027FDA3 /* SCCameraManager.swift in Sources */,
-				786F781D2D22A5230027FDA3 /* SCFocusBoxView.swift in Sources */,
-				782A119E2D239A76007A6D78 /* SCCameraToolItem.swift in Sources */,
-				786F781C2D22A5230027FDA3 /* SCError.swift in Sources */,
+				780DDCD72D268365000CA610 /* SCPhotoSession.swift in Sources */,
+				780DDD182D26876D000CA610 /* SCLoadingView.swift in Sources */,
+				780DDD152D26876D000CA610 /* SCCameraToolBar.swift in Sources */,
+				780DDD192D26876D000CA610 /* TestVC.swift in Sources */,
+				780DDD0E2D26876D000CA610 /* SCToolItem.swift in Sources */,
+				780DDCD12D268365000CA610 /* SCCameraManager.swift in Sources */,
+				780DDD0F2D26876D000CA610 /* SCToolOption.swift in Sources */,
+				780DDD112D26876D000CA610 /* SCToolType.swift in Sources */,
+				780DDCD32D268365000CA610 /* SCFocusBoxView.swift in Sources */,
+				780DDCD22D268365000CA610 /* SCError.swift in Sources */,
+				780DDD0D2D26876D000CA610 /* HomeVC.swift in Sources */,
 				7868A91F2D1412D700CBB2FB /* SceneDelegate.swift in Sources */,
+				780DDD102D26876D000CA610 /* SCToolState.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
