@@ -399,9 +399,9 @@ class SCCameraVC: UIViewController {
         
         // 4. 功能按钮
         livePhotoButton.snp.makeConstraints { make in
-            make.left.equalTo(view.safeAreaLayoutGuide).offset(20)
-            make.centerY.equalTo(captureButton)
-            make.width.height.equalTo(44)
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)  // 与 closeButton 同高
+            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)  // 右边距
+            make.width.height.equalTo(44)  // 保持原有尺寸
         }
         
         // 5. 指示器
