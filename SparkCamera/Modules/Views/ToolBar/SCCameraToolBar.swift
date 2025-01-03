@@ -25,6 +25,7 @@ class SCCameraToolBar: UIView {
     private var originalFrame: CGRect = .zero
     private var originalCenter: CGPoint = .zero
     private var originalCellFrames: [IndexPath: CGRect] = [:]
+    private var originalLayoutAttributes: [IndexPath: UICollectionViewLayoutAttributes] = [:]
     
     // MARK: - UI Components
     private lazy var blurView: UIVisualEffectView = {
@@ -92,12 +93,25 @@ class SCCameraToolBar: UIView {
     // MARK: - Public Methods
     func collapseToolBar(except item: SCToolItem) {
         guard !isCollapsed, !isAnimating else {
-            print("⚠️ [ToolBar] 动画状态检查失败")
-            print("- isCollapsed: \(isCollapsed)")
-            print("- isAnimating: \(isAnimating)")
-            print("- activeItem: \(String(describing: activeItem?.type))")
+            print("⚠️ [ToolBar] 收起动画被拦截")
             return
         }
+        
+        // 找到选中的cell
+        guard let selectedIndex = items.firstIndex(where: { $0.type == item.type }),
+              let selectedCell = collectionView.cellForItem(at: IndexPath(item: selectedIndex, section: 0)) else {
+            print("❌ 未找到选中的cell")
+            return
+        }
+        
+        // 打印收起动画前的状态
+        print("\n📍 [ToolBar] 收起动画前状态")
+        print("- 工具栏frame: \(frame)")
+        print("- 选中工具: \(item.type)")
+        print("- 选中cell位置: \(selectedCell.frame)")
+        print("- 选中cell在屏幕上的位置: \(selectedCell.convert(selectedCell.bounds, to: nil))")
+        print("- collectionView contentOffset: \(collectionView.contentOffset)")
+        print("- collectionView contentSize: \(collectionView.contentSize)")
         
         print("\n📍 [ToolBar] 开始收起动画")
         print("当前状态:")
@@ -150,7 +164,8 @@ class SCCameraToolBar: UIView {
         let sectionInset = layout.sectionInset
         
         // 计算最终的x偏移
-        let finalX = -(frame.width - (cellWidth + sectionInset.right + sectionInset.left))
+        let safeAreaInsets = superview?.safeAreaInsets ?? .zero
+        let finalX = -(frame.width - (cellWidth + sectionInset.right + sectionInset.left)) + safeAreaInsets.left
         
         // 计算选中cell的最终位置
         let rightEdgeX = collectionView.bounds.width - cellWidth - sectionInset.right
@@ -239,10 +254,7 @@ class SCCameraToolBar: UIView {
     
     func expandToolBar() {
         guard isCollapsed, !isAnimating else {
-            print("⚠️ [ToolBar] 展开动画状态检查失败")
-            print("- isCollapsed: \(isCollapsed)")
-            print("- isAnimating: \(isAnimating)")
-            print("- activeItem: \(String(describing: activeItem?.type))")
+            print("⚠️ [ToolBar] 展开动画被拦截")
             return
         }
         
@@ -254,67 +266,109 @@ class SCCameraToolBar: UIView {
         isAnimating = true
         
         if let activeItem = activeItem {
-            print("\n🔔 [ToolBar] 通知代理")
-            print("- 工具类型: \(activeItem.type)")
-            print("- 工具状态: \(activeItem.state)")
             delegate?.toolBar(self, willAnimate: activeItem)
             delegate?.toolBar(self, didCollapse: activeItem)
         }
         
-        print("\n🎬 [ToolBar] 隐藏选项视图")
         optionsView?.hide { [weak self] in
-            self?.optionsView?.removeFromSuperview()
-            self?.optionsView = nil
-        }
-        
-        print("\n📐 [ToolBar] 恢复约束")
-        print("- 原始center: \(originalCenter)")
-        print("- 原始frame: \(originalFrame)")
-        
-        self.snp.remakeConstraints { make in
-            make.center.equalTo(originalCenter)
-            make.width.equalTo(originalFrame.width)
-            make.height.equalTo(originalFrame.height)
-        }
-        
-        print("\n🎬 [ToolBar] 开始展开动画")
-        UIView.animate(withDuration: 0.3, animations: {
-            self.superview?.layoutIfNeeded()
-            self.blurView.layer.cornerRadius = 12
+            guard let self = self else { return }
+            self.optionsView?.removeFromSuperview()
+            self.optionsView = nil
             
-            print("\n📍 [ToolBar] 恢复所有cell")
-            self.collectionView.visibleCells.forEach { cell in
-                if let indexPath = self.collectionView.indexPath(for: cell),
-                   let toolCell = cell as? SCCameraToolCell {
-                    print("- cell[\(indexPath.item)]:")
-                    print("  类型: \(String(describing: toolCell.item?.type))")
-                    print("  原始位置: \(self.originalCellFrames[indexPath] ?? cell.frame)")
+            // 1. 第一步：恢复工具栏位置约束
+            self.snp.remakeConstraints { make in
+                make.center.equalTo(self.originalCenter)
+                make.width.equalTo(self.originalFrame.width)
+                make.height.equalTo(self.originalFrame.height)
+            }
+            
+            // 先重新加载 collectionView 确保所有 cell 都存在
+            self.collectionView.reloadData()
+            self.collectionView.layoutIfNeeded()
+            
+            // 找到选中的 item 的原始位置
+            if let selectedItem = self.activeItem,
+               let selectedIndex = self.items.firstIndex(where: { $0.type == selectedItem.type }),
+               let attributes = self.originalLayoutAttributes[IndexPath(item: selectedIndex, section: 0)] {
+                // 先恢复到选中 item 的滚动位置
+                let targetOffset = attributes.frame.origin.x - self.collectionView.contentInset.left
+                self.collectionView.contentOffset.x = max(0, min(targetOffset, self.collectionView.contentSize.width - self.collectionView.bounds.width))
+            }
+            
+            // 2. 第一步动画：恢复工具栏位置
+            UIView.animate(withDuration: 0.3,
+                          delay: 0,
+                          options: [.curveEaseOut],
+                          animations: {
+                self.superview?.layoutIfNeeded()
+                
+                // 处理所有 items
+                for (index, item) in self.items.enumerated() {
+                    let indexPath = IndexPath(item: index, section: 0)
+                    if let cell = self.collectionView.cellForItem(at: indexPath) {
+                        if item.type == self.activeItem?.type {
+                            // 保持选中 cell 可见
+                            if let attributes = self.originalLayoutAttributes[indexPath] {
+                                cell.frame = attributes.frame
+                                cell.transform = attributes.transform
+                            }
+                            cell.isHidden = false
+                            cell.alpha = 1
+                        } else {
+                            // 其他 cell 保持隐藏
+                            cell.isHidden = true
+                            cell.alpha = 0
+                        }
+                    }
+                }
+            }) { _ in
+                // 3. 第二步动画：显示所有 cells
+                UIView.animate(withDuration: 0.25,
+                              delay: 0,
+                              options: [.curveEaseOut],
+                              animations: {
+                    self.blurView.layer.cornerRadius = 12
                     
-                    cell.isHidden = false
-                    cell.alpha = 1
+                    // 恢复所有 items 的位置和状态
+                    for (index, _) in self.items.enumerated() {
+                        let indexPath = IndexPath(item: index, section: 0)
+                        if let cell = self.collectionView.cellForItem(at: indexPath),
+                           let attributes = self.originalLayoutAttributes[indexPath] {
+                            cell.frame = attributes.frame
+                            cell.transform = attributes.transform
+                            cell.isHidden = false
+                            
+                            // 平滑显示
+                            UIView.animate(withDuration: 0.2,
+                                         delay: 0,
+                                         options: [.curveEaseOut],
+                                         animations: {
+                                cell.alpha = 1
+                            })
+                        }
+                    }
+                }) { _ in
+                    // 清理状态
+                    self.originalLayoutAttributes.removeAll()
+                    self.isCollapsed = false
+                    self.isAnimating = false
+                    self.activeItem = nil
                     
-                    // 使用保存的原始位置，如果没有则使用布局计算的位置
-                    if let originalFrame = self.originalCellFrames[indexPath] {
-                        cell.frame = originalFrame
+                    print("\n🏁 [ToolBar] 展开动画流程结束")
+                    print("- isCollapsed: \(self.isCollapsed)")
+                    print("- isAnimating: \(self.isAnimating)")
+                    print("- activeItem: \(String(describing: self.activeItem))")
+                    
+                    // 打印最终状态
+                    print("- collectionView contentSize: \(self.collectionView.contentSize)")
+                    print("- collectionView contentOffset: \(self.collectionView.contentOffset)")
+                    for (index, _) in self.items.enumerated() {
+                        if let cell = self.collectionView.cellForItem(at: IndexPath(item: index, section: 0)) {
+                            print("- cell[\(index)] frame: \(cell.frame)")
+                        }
                     }
                 }
             }
-        }) { _ in
-            self.isCollapsed = false
-            self.isAnimating = false
-            
-            if let activeItem = self.activeItem {
-                print("\n🔔 [ToolBar] 通知代理动画完成")
-                print("- 工具类型: \(activeItem.type)")
-                print("- 工具状态: \(activeItem.state)")
-                self.delegate?.toolBar(self, didFinishAnimate: activeItem)
-            }
-            self.activeItem = nil
-            
-            print("\n🏁 [ToolBar] 展开动画流程结束")
-            print("- isCollapsed: \(self.isCollapsed)")
-            print("- isAnimating: \(self.isAnimating)")
-            print("- activeItem: \(String(describing: self.activeItem?.type))\n")
         }
     }
     
@@ -365,6 +419,22 @@ extension SCCameraToolBar: UICollectionViewDataSource, UICollectionViewDelegate 
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let item = items[indexPath.item]
+        
+        // 保存所有 cell 的布局属性
+        originalLayoutAttributes.removeAll()
+        for (index, _) in items.enumerated() {
+            let indexPath = IndexPath(item: index, section: 0)
+            if let attributes = collectionView.layoutAttributesForItem(at: indexPath)?.copy() as? UICollectionViewLayoutAttributes {
+                originalLayoutAttributes[indexPath] = attributes
+                
+                if let cell = collectionView.cellForItem(at: indexPath) as? SCCameraToolCell {
+                    print("- cell[\(index)]:")
+                    print("  类型: \(String(describing: cell.item?.type))")
+                    print("  布局位置: \(attributes.frame)")
+                    print("  状态: \(String(describing: cell.item?.state))")
+                }
+            }
+        }
         
         if let cell = collectionView.cellForItem(at: indexPath) as? SCCameraToolCell {
             cell.animateSelection()
