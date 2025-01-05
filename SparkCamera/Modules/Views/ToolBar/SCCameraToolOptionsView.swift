@@ -13,6 +13,13 @@ protocol SCCameraToolOptionsViewDelegate: AnyObject {
     func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType)
 }
 
+// MARK: - Array Extension
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
+}
+
 class SCCameraToolOptionsView: UIView {
     
     // MARK: - Properties
@@ -59,8 +66,25 @@ class SCCameraToolOptionsView: UIView {
     init(type: SCToolType, options: [SCToolOption]) {
         self.type = type
         self.options = options
+        
+        // 找到选中的选项索引
+        selectedIndex = options.firstIndex(where: { $0.isSelected }) ?? 0
+        
         super.init(frame: .zero)
         setupUI()
+        
+        // 打印初始化时的选项信息
+        print("📸 [ToolOptions] 工具类型: \(type)")
+        print("📸 [ToolOptions] 可用选项数量: \(options.count)")
+        print("📸 [ToolOptions] 选项列表:")
+        options.enumerated().forEach { index, option in
+            print("  \(index + 1). \(option.title) (状态: \(String(describing: option.state)))")
+        }
+        print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
+        if let selectedOption = options[safe: selectedIndex] {
+            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
+            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -114,6 +138,15 @@ class SCCameraToolOptionsView: UIView {
     
     // MARK: - Animation
     func show(from sourceView: UIView) {
+        // 打印展开时的选中状态
+        print("📸 [ToolOptions] 展开选项视图")
+        print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
+        if selectedIndex < options.count {
+            let selectedOption = options[selectedIndex]
+            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
+            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
+        }
+        
         alpha = 0
         transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         
@@ -150,14 +183,20 @@ extension SCCameraToolOptionsView: UICollectionViewDataSource {
 // MARK: - UICollectionViewDelegate
 extension SCCameraToolOptionsView: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let previousIndex = selectedIndex
-        selectedIndex = indexPath.item
-        
         // 更新选中状态
-        collectionView.reloadItems(at: [IndexPath(item: previousIndex, section: 0), indexPath])
+        selectedIndex = indexPath.item
+        collectionView.reloadData()
         
-        // 通知代理，让代理处理所有动画逻辑
+        // 获取选中的选项
         let selectedOption = options[indexPath.item]
+        
+        // 打印选择信息
+        print("📸 [ToolOptions] 用户选择了新选项")
+        print("📸 [ToolOptions] 选中索引: \(indexPath.item)")
+        print("📸 [ToolOptions] 选中选项: \(selectedOption.title)")
+        print("📸 [ToolOptions] 选中状态: \(String(describing: selectedOption.state))")
+        
+        // 通知代理
         delegate?.optionsView(self, didSelect: selectedOption, for: type)
     }
 }

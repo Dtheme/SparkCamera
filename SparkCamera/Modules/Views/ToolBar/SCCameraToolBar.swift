@@ -277,7 +277,57 @@ class SCCameraToolBar: UIView {
     }
     
     private func showOptionsView(for item: SCToolItem, from cell: UICollectionViewCell) {
-        let optionsView = SCCameraToolOptionsView(type: item.type, options: item.type.defaultOptions)
+        // 获取选项列表
+        var options = item.type.defaultOptions
+        var selectedIndex = 0
+        
+        // 从数据库获取当前状态并设置选中项
+        switch item.type {
+        case .ratio:
+            let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
+            if savedRatioMode != 0 {
+                selectedIndex = options.firstIndex(where: { ($0.state as? SCRatioState)?.rawValue == savedRatioMode }) ?? 0
+            }
+            
+        case .flash:
+            let savedFlashMode = SCCameraSettingsManager.shared.flashMode
+            if savedFlashMode != 0 {
+                selectedIndex = options.firstIndex(where: { ($0.state as? SCFlashState)?.rawValue == savedFlashMode }) ?? 0
+            }
+            
+        case .whiteBalance:
+            let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
+            if savedWhiteBalanceMode != 0 {
+                selectedIndex = options.firstIndex(where: { ($0.state as? SCWhiteBalanceState)?.rawValue == savedWhiteBalanceMode }) ?? 0
+            }
+            
+        case .exposure:
+            let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
+            selectedIndex = options.firstIndex(where: { ($0.state as? SCExposureState)?.value == savedExposureValue }) ?? 2 // 默认为0
+            
+        case .iso:
+            let savedISOValue = SCCameraSettingsManager.shared.isoValue
+            selectedIndex = options.firstIndex(where: { ($0.state as? SCISOState)?.value == savedISOValue }) ?? 0
+            
+        case .timer:
+            let savedTimerMode = SCCameraSettingsManager.shared.timerMode
+            if savedTimerMode != 0 {
+                selectedIndex = options.firstIndex(where: { ($0.state as? SCTimerState)?.rawValue == savedTimerMode }) ?? 0
+            }
+            
+        case .livePhoto:
+            break // 暂不支持
+        }
+        
+        // 更新选中状态
+        options = options.enumerated().map { index, option in
+            var updatedOption = option
+            updatedOption.isSelected = index == selectedIndex
+            return updatedOption
+        }
+        
+        // 创建并显示选项视图
+        let optionsView = SCCameraToolOptionsView(type: item.type, options: options)
         optionsView.delegate = self
         superview?.addSubview(optionsView)
         

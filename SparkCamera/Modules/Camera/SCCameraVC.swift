@@ -29,6 +29,9 @@ class SCCameraVC: UIViewController {
     private var loadingView: SCLoadingView?
     private var isConfiguring = false
     
+    // 添加选项视图高度常量
+    private let optionsViewHeight: CGFloat = 80
+    
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
         let button = UIButton(type: .system)
@@ -261,7 +264,6 @@ class SCCameraVC: UIViewController {
     }
     
     private func setupCamera() {
-        let startTime = Date()
         print("⏱️ [Camera Setup] Starting camera setup")
         
         // 1. 初始化相机会话
@@ -319,6 +321,7 @@ class SCCameraVC: UIViewController {
         // 如果是第一次使用，保存默认的 4:3 比例
         if SCCameraSettingsManager.shared.ratioMode == 0 {
             SCCameraSettingsManager.shared.ratioMode = SCRatioState.ratio4_3.rawValue
+            print("📸 [Ratio] 首次使用，设置默认比例为 4:3")
         }
         
         // 初始化闪光灯工具项
@@ -330,6 +333,7 @@ class SCCameraVC: UIViewController {
         let ratioItem = SCToolItem(type: .ratio)
         ratioItem.setState(ratioState)  // 设置状态，这会自动更新图标
         ratioItem.isSelected = false    // 确保初始状态未选中
+        print("📸 [Ratio] 初始化比例状态: \(ratioState.title)")
         
         // 初始化工具栏项目
         let toolItems: [SCToolItem] = [
@@ -924,27 +928,17 @@ extension SCCameraVC: SCSessionDelegate {
 // MARK: - SCCameraToolBarDelegate
 extension SCCameraVC: SCCameraToolBarDelegate {
     func toolBar(_ toolBar: SCCameraToolBar, didSelect option: String, for item: SCToolItem) {
+        // 打印当前选中的选项
+        print("📸 [ToolBar] 选中选项: \(item.type), 选项值: \(option)")
+        
         switch item.type {
-        case .flash:
-            if let flashState = item.state as? SCFlashState {
-                if photoSession.setFlashMode(flashState.avFlashMode) {
-                    // 保存闪光灯状态
-                    SCCameraSettingsManager.shared.flashMode = flashState.rawValue
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                    // 显示状态更新提示
-                    showFlashModeChanged(flashState)
-                } else {
-                    // 显示错误提示
-                    showError(NSError(domain: "com.sparkcamera", code: -1, userInfo: [NSLocalizedDescriptionKey: "设置闪光灯失败"]))
-                }
-            }
-        case .livePhoto:
-            // 实况照片功能待实现
-            SwiftMessages.showInfoMessage("实况照片功能待开发")
         case .ratio:
             if let ratioState = item.state as? SCRatioState {
+                // 打印比例相关信息
+                print("📸 [Ratio] 当前选中比例: \(ratioState.title)")
+                print("📸 [Ratio] 当前比例原始值: \(ratioState.rawValue)")
+                print("📸 [Ratio] 数据库中缓存的比例状态: \(SCCameraSettingsManager.shared.ratioMode)")
+                
                 // 保存比例状态
                 SCCameraSettingsManager.shared.ratioMode = ratioState.rawValue
                 
@@ -959,7 +953,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 // 计算新的预览高度
                 let heightByRatio = screenWidth * ratioState.aspectRatio
                 let previewHeight = min(heightByRatio, availableHeight)
-                
+                print("📸 [Ratio] 数据库中缓存的比例状态: \(SCCameraSettingsManager.shared.ratioMode)") 
                 // 根据不同的比例状态更新约束
                 switch ratioState {
                 case .ratio16_9:
@@ -1009,6 +1003,24 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 // 显示状态更新提示
                 SwiftMessages.showInfoMessage("比例：\(ratioState.title)")
             }
+        case .flash:
+            if let flashState = item.state as? SCFlashState {
+                if photoSession.setFlashMode(flashState.avFlashMode) {
+                    // 保存闪光灯状态
+                    SCCameraSettingsManager.shared.flashMode = flashState.rawValue
+                    // 添加触觉反馈
+                    let generator = UIImpactFeedbackGenerator(style: .light)
+                    generator.impactOccurred()
+                    // 显示状态更新提示
+                    showFlashModeChanged(flashState)
+                } else {
+                    // 显示错误提示
+                    showError(NSError(domain: "com.sparkcamera", code: -1, userInfo: [NSLocalizedDescriptionKey: "设置闪光灯失败"]))
+                }
+            }
+        case .livePhoto:
+            // 实况照片功能待实现
+            SwiftMessages.showInfoMessage("实况照片功能待开发")
         case .whiteBalance:
             if let whiteBalanceState = item.state as? SCWhiteBalanceState {
                 // 设置白平衡
@@ -1107,6 +1119,11 @@ extension SCCameraVC: SCCameraToolBarDelegate {
     }
     
     func toolBar(_ toolBar: SCCameraToolBar, didExpand item: SCToolItem) {
+        // 打印展开的工具项信息
+        print("📸 [ToolBar] 展开工具项: \(item.type)")
+        print("📸 [ToolBar] 当前状态: \(String(describing: item.state))")
+        print("📸 [ToolBar] 是否选中: \(item.isSelected)")
+        
         // 处理工具项展开
         UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
             // 隐藏拍照按钮和其他控制按钮
@@ -1118,6 +1135,113 @@ extension SCCameraVC: SCCameraToolBarDelegate {
             self.switchCameraButton.alpha = 0
             self.livePhotoButton.alpha = 0
         })
+        
+        // 根据工具项类型处理特定逻辑
+        switch item.type {
+        case .ratio:
+            // 获取保存的比例设置
+            let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
+            print("📸 [Ratio] 数据库中保存的比例模式: \(savedRatioMode)")
+            if let ratioState = SCRatioState(rawValue: savedRatioMode) {
+                // 更新工具项状态并选中当前配置的比例
+                item.setState(ratioState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [Ratio] 选中保存的状态: \(ratioState.title)")
+                print("📸 [Ratio] 比例值: \(ratioState.aspectRatio)")
+                print("📸 [Ratio] 当前实际比例状态: \(ratioState)")
+            }
+            
+        case .flash:
+            // 获取保存的闪光灯设置
+            let savedFlashMode = SCCameraSettingsManager.shared.flashMode
+            print("📸 [Flash] 数据库中保存的闪光灯模式: \(savedFlashMode)")
+            if let flashState = SCFlashState(rawValue: savedFlashMode) {
+                // 更新工具项状态并选中当前配置的闪光灯模式
+                item.setState(flashState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [Flash] 选中保存的状态: \(flashState.title)")
+                print("📸 [Flash] 闪光灯模式: \(flashState.avFlashMode.rawValue)")
+                print("📸 [Flash] 当前实际闪光灯状态: \(flashState)")
+            }
+            
+        case .whiteBalance:
+            // 获取保存的白平衡设置
+            let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
+            print("📸 [WhiteBalance] 数据库中保存的白平衡模式: \(savedWhiteBalanceMode)")
+            if let whiteBalanceState = SCWhiteBalanceState(rawValue: savedWhiteBalanceMode) {
+                item.setState(whiteBalanceState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [WhiteBalance] 选中保存的状态: \(whiteBalanceState.title)")
+                print("📸 [WhiteBalance] 色温值: \(whiteBalanceState.temperature)")
+                print("📸 [WhiteBalance] 当前实际白平衡状态: \(whiteBalanceState)")
+            }
+            
+        case .exposure:
+            // 获取保存的曝光值
+            let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
+            print("📸 [Exposure] 数据库中保存的曝光值: \(savedExposureValue)")
+            let exposureStates: [SCExposureState] = [.negative2, .negative1, .zero, .positive1, .positive2]
+            if let exposureState = exposureStates.first(where: { $0.value == savedExposureValue }) {
+                item.setState(exposureState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [Exposure] 选中保存的状态: \(exposureState.title)")
+                print("📸 [Exposure] 曝光值: \(exposureState.value)")
+                print("📸 [Exposure] 当前实际曝光状态: \(exposureState)")
+            }
+            
+        case .iso:
+            // 获取保存的 ISO 值
+            let savedISOValue = SCCameraSettingsManager.shared.isoValue
+            print("📸 [ISO] 数据库中保存的 ISO 值: \(savedISOValue)")
+            let isoStates: [SCISOState] = [.auto, .iso100, .iso200, .iso400, .iso800]
+            if let isoState = isoStates.first(where: { $0.value == savedISOValue }) {
+                item.setState(isoState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [ISO] 选中保存的状态: \(isoState.title)")
+                print("📸 [ISO] ISO 值: \(isoState.value)")
+                print("📸 [ISO] 当前实际ISO状态: \(isoState)")
+            }
+            
+        case .timer:
+            // 获取保存的定时器设置
+            let savedTimerMode = SCCameraSettingsManager.shared.timerMode
+            print("📸 [Timer] 数据库中保存的定时器模式: \(savedTimerMode)")
+            if let timerState = SCTimerState(rawValue: savedTimerMode) {
+                item.setState(timerState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [Timer] 选中保存的状态: \(timerState.title)")
+                print("📸 [Timer] 定时秒数: \(timerState.seconds)")
+                print("📸 [Timer] 当前实际定时器状态: \(timerState)")
+            }
+            
+        case .livePhoto:
+            print("📸 [LivePhoto] 功能未实现，使用默认关闭状态")
+            let defaultState = SCLivePhotoState.off
+            item.setState(defaultState)
+            item.isSelected = true
+            toolBar.updateItem(item)
+            print("📸 [LivePhoto] 使用默认状态: \(defaultState.title)")
+            print("📸 [LivePhoto] 当前实际实况照片状态: \(defaultState)")
+        }
+        
+        // 创建并显示选项视图
+        let optionsView = SCCameraToolOptionsView(type: item.type, options: item.options)
+        optionsView.delegate = self
+        toolBar.addSubview(optionsView)
+        
+        optionsView.snp.makeConstraints { make in
+            make.top.equalTo(toolBar.snp.top).offset(-optionsViewHeight)
+            make.left.right.equalToSuperview()
+            make.height.equalTo(optionsViewHeight)
+        }
+        
+        optionsView.show(from: toolBar)
     }
     
     func toolBar(_ toolBar: SCCameraToolBar, didCollapse item: SCToolItem) {
@@ -1166,5 +1290,17 @@ extension SCCameraVC: SCCameraToolBarDelegate {
             break
         }
     }
-} 
+}
+
+// MARK: - SCCameraToolOptionsViewDelegate
+extension SCCameraVC: SCCameraToolOptionsViewDelegate {
+    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType) {
+        // 处理选项选择
+        if let item = toolBar.getItem(for: type) {
+            item.setState(option.state)
+            toolBar.updateItem(item)
+            toolBar.delegate?.toolBar(toolBar, didSelect: option.title, for: item)
+        }
+    }
+}
 

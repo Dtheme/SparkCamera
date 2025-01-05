@@ -50,9 +50,9 @@ extension SCFlashState: SCToolState {
 }
 
 // MARK: - LivePhoto State
-public enum SCLivePhotoState: SCToolState {
-    case off
-    case on
+public enum SCLivePhotoState: Int {
+    case off = 0
+    case on = 1
     
     public var icon: UIImage? {
         switch self {
@@ -67,7 +67,9 @@ public enum SCLivePhotoState: SCToolState {
         case .on: return "开启"
         }
     }
-    
+}
+
+extension SCLivePhotoState: SCToolState {
     public func nextState() -> SCLivePhotoState {
         switch self {
         case .off: return .on
@@ -239,16 +241,16 @@ public enum SCISOState: SCToolState {
 // MARK: - Timer State
 public enum SCTimerState: Int {
     case off = 0
-    case threeSeconds = 1
-    case fiveSeconds = 2
-    case tenSeconds = 3
+    case seconds3 = 1
+    case seconds5 = 2
+    case seconds10 = 3
     
     public var icon: UIImage? {
         let baseIcon = UIImage(systemName: "timer")
         switch self {
         case .off:
             return baseIcon
-        case .threeSeconds, .fiveSeconds, .tenSeconds:
+        case .seconds3, .seconds5, .seconds10:
             return baseIcon?.withTintColor(.yellow, renderingMode: .alwaysOriginal)
         }
     }
@@ -256,22 +258,22 @@ public enum SCTimerState: Int {
     public var title: String {
         switch self {
         case .off: return "关闭"
-        case .threeSeconds: return "3秒"
-        case .fiveSeconds: return "5秒"
-        case .tenSeconds: return "10秒"
+        case .seconds3: return "3秒"
+        case .seconds5: return "5秒"
+        case .seconds10: return "10秒"
         }
     }
-    
-    public func nextState() -> SCTimerState { return self }
     
     public var seconds: Int {
         switch self {
         case .off: return 0
-        case .threeSeconds: return 3
-        case .fiveSeconds: return 5
-        case .tenSeconds: return 10
+        case .seconds3: return 3
+        case .seconds5: return 5
+        case .seconds10: return 10
         }
     }
 }
 
-extension SCTimerState: SCToolState {} 
+extension SCTimerState: SCToolState {
+    public func nextState() -> SCTimerState { return self }
+} 
