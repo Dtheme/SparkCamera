@@ -407,10 +407,11 @@ class SCCameraVC: UIViewController {
         
         // 4. 预览视图
         let screenWidth = UIScreen.main.bounds.width
+        let screenHeight = UIScreen.main.bounds.height
         let safeAreaTop = view.safeAreaInsets.top
         let toolBarHeight: CGFloat = 80
         let bottomSpace: CGFloat = 100  // 拍照按钮和底部安全区域的空间
-        let availableHeight = UIScreen.main.bounds.height - safeAreaTop - toolBarHeight - bottomSpace
+        let availableHeight = screenHeight - safeAreaTop - toolBarHeight - bottomSpace
         
         // 获取当前比例状态
         let ratioState: SCRatioState = {
@@ -427,14 +428,26 @@ class SCCameraVC: UIViewController {
             return min(heightByRatio, availableHeight)
         }()
         
-        // 计算垂直居中的偏移量
-        let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
-        
-        previewView.snp.makeConstraints { make in
-            make.width.equalTo(screenWidth)
-            make.height.equalTo(previewHeight)
-            make.centerX.equalToSuperview()
-            make.top.equalToSuperview().offset(verticalOffset)
+        // 根据不同的比例状态设置不同的布局
+        switch ratioState {
+        case .ratio16_9:
+            // 16:9 模式下垂直居中
+            let verticalCenter = (screenHeight - previewHeight) / 2
+            previewView.snp.makeConstraints { make in
+                make.width.equalTo(screenWidth)
+                make.height.equalTo(previewHeight)
+                make.centerX.equalToSuperview()
+                make.centerY.equalToSuperview()
+            }
+        default:
+            // 其他模式保持原来的布局
+            let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+            previewView.snp.makeConstraints { make in
+                make.width.equalTo(screenWidth)
+                make.height.equalTo(previewHeight)
+                make.centerX.equalToSuperview()
+                make.top.equalToSuperview().offset(verticalOffset)
+            }
         }
         
         // 5. 切换相机按钮
@@ -504,11 +517,30 @@ class SCCameraVC: UIViewController {
             
             // 更新布局
             self.view.addSubview(self.lensSelectorView)
+            
+            // 获取当前比例状态
+            let ratioState: SCRatioState = {
+                if let ratioItem = self.toolBar.getItem(for: .ratio),
+                   let state = ratioItem.state as? SCRatioState {
+                    return state
+                }
+                return .ratio4_3
+            }()
+            
+            // 根据不同的预览模式设置不同的布局
             self.lensSelectorView.snp.makeConstraints { make in
                 make.centerX.equalToSuperview()
-                make.bottom.equalTo(self.previewView.snp.bottom).offset(-20)
                 make.height.equalTo(50)
                 make.width.equalTo(200)
+                
+                switch ratioState {
+                case .ratio16_9:
+                    // 16:9模式下，距离工具栏顶部-20pt
+                    make.bottom.equalTo(self.toolBar.snp.top).offset(-20)
+                default:
+                    // 1:1和4:3模式下，距离预览视图底部-20pt
+                    make.bottom.equalTo(self.previewView.snp.bottom).offset(-20)
+                }
             }
             
             // 设置镜头选择回调
@@ -918,22 +950,51 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 
                 // 更新预览视图约束
                 let screenWidth = UIScreen.main.bounds.width
+                let screenHeight = UIScreen.main.bounds.height
                 let safeAreaTop = view.safeAreaInsets.top
                 let toolBarHeight: CGFloat = 80
                 let bottomSpace: CGFloat = 100
-                let availableHeight = UIScreen.main.bounds.height - safeAreaTop - toolBarHeight - bottomSpace
+                let availableHeight = screenHeight - safeAreaTop - toolBarHeight - bottomSpace
                 
                 // 计算新的预览高度
                 let heightByRatio = screenWidth * ratioState.aspectRatio
                 let previewHeight = min(heightByRatio, availableHeight)
                 
-                // 计算垂直居中的偏移量
-                let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
-                
-                // 更新约束
-                previewView.snp.updateConstraints { make in
-                    make.height.equalTo(previewHeight)
-                    make.top.equalToSuperview().offset(verticalOffset)
+                // 根据不同的比例状态更新约束
+                switch ratioState {
+                case .ratio16_9:
+                    // 16:9 模式下垂直居中
+                    previewView.snp.remakeConstraints { make in
+                        make.width.equalTo(screenWidth)
+                        make.height.equalTo(previewHeight)
+                        make.centerX.equalToSuperview()
+                        make.centerY.equalToSuperview()
+                    }
+                    
+                    // 更新 lensSelectorView 位置到工具栏顶部
+                    lensSelectorView.snp.remakeConstraints { make in
+                        make.centerX.equalToSuperview()
+                        make.height.equalTo(50)
+                        make.width.equalTo(200)
+                        make.bottom.equalTo(toolBar.snp.top).offset(-20)
+                    }
+                default:
+                    // 其他模式保持原来的布局
+                    let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+                    previewView.snp.remakeConstraints { make in
+                        make.width.equalTo(screenWidth)
+                        make.height.equalTo(previewHeight)
+                        make.centerX.equalToSuperview()
+                        make.top.equalToSuperview().offset(verticalOffset)
+                    }
+                    
+                    // 更新 lensSelectorView 位置到预览视图底部
+                    lensSelectorView.snp.remakeConstraints { make in
+                        make.centerX.equalToSuperview()
+                        make.height.equalTo(50)
+                        make.width.equalTo(200)
+                        make.bottom.equalTo(previewView.snp.bottom).offset(-20)
+                    }
                 }
                 
                 // 使用动画更新布局
