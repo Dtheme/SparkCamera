@@ -13,13 +13,6 @@ protocol SCCameraToolOptionsViewDelegate: AnyObject {
     func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType)
 }
 
-// MARK: - Array Extension
-extension Array {
-    subscript(safe index: Int) -> Element? {
-        return indices.contains(index) ? self[index] : nil
-    }
-}
-
 class SCCameraToolOptionsView: UIView {
     
     // MARK: - Properties
@@ -66,10 +59,6 @@ class SCCameraToolOptionsView: UIView {
     init(type: SCToolType, options: [SCToolOption]) {
         self.type = type
         self.options = options
-        
-        // 找到选中的选项索引
-        selectedIndex = options.firstIndex(where: { $0.isSelected }) ?? 0
-        
         super.init(frame: .zero)
         setupUI()
         
@@ -81,10 +70,6 @@ class SCCameraToolOptionsView: UIView {
             print("  \(index + 1). \(option.title) (状态: \(String(describing: option.state)))")
         }
         print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
-        if let selectedOption = options[safe: selectedIndex] {
-            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
-            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
-        }
     }
     
     required init?(coder: NSCoder) {
