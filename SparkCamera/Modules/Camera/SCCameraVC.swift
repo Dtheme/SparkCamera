@@ -383,26 +383,21 @@ class SCCameraVC: UIViewController {
     }
     
     private func setupConstraints() {
-        // 1. 基础控制按钮
+        // 1. 关闭按钮
         closeButton.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.left.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.width.height.equalTo(44)
         }
         
+        // 2. 拍照按钮
         captureButton.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
             make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-30)
+            make.centerX.equalToSuperview()
             make.width.height.equalTo(70)
         }
         
-        switchCameraButton.snp.makeConstraints { make in
-            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
-            make.centerY.equalTo(captureButton)
-            make.width.height.equalTo(44)
-        }
-        
-        // 2. 工具栏
+        // 3. 工具栏
         toolBar.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.bottom.equalTo(captureButton.snp.top).offset(-20)
@@ -410,24 +405,53 @@ class SCCameraVC: UIViewController {
             make.height.equalTo(80)
         }
         
-        // 3. 预览视图
+        // 4. 预览视图
+        let screenWidth = UIScreen.main.bounds.width
+        let safeAreaTop = view.safeAreaInsets.top
+        let toolBarHeight: CGFloat = 80
+        let bottomSpace: CGFloat = 100  // 拍照按钮和底部安全区域的空间
+        let availableHeight = UIScreen.main.bounds.height - safeAreaTop - toolBarHeight - bottomSpace
+        
+        // 获取当前比例状态
+        let ratioState: SCRatioState = {
+            if let ratioItem = toolBar.getItem(for: .ratio),
+               let state = ratioItem.state as? SCRatioState {
+                return state
+            }
+            return .ratio4_3  // 默认 4:3
+        }()
+        
+        // 计算预览高度
+        let previewHeight: CGFloat = {
+            let heightByRatio = screenWidth * ratioState.aspectRatio
+            return min(heightByRatio, availableHeight)
+        }()
+        
+        // 计算垂直居中的偏移量
+        let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+        
         previewView.snp.makeConstraints { make in
-            make.top.equalTo(closeButton.snp.bottom).offset(20)
-            make.left.equalToSuperview().offset(10)
-            make.right.equalToSuperview().offset(-10)
-            make.bottom.equalTo(toolBar.snp.top).offset(-10)
-            // 设置 4:3 比例
-            make.height.equalTo(previewView.snp.width).multipliedBy(4.0/3.0).priority(.high)
+            make.width.equalTo(screenWidth)
+            make.height.equalTo(previewHeight)
+            make.centerX.equalToSuperview()
+            make.top.equalToSuperview().offset(verticalOffset)
         }
         
-        // 4. 功能按钮
+        // 5. 切换相机按钮
+        switchCameraButton.snp.makeConstraints { make in
+            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
+            make.centerY.equalTo(captureButton)
+            make.width.height.equalTo(44)
+        }
+        
+        // 6. 实况照片按钮
         livePhotoButton.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)  // 与 closeButton 同高
-            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)  // 右边距
-            make.width.height.equalTo(44)  // 保持原有尺寸
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
+            make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
+            make.width.height.equalTo(44)
         }
         
-        // 5. 指示器
+        // 7. 变焦指示器
         zoomIndicatorView.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
@@ -435,11 +459,7 @@ class SCCameraVC: UIViewController {
             make.height.equalTo(30)
         }
         
-        zoomLabel.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(UIEdgeInsets(top: 0, left: 5, bottom: 0, right: 5))
-        }
-        
-        // 6. 水平指示器
+        // 8. 水平指示器
         horizontalIndicator.snp.makeConstraints { make in
             make.center.equalTo(previewView)
             make.width.equalTo(200)
@@ -895,13 +915,38 @@ extension SCCameraVC: SCCameraToolBarDelegate {
             if let ratioState = item.state as? SCRatioState {
                 // 保存比例状态
                 SCCameraSettingsManager.shared.ratioMode = ratioState.rawValue
-                // 设置预览比例
-                updatePreviewRatio(ratioState)
+                
+                // 更新预览视图约束
+                let screenWidth = UIScreen.main.bounds.width
+                let safeAreaTop = view.safeAreaInsets.top
+                let toolBarHeight: CGFloat = 80
+                let bottomSpace: CGFloat = 100
+                let availableHeight = UIScreen.main.bounds.height - safeAreaTop - toolBarHeight - bottomSpace
+                
+                // 计算新的预览高度
+                let heightByRatio = screenWidth * ratioState.aspectRatio
+                let previewHeight = min(heightByRatio, availableHeight)
+                
+                // 计算垂直居中的偏移量
+                let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+                
+                // 更新约束
+                previewView.snp.updateConstraints { make in
+                    make.height.equalTo(previewHeight)
+                    make.top.equalToSuperview().offset(verticalOffset)
+                }
+                
+                // 使用动画更新布局
+                UIView.animate(withDuration: 0.3) {
+                    self.view.layoutIfNeeded()
+                }
+                
                 // 添加触觉反馈
                 let generator = UIImpactFeedbackGenerator(style: .light)
                 generator.impactOccurred()
+                
                 // 显示状态更新提示
-                showRatioModeChanged(ratioState)
+                SwiftMessages.showInfoMessage("比例：\(ratioState.title)")
             }
         case .whiteBalance:
             if let whiteBalanceState = item.state as? SCWhiteBalanceState {

@@ -107,11 +107,11 @@ public enum SCRatioState: Int {
     public var aspectRatio: CGFloat {
         switch self {
         case .ratio4_3:
-            return 4.0 / 3.0
+            return 3.0 / 4.0
         case .ratio1_1:
             return 1.0
         case .ratio16_9:
-            return 16.0 / 9.0
+            return 9.0 / 16.0
         }
     }
 }

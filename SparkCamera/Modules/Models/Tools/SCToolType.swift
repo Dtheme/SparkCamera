@@ -58,7 +58,7 @@ public enum SCToolType {
     /// 是否支持状态切换
     public var supportsStateToggle: Bool {
         switch self {
-        case .flash, .livePhoto:
+        case .livePhoto:
             return true
         default:
             return false
