@@ -62,6 +62,8 @@ struct SCScaleSliderStyle {
     var subScaleHeight: CGFloat
     /// 标签字体大小
     var labelFontSize: CGFloat
+    /// 刻度间距
+    var scaleWidth: CGFloat
     
     /// 滑块形状
     enum ThumbShape {
@@ -93,7 +95,8 @@ struct SCScaleSliderStyle {
                     thumbShape: .circle,
                     mainScaleHeight: Constants.mainScaleHeight,
                     subScaleHeight: Constants.subScaleHeight,
-                    labelFontSize: Constants.labelFontSize
+                    labelFontSize: Constants.labelFontSize,
+                    scaleWidth: Constants.stepWidth
                 )
             case .dark:
                 return SCScaleSliderStyle(
@@ -108,7 +111,8 @@ struct SCScaleSliderStyle {
                     thumbShape: .circle,
                     mainScaleHeight: Constants.mainScaleHeight,
                     subScaleHeight: Constants.subScaleHeight,
-                    labelFontSize: Constants.labelFontSize
+                    labelFontSize: Constants.labelFontSize,
+                    scaleWidth: Constants.stepWidth
                 )
             case .vertical:
                 return SCScaleSliderStyle(
@@ -123,7 +127,8 @@ struct SCScaleSliderStyle {
                     thumbShape: .vertical,
                     mainScaleHeight: Constants.mainScaleHeight,
                     subScaleHeight: Constants.subScaleHeight,
-                    labelFontSize: Constants.labelFontSize
+                    labelFontSize: Constants.labelFontSize,
+                    scaleWidth: Constants.stepWidth
                 )
             }
         }
@@ -263,7 +268,7 @@ class SCScaleSlider: UIView {
             make.centerY.equalToSuperview()
             
             let totalSteps = Int((config.maxValue - config.minValue) / config.step)
-            let stepSize = Constants.stepWidth
+            let stepSize = style.scaleWidth
             let totalSize = CGFloat(totalSteps) * stepSize
             
             // 总宽度 = 刻度总宽度 + 屏幕宽度（确保两端有足够空间）
@@ -321,7 +326,7 @@ class SCScaleSlider: UIView {
         scaleLabels.removeAll()
         
         let totalSteps = Int((config.maxValue - config.minValue) / config.step)
-        let stepWidth = Constants.stepWidth
+        let stepWidth = style.scaleWidth
         let screenWidth = UIScreen.main.bounds.width
         
         // 计算0点位置
@@ -380,7 +385,7 @@ class SCScaleSlider: UIView {
             }
             
         case .changed:
-            let stepWidth = Constants.stepWidth
+            let stepWidth = style.scaleWidth
             let sensitivity = min(abs(gesture.velocity(in: self).x) / 1000, 2.0)
             // 左滑尺子向左移动，数值增加
             let valueChange = Float(translation.x / stepWidth) * config.step * Float(sensitivity)
@@ -426,12 +431,12 @@ class SCScaleSlider: UIView {
         let hitTestRect = CGRect(x: location.x - 20, y: 0, width: 40, height: bounds.height)
         guard hitTestRect.contains(CGPoint(x: location.x, y: location.y)) else { return }
         
-        let stepWidth = Constants.stepWidth
-        // 点击左侧，尺子向左移动，数值增加
+        let stepWidth = style.scaleWidth
+        // 点击右侧，尺子向左移动（值增大）；点击左侧，尺子向右移动（值减小）
         let steps = (location.x - centerX) / stepWidth
         let valueChange = Float(steps) * config.step
         
-        var newValue = currentValue - valueChange  // 注意这里改为减法
+        var newValue = currentValue + valueChange  // 点击右侧值增大，点击左侧值减小
         newValue = min(config.maxValue, max(config.minValue, newValue))
         currentValue = newValue
         
@@ -444,7 +449,7 @@ class SCScaleSlider: UIView {
     private func getCurrentScaleValue() -> Float {
         let transform = contentView.transform.tx
         let totalSteps = Int((config.maxValue - config.minValue) / config.step)
-        let stepWidth = Constants.stepWidth
+        let stepWidth = style.scaleWidth
         let totalSize = CGFloat(totalSteps) * stepWidth
         
         // 反转计算方向：保持与移动方向一致
@@ -475,7 +480,7 @@ class SCScaleSlider: UIView {
     }
     
     private func updateScalePosition(animated: Bool) {
-        let stepWidth = Constants.stepWidth
+        let stepWidth = style.scaleWidth
         
         // 计算当前值相对于0点的步数
         let stepsFromZero = -currentValue / config.step
@@ -615,6 +620,19 @@ class SCScaleSlider: UIView {
         // 更新数值标签样式
         valueLabel.backgroundColor = style.valueLabelBackgroundColor
         valueLabel.textColor = style.valueLabelTextColor
+        
+        // 重新绘制刻度
+        drawScales()
+        
+        // 更新内容视图宽度
+        let totalSteps = Int((config.maxValue - config.minValue) / config.step)
+        let totalSize = CGFloat(totalSteps) * style.scaleWidth
+        contentView.snp.updateConstraints { make in
+            make.width.equalTo(totalSize + UIScreen.main.bounds.width)
+        }
+        
+        // 更新位置
+        updateScalePosition(animated: false)
     }
     
     private func setupThumbView() {
@@ -684,7 +702,7 @@ class SCScaleSlider: UIView {
 
 // MARK: - Constants
 private enum Constants {
-    /// 步宽
+    /// 默认步宽
     static let stepWidth: CGFloat = 20.0
     /// 滑块大小
     static let thumbSize: CGFloat = 24.0
