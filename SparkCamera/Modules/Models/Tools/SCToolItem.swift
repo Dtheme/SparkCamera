@@ -6,7 +6,8 @@ public class SCToolItem {
     public let options: [SCToolOption]
     public var isSelected: Bool = false
     public var isEnabled: Bool = true
-    
+//    public var title: String = ""
+
     public init(type: SCToolType) {
         self.type = type
         self.options = type.defaultOptions

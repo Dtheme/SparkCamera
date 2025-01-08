@@ -401,4 +401,126 @@ extension SCSession.FlashMode {
     var currentFlashMode: AVCaptureDevice.FlashMode? {
         return captureDeviceInput?.device.flashMode
     }
+
+    public func setWhiteBalanceMode(_ state: SCWhiteBalanceState) -> Bool {
+        guard let device = captureDeviceInput?.device else { return false }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            switch state {
+            case .auto:
+                if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                    device.whiteBalanceMode = .continuousAutoWhiteBalance
+                    print("设置自动白平衡模式成功")
+                } else {
+                    print("设备不支持自动白平衡模式")
+                    device.unlockForConfiguration()
+                    return false
+                }
+                
+            case .sunny, .cloudy, .fluorescent, .incandescent:
+                if device.isWhiteBalanceModeSupported(.locked) {
+                    device.whiteBalanceMode = .locked
+                    let temperatureAndTint = AVCaptureDevice.WhiteBalanceTemperatureAndTintValues(
+                        temperature: state.temperature,
+                        tint: state.tint
+                    )
+                    let gains = device.deviceWhiteBalanceGains(for: temperatureAndTint)
+                    let normalizedGains = self.normalizeWhiteBalanceGains(gains, for: device)
+                    device.setWhiteBalanceModeLocked(with: normalizedGains)
+                    print("设置白平衡模式成功：\(state.title)")
+                } else {
+                    print("设备不支持锁定白平衡模式")
+                    device.unlockForConfiguration()
+                    return false
+                }
+            }
+            
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("设置白平衡模式失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    // 辅助方法：确保白平衡增益值在设备支持的范围内
+    private func normalizeWhiteBalanceGains(_ gains: AVCaptureDevice.WhiteBalanceGains, for device: AVCaptureDevice) -> AVCaptureDevice.WhiteBalanceGains {
+        var normalizedGains = gains
+        
+        // 确保每个增益值都在设备支持的范围内
+        let minGain: Float = 1.0  // 最小增益值通常为 1.0
+        let maxGain: Float = device.maxWhiteBalanceGain
+        
+        normalizedGains.redGain = min(max(gains.redGain, minGain), maxGain)
+        normalizedGains.greenGain = min(max(gains.greenGain, minGain), maxGain)
+        normalizedGains.blueGain = min(max(gains.blueGain, minGain), maxGain)
+        
+        return normalizedGains
+    }
+
+    // MARK: - Camera Settings
+    public func setExposure(_ value: Float) -> Bool {
+        guard let device = captureDeviceInput?.device else { return false }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            if device.isExposureModeSupported(.custom) {
+                device.exposureMode = .custom
+                let exposureValue = value * device.maxExposureTargetBias
+                device.setExposureTargetBias(exposureValue)
+                print("设置曝光值为：\(exposureValue)")
+            } else {
+                print("设备不支持自定义曝光模式")
+                device.unlockForConfiguration()
+                return false
+            }
+            
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("设置曝光值失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    public func setISO(_ value: Float) -> Bool {
+        guard let device = captureDeviceInput?.device else { return false }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            if value == 0 {
+                // Auto ISO
+                if device.isExposureModeSupported(.continuousAutoExposure) {
+                    device.exposureMode = .continuousAutoExposure
+                    print("设置 ISO 为自动模式")
+                } else {
+                    print("设备不支持自动 ISO 模式")
+                    device.unlockForConfiguration()
+                    return false
+                }
+            } else {
+                // Manual ISO
+                if device.isExposureModeSupported(.custom) {
+                    device.exposureMode = .custom
+                    let isoValue = min(max(value, device.activeFormat.minISO), device.activeFormat.maxISO)
+                    device.setExposureModeCustom(duration: device.exposureDuration, iso: isoValue)
+                    print("设置 ISO 值为：\(isoValue)")
+                } else {
+                    print("设备不支持自定义 ISO 模式")
+                    device.unlockForConfiguration()
+                    return false
+                }
+            }
+            
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            print("设置 ISO 失败: \(error.localizedDescription)")
+            return false
+        }
+    }
 }

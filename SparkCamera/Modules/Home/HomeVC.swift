@@ -23,6 +23,17 @@ class HomeVC: UIViewController {
         return button
     }()
     
+    private lazy var labButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("相机实验室", for: .normal)
+        button.titleLabel?.font = UIFont.mainFont(ofSize: 18, weight: .medium)
+        button.setTitleColor(.white, for: .normal)
+        button.backgroundColor = .systemGreen
+        button.layer.cornerRadius = 25
+        button.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        return button
+    }()
+    
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
         label.text = "SparkCamera"
@@ -45,6 +56,7 @@ class HomeVC: UIViewController {
         view.backgroundColor = .white
         view.addSubview(titleLabel)
         view.addSubview(cameraButton)
+        view.addSubview(labButton)
     }
     
     private func setupConstraints() {
@@ -54,7 +66,15 @@ class HomeVC: UIViewController {
         }
         
         cameraButton.snp.makeConstraints { make in
-            make.center.equalToSuperview()
+            make.centerX.equalToSuperview()
+            make.centerY.equalToSuperview().offset(-40)
+            make.width.equalTo(200)
+            make.height.equalTo(50)
+        }
+        
+        labButton.snp.makeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(cameraButton.snp.bottom).offset(20)
             make.width.equalTo(200)
             make.height.equalTo(50)
         }
@@ -62,6 +82,7 @@ class HomeVC: UIViewController {
     
     private func setupActions() {
         cameraButton.addTarget(self, action: #selector(openCamera), for: .touchUpInside)
+        labButton.addTarget(self, action: #selector(openLab), for: .touchUpInside)
     }
     
     // MARK: - Actions
@@ -69,5 +90,12 @@ class HomeVC: UIViewController {
         let cameraVC = SCCameraVC()
         cameraVC.modalPresentationStyle = .fullScreen
         present(cameraVC, animated: true)
+    }
+    
+    @objc private func openLab() {
+        let labVC = TestVC()
+        let nav = UINavigationController(rootViewController: labVC)
+        nav.modalPresentationStyle = .fullScreen
+        present(nav, animated: true)
     }
 } 

@@ -21,15 +21,33 @@ class SCCameraToolOptionsView: UIView {
     private var options: [SCToolOption]
     private var selectedIndex: Int = 0
     private var gradientLayer: CAGradientLayer?
+    private var itemTitle: String
+    
+    // 添加滑块视图
+    private lazy var scaleSlider: SCScaleSlider? = {
+        if type == .exposure {
+            let config = SCScaleSliderConfig(minValue: -2.0,
+                                           maxValue: 2.0,
+                                           step: 0.1,
+                                           defaultValue: 0.0)
+            let slider = SCScaleSlider(config: config)
+            slider.style = .Style.vertical.style
+            slider.valueChangedHandler = { [weak self] value in
+                self?.handleSliderValueChanged(value)
+            }
+            return slider
+        }
+        return nil
+    }()
     
     // MARK: - UI Components
-    private lazy var blurView: UIVisualEffectView = {
-        let blurEffect = UIBlurEffect(style: .dark)
-        let view = UIVisualEffectView(effect: blurEffect)
-        view.clipsToBounds = true
-        view.backgroundColor = .clear
-        view.alpha = 0.5  // 降低模糊效果的不透明度
-        return view
+    private lazy var titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .white
+        label.textAlignment = .right
+        label.text = itemTitle
+        return label
     }()
     
     private lazy var maskLayer: CAShapeLayer = {
@@ -56,13 +74,16 @@ class SCCameraToolOptionsView: UIView {
     }()
     
     // MARK: - Initialization
-    init(type: SCToolType, options: [SCToolOption]) {
+    init(type: SCToolType, options: [SCToolOption], selectedIndex: Int = 0, itemTitle: String) {
         self.type = type
         self.options = options
+        self.selectedIndex = selectedIndex
+        self.itemTitle = itemTitle
+        
         super.init(frame: .zero)
         setupUI()
         
-        // 打印初始化时的选项信息
+        // 打印选项信息
         print("📸 [ToolOptions] 工具类型: \(type)")
         print("📸 [ToolOptions] 可用选项数量: \(options.count)")
         print("📸 [ToolOptions] 选项列表:")
@@ -70,6 +91,12 @@ class SCCameraToolOptionsView: UIView {
             print("  \(index + 1). \(option.title) (状态: \(String(describing: option.state)))")
         }
         print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
+        
+        if selectedIndex < options.count {
+            let selectedOption = options[selectedIndex]
+            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
+            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -80,50 +107,27 @@ class SCCameraToolOptionsView: UIView {
     private func setupUI() {
         backgroundColor = .clear
         
-        addSubview(blurView)
-        blurView.contentView.addSubview(collectionView)
+        self.addSubview(collectionView)
+        self.addSubview(titleLabel)
         
-        blurView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+        titleLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(8)
+            make.right.equalToSuperview().offset(-15)
+            make.height.equalTo(20)
         }
         
         collectionView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
+            make.left.right.bottom.top.equalToSuperview()
+//            make.top.equalTo(titleLabel.snp.bottom).offset(8)
         }
     }
     
     override func layoutSubviews() {
         super.layoutSubviews()
-        
-        // 创建左直角右圆角的路径
-        let path = UIBezierPath()
-        let radius: CGFloat = 12 // 调整圆角大小与工具栏一致
-        
-        // 从左上角开始，顺时针绘制
-        path.move(to: CGPoint(x: 0, y: 0))
-        path.addLine(to: CGPoint(x: bounds.width - radius, y: 0))
-        path.addArc(withCenter: CGPoint(x: bounds.width - radius, y: radius),
-                   radius: radius,
-                   startAngle: -CGFloat.pi/2,
-                   endAngle: 0,
-                   clockwise: true)
-        path.addLine(to: CGPoint(x: bounds.width, y: bounds.height - radius))
-        path.addArc(withCenter: CGPoint(x: bounds.width - radius, y: bounds.height - radius),
-                   radius: radius,
-                   startAngle: 0,
-                   endAngle: CGFloat.pi/2,
-                   clockwise: true)
-        path.addLine(to: CGPoint(x: 0, y: bounds.height))
-        path.close()
-        
-        // 应用遮罩
-        maskLayer.path = path.cgPath
-        blurView.layer.mask = maskLayer
     }
     
     // MARK: - Animation
     func show(from sourceView: UIView) {
-        // 打印展开时的选中状态
         print("📸 [ToolOptions] 展开选项视图")
         print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
         if selectedIndex < options.count {
@@ -132,12 +136,27 @@ class SCCameraToolOptionsView: UIView {
             print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
         }
         
-        alpha = 0
-        transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        // 更新选中状态
+        collectionView.reloadData()
         
-        UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut], animations: {
-            self.alpha = 1
+        // 确保选中项可见
+        if selectedIndex < options.count {
+            let indexPath = IndexPath(item: selectedIndex, section: 0)
+            collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
+        }
+        
+        // 动画显示
+        transform = CGAffineTransform(translationX: 0, y: -20)
+        alpha = 0
+        
+        UIView.animate(withDuration: 0.3,
+                      delay: 0,
+                      usingSpringWithDamping: 0.8,
+                      initialSpringVelocity: 0.5,
+                      options: .curveEaseOut,
+                      animations: {
             self.transform = .identity
+            self.alpha = 1
         })
     }
     
@@ -148,6 +167,16 @@ class SCCameraToolOptionsView: UIView {
             self.removeFromSuperview()
             completion?()
         }
+    }
+    
+    private func handleSliderValueChanged(_ value: Float) {
+        // 创建一个自定义的 SCToolOption 来表示滑块值
+        let option = SCDefaultToolOption(
+            title: String(format: "%.1f", value),
+            state: SCExposureState.custom(value: value),
+            isSelected: true
+        )
+        delegate?.optionsView(self, didSelect: option, for: type)
     }
 }
 

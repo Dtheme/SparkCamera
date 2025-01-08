@@ -164,6 +164,16 @@ public enum SCWhiteBalanceState: Int {
         case .incandescent: return 2700  // 白炽灯色温
         }
     }
+    
+    public var tint: Float {
+        switch self {
+        case .auto: return 0      // 自动模式，不调整色调
+        case .sunny: return 0      // 晴天，标准色调
+        case .cloudy: return 10    // 阴天，稍微偏冷
+        case .fluorescent: return -10  // 荧光灯，稍微偏绿
+        case .incandescent: return 5   // 白炽灯，稍微偏暖
+        }
+    }
 }
 
 extension SCWhiteBalanceState: SCToolState {}
@@ -175,6 +185,7 @@ public enum SCExposureState: SCToolState {
     case zero
     case positive1
     case positive2
+    case custom(value: Float)
     
     public var icon: UIImage? {
         return UIImage(systemName: "plusminus")
@@ -187,6 +198,7 @@ public enum SCExposureState: SCToolState {
         case .zero: return "0"
         case .positive1: return "+1.0"
         case .positive2: return "+2.0"
+        case .custom(let value): return String(format: "%.1f", value)
         }
     }
     
@@ -199,6 +211,7 @@ public enum SCExposureState: SCToolState {
         case .zero: return 0.0
         case .positive1: return 1.0
         case .positive2: return 2.0
+        case .custom(let value): return value
         }
     }
 }

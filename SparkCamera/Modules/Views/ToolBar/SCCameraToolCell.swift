@@ -29,13 +29,13 @@ class SCCameraToolCell: UICollectionViewCell {
         return label
     }()
     
-    private lazy var selectedIndicator: UIView = {
-        let view = UIView()
-        view.backgroundColor = .yellow
-        view.layer.cornerRadius = 2
-        view.isHidden = true
-        return view
-    }()
+//    private lazy var selectedIndicator: UIView = {
+//        let view = UIView()
+//        view.backgroundColor = .yellow
+//        view.layer.cornerRadius = 2
+//        view.isHidden = true
+//        return view
+//    }()
     
     // MARK: - Properties
     var item: SCToolItem? {
@@ -59,7 +59,6 @@ class SCCameraToolCell: UICollectionViewCell {
         contentView.addSubview(containerView)
         containerView.addSubview(iconView)
         containerView.addSubview(titleLabel)
-        containerView.addSubview(selectedIndicator)
         
         containerView.snp.makeConstraints { make in
             make.center.equalToSuperview()
@@ -77,12 +76,12 @@ class SCCameraToolCell: UICollectionViewCell {
             make.left.right.equalToSuperview()
         }
         
-        selectedIndicator.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.bottom.equalTo(containerView).offset(-4)
-            make.width.equalTo(20)
-            make.height.equalTo(4)
-        }
+//        selectedIndicator.snp.makeConstraints { make in
+//            make.centerX.equalToSuperview()
+//            make.bottom.equalTo(containerView).offset(-4)
+//            make.width.equalTo(20)
+//            make.height.equalTo(4)
+//        }
     }
     
     private func updateUI() {
@@ -90,7 +89,7 @@ class SCCameraToolCell: UICollectionViewCell {
         
         iconView.image = item.icon
         titleLabel.text = item.title
-        selectedIndicator.isHidden = !item.isSelected
+//        selectedIndicator.isHidden = !item.isSelected
         
         // 更新启用/禁用状态
         containerView.alpha = item.isEnabled ? 1.0 : 0.5
@@ -179,7 +178,7 @@ class SCCameraToolCell: UICollectionViewCell {
         
         iconView.image = item.icon
         titleLabel.text = item.title
-        selectedIndicator.isHidden = !item.isSelected
+//        selectedIndicator.isHidden = !item.isSelected
         
         // 更新启用/禁用状态
         containerView.alpha = item.isEnabled ? 1.0 : 0.5

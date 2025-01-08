@@ -201,8 +201,13 @@ class SCCameraToolBar: UIView {
         isAnimating = true
         
         if let activeItem = activeItem {
+            // 重置 item 的选中状态
+            var updatedItem = activeItem
+            updatedItem.isSelected = false
+            updateItem(updatedItem)
+            
             delegate?.toolBar(self, willAnimate: activeItem)
-            delegate?.toolBar(self, didCollapse: activeItem)
+            delegate?.toolBar(self, didCollapse: updatedItem)
         }
         
         optionsView?.hide { [weak self] in
@@ -247,10 +252,13 @@ class SCCameraToolBar: UIView {
                 }
             }) { _ in
                 // 第二步：显示所有 cells
+                let totalCells = self.originalCellFrames.count
+                var completedCells = 0
+                
                 UIView.animate(withDuration: 0.25,
-                              delay: 0,
-                              options: [.curveEaseOut],
-                              animations: {
+                             delay: 0,
+                             options: [.curveEaseOut],
+                             animations: {
                     // 显示所有 cells
                     for (indexPath, originalFrame) in self.originalCellFrames {
                         if let cell = self.collectionView.cellForItem(at: indexPath) {
@@ -261,32 +269,64 @@ class SCCameraToolBar: UIView {
                                          options: [.curveEaseOut],
                                          animations: {
                                 cell.alpha = 1
+                            }, completion: { _ in
+                                completedCells += 1
+                                // 当所有 cell 动画都完成时
+                                if completedCells == totalCells {
+                                    // 清理状态
+                                    self.originalLayoutAttributes.removeAll()
+                                    self.originalCellFrames.removeAll()
+                                    self.isCollapsed = false
+                                    self.isAnimating = false
+                                    
+                                    // 通知代理动画完成
+                                    self.delegate?.toolBar(self, didFinishAnimate: self.activeItem!)
+                                    // 最后清除 activeItem
+                                    self.activeItem = nil
+                                }
                             })
                         }
                     }
                 }) { _ in
-                    // 清理状态
-                    self.originalLayoutAttributes.removeAll()
-                    self.originalCellFrames.removeAll()
-                    self.isCollapsed = false
-                    self.isAnimating = false
-                    self.activeItem = nil
+                    // 这里不需要做任何事情，因为我们在每个 cell 的动画完成后处理
                 }
             }
         }
     }
     
     private func showOptionsView(for item: SCToolItem, from cell: UICollectionViewCell) {
+        print("📸 [ToolOptions] 开始创建选项视图")
         // 获取选项列表
         var options = item.type.defaultOptions
         var selectedIndex = 0
+        
+        // 获取工具类型对应的中文名称
+        let itemTitle: String
+        switch item.type {
+        case .ratio:
+            itemTitle = "比例"
+        case .flash:
+            itemTitle = "闪光灯"
+        case .whiteBalance:
+            itemTitle = "白平衡"
+        case .exposure:
+            itemTitle = "曝光"
+        case .iso:
+            itemTitle = "ISO"
+        case .timer:
+            itemTitle = "定时拍摄"
+        case .livePhoto:
+            itemTitle = "实况照片"
+        }
         
         // 从数据库获取当前状态并设置选中项
         switch item.type {
         case .ratio:
             let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
+            print("📸 [ToolOptions] 保存的比例模式: \(savedRatioMode)")
             if savedRatioMode != 0 {
                 selectedIndex = options.firstIndex(where: { ($0.state as? SCRatioState)?.rawValue == savedRatioMode }) ?? 0
+                print("📸 [ToolOptions] 找到匹配的选项索引: \(selectedIndex)")
             }
             
         case .flash:
@@ -303,7 +343,7 @@ class SCCameraToolBar: UIView {
             
         case .exposure:
             let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
-            selectedIndex = options.firstIndex(where: { ($0.state as? SCExposureState)?.value == savedExposureValue }) ?? 2 // 默认为0
+            selectedIndex = options.firstIndex(where: { ($0.state as? SCExposureState)?.value == savedExposureValue }) ?? 2
             
         case .iso:
             let savedISOValue = SCCameraSettingsManager.shared.isoValue
@@ -316,18 +356,26 @@ class SCCameraToolBar: UIView {
             }
             
         case .livePhoto:
-            break // 暂不支持
+            break
         }
+        
+        print("📸 [ToolOptions] 最终选中的索引: \(selectedIndex)")
         
         // 更新选中状态
         options = options.enumerated().map { index, option in
             var updatedOption = option
             updatedOption.isSelected = index == selectedIndex
+            if updatedOption.isSelected {
+                print("📸 [ToolOptions] 设置选中选项: \(updatedOption.title)")
+            }
             return updatedOption
         }
         
         // 创建并显示选项视图
-        let optionsView = SCCameraToolOptionsView(type: item.type, options: options)
+        let optionsView = SCCameraToolOptionsView(type: item.type, 
+                                                options: options, 
+                                                selectedIndex: selectedIndex,
+                                                itemTitle: itemTitle)
         optionsView.delegate = self
         superview?.addSubview(optionsView)
         
@@ -335,7 +383,7 @@ class SCCameraToolBar: UIView {
             make.left.equalTo(self.snp.right).offset(10)
             make.right.equalToSuperview().offset(-10)
             make.centerY.equalTo(self)
-            make.height.equalTo(80)
+            make.height.equalTo(120)
         }
         
         self.optionsView = optionsView
@@ -355,7 +403,27 @@ class SCCameraToolBar: UIView {
     public func updateItem(_ item: SCToolItem) {
         if let index = items.firstIndex(where: { $0.type == item.type }) {
             items[index] = item
-            collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+            
+            // 如果工具栏处于收起状态，且更新的是当前激活的 item
+            if isCollapsed && item.type == activeItem?.type {
+                let indexPath = IndexPath(item: index, section: 0)
+                if let cell = collectionView.cellForItem(at: indexPath) {
+                    // 更新 cell 但保持其可见性
+                    if let toolCell = cell as? SCCameraToolCell {
+                        toolCell.configure(with: item)
+                    }
+                    cell.isHidden = false
+                    cell.alpha = 1
+                }
+            } else {
+                // 正常更新 cell
+                collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+            }
+            
+            // 更新 activeItem
+            if item.type == activeItem?.type {
+                activeItem = item
+            }
         }
     }
 }
@@ -410,9 +478,10 @@ extension SCCameraToolBar: UICollectionViewDelegate {
             return
         }
         
-        // 如果工具支持展开，收起工具栏
+        // 如果工具支持展开，收起工具栏并通知代理
         if item.type.supportsExpansion {
             collapseToolBar(except: item)
+            delegate?.toolBar(self, didExpand: item)
         }
         
         // 通知代理工具被选中
