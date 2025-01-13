@@ -194,80 +194,77 @@ class SCCameraToolBar: UIView {
     }
     
     func expandToolBar() {
-        guard isCollapsed, !isAnimating else {
-            return
-        }
-        
+        guard isCollapsed else { return }
         isAnimating = true
+        
+        // 隐藏选项视图
+        if let optionsView = optionsView {
+            optionsView.hide()
+            optionsView.removeFromSuperview()
+            self.optionsView = nil
+        }
         
         if let activeItem = activeItem {
             // 重置 item 的选中状态
             var updatedItem = activeItem
             updatedItem.isSelected = false
             updateItem(updatedItem)
-            
-            delegate?.toolBar(self, willAnimate: activeItem)
-            delegate?.toolBar(self, didCollapse: updatedItem)
+
         }
         
-        optionsView?.hide { [weak self] in
-            guard let self = self else { return }
-            self.optionsView?.removeFromSuperview()
-            self.optionsView = nil
+        // 恢复工具栏位置约束
+        self.snp.remakeConstraints { make in
+            make.center.equalTo(self.originalCenter)
+            make.width.equalTo(self.originalFrame.width)
+            make.height.equalTo(self.originalFrame.height)
+        }
+        
+        // 重新加载 collectionView
+        self.collectionView.reloadData()
+        self.collectionView.layoutIfNeeded()
+        
+        // 第一步：恢复工具栏位置
+        UIView.animate(withDuration: 0.3,
+                      delay: 0,
+                      options: [.curveEaseOut],
+                      animations: {
+            self.superview?.layoutIfNeeded()
+            self.blurView.layer.cornerRadius = 12
             
-            // 恢复工具栏位置约束
-            self.snp.remakeConstraints { make in
-                make.center.equalTo(self.originalCenter)
-                make.width.equalTo(self.originalFrame.width)
-                make.height.equalTo(self.originalFrame.height)
-            }
-            
-            // 重新加载 collectionView
-            self.collectionView.reloadData()
-            self.collectionView.layoutIfNeeded()
-            
-            // 第一步：恢复工具栏位置
-            UIView.animate(withDuration: 0.3,
-                          delay: 0,
-                          options: [.curveEaseOut],
-                          animations: {
-                self.superview?.layoutIfNeeded()
-                self.blurView.layer.cornerRadius = 12
-                
-                // 恢复所有 cell 的位置
-                for (indexPath, originalFrame) in self.originalCellFrames {
-                    if let cell = self.collectionView.cellForItem(at: indexPath) {
-                        if let activeItem = self.activeItem, 
-                           let index = self.items.firstIndex(where: { $0.type == activeItem.type }),
-                           indexPath.item == index {
-                            cell.frame = originalFrame
-                            cell.isHidden = false
-                            cell.alpha = 1
-                        } else {
-                            cell.frame = originalFrame
-                            cell.isHidden = true
-                            cell.alpha = 0
-                        }
+            // 恢复所有 cell 的位置
+            for (indexPath, originalFrame) in self.originalCellFrames {
+                if let cell = self.collectionView.cellForItem(at: indexPath) {
+                    if let activeItem = self.activeItem, 
+                       let index = self.items.firstIndex(where: { $0.type == activeItem.type }),
+                       indexPath.item == index {
+                        cell.frame = originalFrame
+                        cell.isHidden = false
+                        cell.alpha = 1
+                    } else {
+                        cell.frame = originalFrame
+                        cell.isHidden = true
+                        cell.alpha = 0
                     }
                 }
-            }) { _ in
-                // 第二步：显示所有 cells
-                let totalCells = self.originalCellFrames.count
-                var completedCells = 0
-                
-                UIView.animate(withDuration: 0.25,
-                             delay: 0,
-                             options: [.curveEaseOut],
-                             animations: {
-                    // 显示所有 cells
-                    for (indexPath, originalFrame) in self.originalCellFrames {
-                        if let cell = self.collectionView.cellForItem(at: indexPath) {
-                            cell.frame = originalFrame
-                            cell.isHidden = false
-                            UIView.animate(withDuration: 0.2,
-                                         delay: 0,
-                                         options: [.curveEaseOut],
-                                         animations: {
+            }
+        }) { _ in
+            // 第二步：显示所有 cells
+            let totalCells = self.originalCellFrames.count
+            var completedCells = 0
+            
+            UIView.animate(withDuration: 0.25,
+                         delay: 0,
+                         options: [.curveEaseOut],
+                         animations: {
+                // 显示所有 cells
+                for (indexPath, originalFrame) in self.originalCellFrames {
+                    if let cell = self.collectionView.cellForItem(at: indexPath) {
+                        cell.frame = originalFrame
+                        cell.isHidden = false
+                        UIView.animate(withDuration: 0.2,
+                                     delay: 0,
+                                     options: [.curveEaseOut],
+                                     animations: {
                                 cell.alpha = 1
                             }, completion: { _ in
                                 completedCells += 1
@@ -280,99 +277,55 @@ class SCCameraToolBar: UIView {
                                     self.isAnimating = false
                                     
                                     // 通知代理动画完成
-                                    self.delegate?.toolBar(self, didFinishAnimate: self.activeItem!)
-                                    // 最后清除 activeItem
-                                    self.activeItem = nil
+                                    if let activeItem = self.activeItem {
+                                        // 根据工具类型确定选项类型
+                                        let optionType: SCCameraToolOptionsViewType
+                                        switch activeItem.type {
+                                        case .exposure, .iso:
+                                            // 对于支持滑块的工具，使用 scale 类型
+                                            optionType = .scale
+                                        default:
+                                            // 对于其他工具，使用 normal 类型
+                                            optionType = .normal
+                                        }
+                                        
+                                        // 通知代理动画完成，让代理根据工具类型和状态进行相应处理
+                                        self.delegate?.toolBar(self, didFinishAnimate: activeItem, optionType: optionType)
+                                        
+                                        // 最后清除 activeItem
+                                        self.activeItem = nil
+                                    }
                                 }
                             })
-                        }
                     }
-                }) { _ in
-                    // 这里不需要做任何事情，因为我们在每个 cell 的动画完成后处理
                 }
+            }) { _ in
+                // 这里不需要做任何事情，因为我们在每个 cell 的动画完成后处理
             }
         }
     }
     
     private func showOptionsView(for item: SCToolItem, from cell: UICollectionViewCell) {
-        print("📸 [ToolOptions] 开始创建选项视图")
+        // 隐藏已存在的选项视图
+        if let existingOptionsView = optionsView {
+            existingOptionsView.hide()
+            existingOptionsView.removeFromSuperview()
+            self.optionsView = nil
+        }
+        
         // 获取选项列表
-        var options = item.type.defaultOptions
-        var selectedIndex = 0
-        
-        // 获取工具类型对应的中文名称
-        let itemTitle: String
-        switch item.type {
-        case .ratio:
-            itemTitle = "比例"
-        case .flash:
-            itemTitle = "闪光灯"
-        case .whiteBalance:
-            itemTitle = "白平衡"
-        case .exposure:
-            itemTitle = "曝光"
-        case .iso:
-            itemTitle = "ISO"
-        case .timer:
-            itemTitle = "定时拍摄"
-        case .livePhoto:
-            itemTitle = "实况照片"
-        }
-        
-        // 从数据库获取当前状态并设置选中项
-        switch item.type {
-        case .ratio:
-            let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
-            print("📸 [ToolOptions] 保存的比例模式: \(savedRatioMode)")
-            if savedRatioMode != 0 {
-                selectedIndex = options.firstIndex(where: { ($0.state as? SCRatioState)?.rawValue == savedRatioMode }) ?? 0
-                print("📸 [ToolOptions] 找到匹配的选项索引: \(selectedIndex)")
+        let options = item.options
+        let selectedIndex = options.firstIndex(where: { option in
+            if let optionState = option.state as? SCToolState,
+               let itemState = item.state {
+                return String(describing: optionState) == String(describing: itemState)
             }
-            
-        case .flash:
-            let savedFlashMode = SCCameraSettingsManager.shared.flashMode
-            if savedFlashMode != 0 {
-                selectedIndex = options.firstIndex(where: { ($0.state as? SCFlashState)?.rawValue == savedFlashMode }) ?? 0
-            }
-            
-        case .whiteBalance:
-            let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
-            if savedWhiteBalanceMode != 0 {
-                selectedIndex = options.firstIndex(where: { ($0.state as? SCWhiteBalanceState)?.rawValue == savedWhiteBalanceMode }) ?? 0
-            }
-            
-        case .exposure:
-            let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
-            selectedIndex = options.firstIndex(where: { ($0.state as? SCExposureState)?.value == savedExposureValue }) ?? 2
-            
-        case .iso:
-            let savedISOValue = SCCameraSettingsManager.shared.isoValue
-            selectedIndex = options.firstIndex(where: { ($0.state as? SCISOState)?.value == savedISOValue }) ?? 0
-            
-        case .timer:
-            let savedTimerMode = SCCameraSettingsManager.shared.timerMode
-            if savedTimerMode != 0 {
-                selectedIndex = options.firstIndex(where: { ($0.state as? SCTimerState)?.rawValue == savedTimerMode }) ?? 0
-            }
-            
-        case .livePhoto:
-            break
-        }
-        
-        print("📸 [ToolOptions] 最终选中的索引: \(selectedIndex)")
-        
-        // 更新选中状态
-        options = options.enumerated().map { index, option in
-            var updatedOption = option
-            updatedOption.isSelected = index == selectedIndex
-            if updatedOption.isSelected {
-                print("📸 [ToolOptions] 设置选中选项: \(updatedOption.title)")
-            }
-            return updatedOption
-        }
+            return false
+        }) ?? 0
+        let itemTitle = item.title
         
         // 创建并显示选项视图
-        let optionsView = SCCameraToolOptionsView(type: item.type, 
+        let optionsView = SCCameraToolOptionsView(toolType: item.type, 
                                                 options: options, 
                                                 selectedIndex: selectedIndex,
                                                 itemTitle: itemTitle)
@@ -387,7 +340,7 @@ class SCCameraToolBar: UIView {
         }
         
         self.optionsView = optionsView
-        optionsView.show(from: cell)
+        optionsView.show()
     }
     
     // MARK: - Item Management
@@ -474,41 +427,93 @@ extension SCCameraToolBar: UICollectionViewDelegate {
             if let cell = collectionView.cellForItem(at: indexPath) as? SCCameraToolCell {
                 cell.animateStateChange()
             }
-            delegate?.toolBar(self, didToggleState: item)
+            let optionType: SCCameraToolOptionsViewType = (item.type == .exposure || item.type == .iso) ? .scale : .normal
+            delegate?.toolBar(self, didToggleState: item, optionType: optionType)
             return
         }
         
         // 如果工具支持展开，收起工具栏并通知代理
         if item.type.supportsExpansion {
             collapseToolBar(except: item)
-            delegate?.toolBar(self, didExpand: item)
+            let optionType: SCCameraToolOptionsViewType = (item.type == .exposure || item.type == .iso) ? .scale : .normal
+            delegate?.toolBar(self, didExpand: item, optionType: optionType)
         }
         
         // 通知代理工具被选中
-        delegate?.toolBar(self, didSelect: item)
+        let optionType: SCCameraToolOptionsViewType = (item.type == .exposure || item.type == .iso) ? .scale : .normal
+        delegate?.toolBar(self, didSelect: item, optionType: optionType)
     }
 }
 
 // MARK: - SCCameraToolOptionsViewDelegate
 extension SCCameraToolBar: SCCameraToolOptionsViewDelegate {
+    func optionsView(_ optionsView: SCCameraToolOptionsView, didChangeSliderValue value: Float, for type: SCToolType) {
+        // 只在 Scale 类型时响应滑块值变化
+        let optionType: SCCameraToolOptionsViewType = .scale
+        
+        if let item = getItem(for: type) {
+            // 先设置 item 的值
+            item.setValue(value, for: optionType)
+            // 再通知代理
+            delegate?.toolBar(self, didChangeSlider: value, for: item, optionType: optionType)
+        }
+    }
+    
     func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType) {
-        if let item = items.first(where: { $0.type == type }) {
-            var updatedItem = item
-            updatedItem.setState(option.state)
-            updateItem(updatedItem)
+        // 只在 Normal 类型时响应选项选择
+        let optionType: SCCameraToolOptionsViewType = .normal
+        
+        if let item = getItem(for: type) {
+            // 先更新 item 的状态
+            item.setState(option.state)
+            updateItem(item)
             
-            // 如果工具栏已收起，更新 activeItem
+            // 然后调用代理方法
+            delegate?.toolBar(self, didSelect: option.title, for: item, optionType: optionType)
+            
+            // 如果工具栏处于收起状态，展开工具栏
             if isCollapsed {
-                activeItem = updatedItem
+                expandToolBar()
             }
+        }
+    }
+}
+
+// 添加缺失的协议定义
+protocol SCToolItemDelegate: AnyObject {
+    func toolItem(_ item: SCToolItem, didChangeState state: Any)
+    func toolItem(_ item: SCToolItem, didTapWithState state: Any)
+}
+
+extension SCCameraToolBar: SCToolItemDelegate {
+    func toolItem(_ item: SCToolItem, didChangeState state: Any) {
+        let optionType: SCCameraToolOptionsViewType = (item.type == .exposure || item.type == .iso) ? .scale : .normal
+        delegate?.toolBar(self, didToggleState: item, optionType: optionType)
+        updateItem(item)
+    }
+    
+    func toolItem(_ item: SCToolItem, didTapWithState state: Any) {
+        let optionType: SCCameraToolOptionsViewType = (item.type == .exposure || item.type == .iso) ? .scale : .normal
+        
+        if item.isSelected {
+            // 如果已经选中，则收起选项视图
+            delegate?.toolBar(self, didCollapse: item, optionType: optionType)
+            item.isSelected = false
+            updateItem(item)
+        } else {
+            // 如果未选中，则展开选项视图
+            delegate?.toolBar(self, didExpand: item, optionType: optionType)
+            item.isSelected = true
+            updateItem(item)
             
-            // 隐藏选项视图
-            optionsView.hide { [weak self] in
-                guard let self = self else { return }
-                // 展开工具栏
-                self.expandToolBar()
-                // 通知代理选项已选择
-                self.delegate?.toolBar(self, didSelect: option.title, for: updatedItem)
+            // 通知代理即将开始动画
+            delegate?.toolBar(self, willAnimate: item, optionType: optionType)
+            
+            // 获取对应的 cell
+            if let index = items.firstIndex(where: { $0.type == item.type }),
+               let cell = collectionView.cellForItem(at: IndexPath(item: index, section: 0)) {
+                // 展开选项视图
+                showOptionsView(for: item, from: cell)
             }
         }
     }

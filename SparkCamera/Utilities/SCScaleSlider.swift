@@ -87,10 +87,10 @@ struct SCScaleSliderStyle {
                     trackColor: .clear,
                     scaleColor: .systemGray3,
                     thumbColor: .white,
-                    thumbTintColor: .systemBlue,
+                    thumbTintColor: SCConstants.themeColor,
                     mainScaleTextColor: .systemGray,
-                    centerLineColor: .systemBlue,
-                    valueLabelBackgroundColor: .systemBlue,
+                    centerLineColor: SCConstants.themeColor,
+                    valueLabelBackgroundColor: SCConstants.themeColor,
                     valueLabelTextColor: .white,
                     thumbShape: .circle,
                     mainScaleHeight: Constants.mainScaleHeight,
@@ -117,12 +117,12 @@ struct SCScaleSliderStyle {
             case .vertical:
                 return SCScaleSliderStyle(
                     trackColor: .clear,
-                    scaleColor: .systemGray3,
-                    thumbColor: .white,
-                    thumbTintColor: .systemBlue,
-                    mainScaleTextColor: .systemGray,
+                    scaleColor: .systemGray6,
+                    thumbColor: .systemGray6,
+                    thumbTintColor: SCConstants.themeColor,
+                    mainScaleTextColor: .white,
                     centerLineColor: .clear,
-                    valueLabelBackgroundColor: .systemBlue,
+                    valueLabelBackgroundColor: SCConstants.themeColor,
                     valueLabelTextColor: .white,
                     thumbShape: .vertical,
                     mainScaleHeight: Constants.mainScaleHeight,
@@ -200,7 +200,7 @@ class SCScaleSlider: UIView {
     
     private lazy var centerLine: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBlue
+        view.backgroundColor = SCConstants.themeColor
         return view
     }()
     
@@ -215,7 +215,7 @@ class SCScaleSlider: UIView {
         
         // 添加内部蓝色圆圈
         let innerCircle = UIView()
-        innerCircle.backgroundColor = .systemBlue
+        innerCircle.backgroundColor = SCConstants.themeColor
         innerCircle.layer.cornerRadius = 8
         view.addSubview(innerCircle)
         innerCircle.snp.makeConstraints { make in
@@ -231,7 +231,7 @@ class SCScaleSlider: UIView {
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .white
-        label.backgroundColor = .systemBlue
+        label.backgroundColor = SCConstants.themeColor
         label.layer.cornerRadius = 10
         label.layer.masksToBounds = true
         label.frame = CGRect(x: 0, y: 0, width: 50, height: 20)
@@ -255,9 +255,13 @@ class SCScaleSlider: UIView {
     
     // MARK: - Setup
     private func setupUI() {
+        // 设置裁剪属性，确保内容不会超出视图范围
+        clipsToBounds = true
+        
         addSubview(contentView)
         contentView.addSubview(sliderTrack)
         contentView.addSubview(scaleView)
+        
         addSubview(centerLine)
         addSubview(thumbView)
         addSubview(valueLabel)
@@ -317,6 +321,10 @@ class SCScaleSlider: UIView {
         
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
         contentView.addGestureRecognizer(tapGesture)
+        
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleThumbPress(_:)))
+        longPressGesture.minimumPressDuration = 0.1
+        thumbView.addGestureRecognizer(longPressGesture)
     }
     
     // MARK: - Drawing
@@ -396,15 +404,22 @@ class SCScaleSlider: UIView {
             if newValue != currentValue {
                 currentValue = newValue
                 updateScalePosition(animated: true)
-                valueChangedHandler?(currentValue)
             }
             gesture.setTranslation(.zero, in: self)
             
-        case .ended, .cancelled:
+        case .ended:
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
                 self.thumbView.transform = .identity
                 self.snapToNearestStep()
             }
+//            print("📏 [ScaleSlider] 滑动结束，最终值: \(currentValue)")
+            
+        case .cancelled:
+            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
+                self.thumbView.transform = .identity
+                self.snapToNearestStep()
+            }
+//            print("📏 [ScaleSlider] 滑动取消，最终值: \(currentValue)")
             
         default:
             break
@@ -414,13 +429,18 @@ class SCScaleSlider: UIView {
     private func snapToNearestStep() {
         let steps = round(currentValue / config.step)
         let newValue = steps * config.step
+        let oldValue = currentValue
         currentValue = min(config.maxValue, max(config.minValue, newValue))
         
         updateScalePosition(animated: true)
         DispatchQueue.main.asyncAfter(deadline: .now() + Constants.animationDuration) {
             self.updateValueLabel()
+            if oldValue != self.currentValue {
+                self.valueChangedHandler?(self.currentValue)
+                print("📏 [ScaleSlider] 对齐到最近刻度: \(self.currentValue)")
+            }
         }
-        valueChangedHandler?(currentValue)
+        
         Constants.impactFeedback.impactOccurred()
     }
     
@@ -718,5 +738,6 @@ private enum Constants {
     static let animationDuration: TimeInterval = 0.2
     /// 触感反馈
     static let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+   
 }
 

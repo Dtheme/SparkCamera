@@ -93,7 +93,7 @@ class SCLensSelectorView: UIView {
         // 动画效果
         UIView.animate(withDuration: 0.1, animations: {
             sender.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
-            sender.setTitleColor(.yellow, for: .normal)
+            sender.setTitleColor(SCConstants.themeColor, for: .normal)
         }) { _ in
             UIView.animate(withDuration: 0.1) {
                 sender.transform = .identity
@@ -108,7 +108,7 @@ class SCLensSelectorView: UIView {
     
     private func selectButton(_ button: UIButton) {
         buttons.forEach { $0.setTitleColor(.white, for: .normal) }
-        button.setTitleColor(.yellow, for: .normal)
+        button.setTitleColor(SCConstants.themeColor, for: .normal)
     }
 
 } 

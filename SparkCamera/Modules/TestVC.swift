@@ -128,9 +128,10 @@ class TestVC: UIViewController {
         }
 
         scaleSlider.snp.makeConstraints { make in
-            make.left.right.equalToSuperview()
+            make.left.equalToSuperview().offset(30)
+            make.right.equalToSuperview().offset(-30)
             make.top.equalTo(valueLabel.snp.bottom).offset(40)
-            make.height.equalTo(60)
+            make.height.equalTo(100)
         }
 
         styleStackView.snp.makeConstraints { make in

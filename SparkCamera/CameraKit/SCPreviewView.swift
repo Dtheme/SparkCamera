@@ -122,13 +122,15 @@ import AVFoundation
         if let previewLayer = previewLayer {
             layer.insertSublayer(previewLayer, at: 0)
             previewLayer.frame = bounds
-            print("Preview layer setup completed: \(previewLayer.frame)")
         }
     }
     
     @objc public override func layoutSubviews() {
         super.layoutSubviews()
         previewLayer?.frame = bounds
+
+        print("Preview layer setup completed: \(String(describing: self.previewLayer?.bounds))")
+        print("Preview view setup completed: \(self.frame)")
     }
     
     // MARK: - Configuration

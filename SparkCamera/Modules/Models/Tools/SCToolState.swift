@@ -264,7 +264,7 @@ public enum SCTimerState: Int {
         case .off:
             return baseIcon
         case .seconds3, .seconds5, .seconds10:
-            return baseIcon?.withTintColor(.yellow, renderingMode: .alwaysOriginal)
+            return baseIcon?.withTintColor(SCConstants.themeColor, renderingMode: .alwaysOriginal)
         }
     }
     

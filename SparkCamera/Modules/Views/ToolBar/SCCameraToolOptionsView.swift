@@ -8,175 +8,234 @@
 import UIKit
 import SnapKit
 import SwiftMessages
+import AVFoundation
 
-protocol SCCameraToolOptionsViewDelegate: AnyObject {
-    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType)
-}
-
-class SCCameraToolOptionsView: UIView {
-    
-    // MARK: - Properties
-    weak var delegate: SCCameraToolOptionsViewDelegate?
-    private var type: SCToolType
-    private var options: [SCToolOption]
-    private var selectedIndex: Int = 0
-    private var gradientLayer: CAGradientLayer?
-    private var itemTitle: String
-    
-    // 添加滑块视图
-    private lazy var scaleSlider: SCScaleSlider? = {
-        if type == .exposure {
-            let config = SCScaleSliderConfig(minValue: -2.0,
-                                           maxValue: 2.0,
-                                           step: 0.1,
-                                           defaultValue: 0.0)
-            let slider = SCScaleSlider(config: config)
-            slider.style = .Style.vertical.style
-            slider.valueChangedHandler = { [weak self] value in
-                self?.handleSliderValueChanged(value)
-            }
-            return slider
-        }
-        return nil
-    }()
+// MARK: - Cell
+class SCCameraToolOptionCell: UICollectionViewCell {
     
     // MARK: - UI Components
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
-        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.textAlignment = .center
+        label.font = .systemFont(ofSize: 14)
         label.textColor = .white
-        label.textAlignment = .right
-        label.text = itemTitle
         return label
     }()
     
-    private lazy var maskLayer: CAShapeLayer = {
-        let layer = CAShapeLayer()
-        return layer
-    }()
-    
-    private lazy var collectionView: UICollectionView = {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumInteritemSpacing = 15
-        layout.minimumLineSpacing = 15
-        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize  // 使用自动大小
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 15, bottom: 0, right: 15)
-        
-        let collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collection.backgroundColor = .clear
-        collection.delegate = self
-        collection.dataSource = self
-        collection.showsHorizontalScrollIndicator = false
-        collection.register(OptionCell.self, forCellWithReuseIdentifier: "OptionCell")
-        collection.alwaysBounceHorizontal = true
-        return collection
-    }()
-    
     // MARK: - Initialization
-    init(type: SCToolType, options: [SCToolOption], selectedIndex: Int = 0, itemTitle: String) {
-        self.type = type
-        self.options = options
-        self.selectedIndex = selectedIndex
-        self.itemTitle = itemTitle
-        
-        super.init(frame: .zero)
+    override init(frame: CGRect) {
+        super.init(frame: frame)
         setupUI()
-        
-        // 打印选项信息
-        print("📸 [ToolOptions] 工具类型: \(type)")
-        print("📸 [ToolOptions] 可用选项数量: \(options.count)")
-        print("📸 [ToolOptions] 选项列表:")
-        options.enumerated().forEach { index, option in
-            print("  \(index + 1). \(option.title) (状态: \(String(describing: option.state)))")
-        }
-        print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
-        
-        if selectedIndex < options.count {
-            let selectedOption = options[selectedIndex]
-            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
-            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
-        }
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    // MARK: - UI Setup
+    // MARK: - Setup
+    private func setupUI() {
+        contentView.addSubview(titleLabel)
+        titleLabel.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(8)
+        }
+    }
+    
+    // MARK: - Configuration
+    func configure(with title: String, isSelected: Bool) {
+        titleLabel.text = title
+        titleLabel.textColor = isSelected ? SCConstants.themeColor : .white
+        titleLabel.font = isSelected ? .systemFont(ofSize: 14, weight: .medium) : .systemFont(ofSize: 14)
+    }
+}
+
+// MARK: - 选项视图代理
+protocol SCCameraToolOptionsViewDelegate: AnyObject {
+    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType)
+    func optionsView(_ optionsView: SCCameraToolOptionsView, didChangeSliderValue value: Float, for type: SCToolType)
+}
+
+/// 工具栏选项视图类型
+public enum SCCameraToolOptionsViewType {
+    case normal
+    case scale
+}
+
+class SCCameraToolOptionsView: UIView {
+    
+    // MARK: - Properties
+    weak var delegate: SCCameraToolOptionsViewDelegate?
+    public var type: SCCameraToolOptionsViewType = .normal
+    private var options: [SCToolOption] = []
+    private var selectedOption: SCToolOption?
+    private var toolType: SCToolType?
+    private var selectedIndex: Int = 0
+    
+    var didSelectOption: ((SCToolOption) -> Void)?
+//    var didChangeValue: ((Float) -> Void)?
+    
+    // MARK: - UI Components
+    private lazy var collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.register(SCCameraToolOptionCell.self, forCellWithReuseIdentifier: "OptionCell")
+        return collectionView
+    }()
+    
+    private lazy var scaleSlider: SCScaleSlider = {
+        // 使用固定的用户友好范围 -2 ~ 2
+        let config = SCScaleSliderConfig(
+            minValue: -2.0,
+            maxValue: 2.0,
+            step: 0.1,
+            defaultValue: 0.0
+        )
+        
+        print("📏 [ScaleSlider] 初始化配置：")
+        print("📏 [ScaleSlider] 用户范围：[-2.0, 2.0]")
+        print("📏 [ScaleSlider] 步长：\(config.step)")
+        
+        let slider = SCScaleSlider(config: config)
+        var customStyle = SCScaleSliderStyle.Style.vertical.style
+        customStyle.scaleWidth = 10
+        slider.style = customStyle
+        
+        // 设置值变化回调
+        slider.valueChangedHandler = { [weak self] value in
+            guard let self = self,
+                  let toolType = self.toolType else { return }
+            
+            print("📏 [ScaleSlider] 用户值：\(value)")
+            
+            // 通过代理传递值变化
+            self.delegate?.optionsView(self, didChangeSliderValue: value, for: toolType)
+        }
+        
+        return slider
+    }()
+    
+    // MARK: - Initialization
+    init(toolType: SCToolType, options: [SCToolOption], selectedIndex: Int, itemTitle: String) {
+        super.init(frame: .zero)
+        self.toolType = toolType
+        self.options = options
+        self.selectedIndex = selectedIndex
+        
+        // 根据工具类型决定视图类型
+        self.type = toolType == .exposure ? .scale : .normal
+        
+        setupUI()
+        configure(with: options)
+    }
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    // MARK: - Setup
     private func setupUI() {
         backgroundColor = .clear
         
-        self.addSubview(collectionView)
-        self.addSubview(titleLabel)
-        
-        titleLabel.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(8)
-            make.right.equalToSuperview().offset(-15)
-            make.height.equalTo(20)
-        }
+        addSubview(collectionView)
+        addSubview(scaleSlider)
         
         collectionView.snp.makeConstraints { make in
-            make.left.right.bottom.top.equalToSuperview()
-//            make.top.equalTo(titleLabel.snp.bottom).offset(8)
-        }
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-    }
-    
-    // MARK: - Animation
-    func show(from sourceView: UIView) {
-        print("📸 [ToolOptions] 展开选项视图")
-        print("📸 [ToolOptions] 当前选中索引: \(selectedIndex)")
-        if selectedIndex < options.count {
-            let selectedOption = options[selectedIndex]
-            print("📸 [ToolOptions] 当前选中选项: \(selectedOption.title)")
-            print("📸 [ToolOptions] 当前选中状态: \(String(describing: selectedOption.state))")
+            make.edges.equalToSuperview()
         }
         
-        // 更新选中状态
+        scaleSlider.snp.makeConstraints { make in
+//            make.left.right.equalToSuperview()
+//            make.centerY.equalToSuperview()
+//            make.height.equalTo(80)
+            make.edges.equalToSuperview()
+        }
+        
+        // 默认隐藏 scaleSlider
+        scaleSlider.isHidden = true
+
+
+        // 设置 scaleSlider 的值变化回调
+        scaleSlider.valueChangedHandler = { [weak self] value in
+            guard let self = self,
+                  let toolType = self.toolType else { return }
+
+            print("📏 [ScaleSlider] 原始值：\(value)")
+            if toolType == .exposure {
+                let range = SCCameraSettingsManager.shared.exposureRange
+                print("📏 [ScaleSlider] 设备支持范围：[\(range.min), \(range.max)]")
+            }
+
+            // 通过代理传递值变化
+            self.delegate?.optionsView(self, didChangeSliderValue: value, for: toolType)
+        }
+    }
+    
+    // MARK: - Public Methods
+    func configure(with options: [SCToolOption]) {
+        self.options = options
+        
+        // 根据类型显示不同的视图
+        switch type {
+        case .normal:
+            collectionView.isHidden = false
+            scaleSlider.isHidden = true
+            collectionView.reloadData()
+        case .scale:
+            collectionView.isHidden = true
+            scaleSlider.isHidden = false
+            
+            // 如果是曝光调节，设置当前值
+            if toolType == .exposure {
+                let currentValue = SCCameraSettingsManager.shared.exposureValue
+                scaleSlider.setValue(currentValue, animated: false)
+            }
+        }
+    }
+    
+    func updateSelectedOption(_ option: SCToolOption) {
+        self.selectedOption = option
         collectionView.reloadData()
-        
-        // 确保选中项可见
-        if selectedIndex < options.count {
-            let indexPath = IndexPath(item: selectedIndex, section: 0)
-            collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
-        }
-        
-        // 动画显示
-        transform = CGAffineTransform(translationX: 0, y: -20)
-        alpha = 0
-        
-        UIView.animate(withDuration: 0.3,
-                      delay: 0,
-                      usingSpringWithDamping: 0.8,
-                      initialSpringVelocity: 0.5,
-                      options: .curveEaseOut,
-                      animations: {
-            self.transform = .identity
-            self.alpha = 1
-        })
     }
     
-    func hide(completion: (() -> Void)? = nil) {
-        UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut], animations: {
-            self.alpha = 0
-        }) { _ in
-            self.removeFromSuperview()
-            completion?()
-        }
+    /// 隐藏选项视图
+    func hide() {
+        // 重置状态
+        selectedOption = nil
+        selectedIndex = 0
+        
+        // 隐藏视图
+        isHidden = true
+        
+        // 重置所有子视图状态
+        collectionView.isHidden = true
+        scaleSlider.isHidden = true
     }
     
-    private func handleSliderValueChanged(_ value: Float) {
-        // 创建一个自定义的 SCToolOption 来表示滑块值
-        let option = SCDefaultToolOption(
-            title: String(format: "%.1f", value),
-            state: SCExposureState.custom(value: value),
-            isSelected: true
-        )
-        delegate?.optionsView(self, didSelect: option, for: type)
+    /// 显示选项视图
+    func show() {
+        isHidden = false
+        
+        // 根据类型显示对应的视图
+        switch type {
+        case .normal:
+            collectionView.isHidden = false
+            scaleSlider.isHidden = true
+        case .scale:
+            collectionView.isHidden = true
+            scaleSlider.isHidden = false
+        }
     }
 }
 
@@ -187,7 +246,7 @@ extension SCCameraToolOptionsView: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "OptionCell", for: indexPath) as! OptionCell
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "OptionCell", for: indexPath) as! SCCameraToolOptionCell
         let option = options[indexPath.item]
         cell.configure(with: option.title, isSelected: indexPath.item == selectedIndex)
         return cell
@@ -211,51 +270,21 @@ extension SCCameraToolOptionsView: UICollectionViewDelegate {
         print("📸 [ToolOptions] 选中状态: \(String(describing: selectedOption.state))")
         
         // 通知代理
-        delegate?.optionsView(self, didSelect: selectedOption, for: type)
+        if let toolType = toolType {
+            delegate?.optionsView(self, didSelect: selectedOption, for: toolType)
+        }
     }
 }
 
-// MARK: - OptionCell
-private class OptionCell: UICollectionViewCell {
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.textColor = .white
-        label.font = .systemFont(ofSize: 15)
-        label.textAlignment = .center
-        label.numberOfLines = 1
-        return label
-    }()
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupUI()
+// MARK: - UICollectionViewDelegateFlowLayout
+extension SCCameraToolOptionsView: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let option = options[indexPath.item]
+        let width = (option.title as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 14)]).width + 32
+        return CGSize(width: width, height: collectionView.bounds.height)
     }
     
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    private func setupUI() {
-        backgroundColor = .clear
-        
-        contentView.addSubview(titleLabel)
-        titleLabel.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10))  // 添加水平内边距
-            make.height.equalTo(80)  // 固定高度
-        }
-    }
-    
-    func configure(with title: String, isSelected: Bool = false) {
-        titleLabel.text = title
-        titleLabel.textColor = isSelected ? UIColor.yellow : .white
-        titleLabel.font = isSelected ? .systemFont(ofSize: 15, weight: .medium) : .systemFont(ofSize: 15, weight: .regular)
-    }
-    
-    override func preferredLayoutAttributesFitting(_ layoutAttributes: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
-        let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
-        let targetSize = CGSize(width: UIView.layoutFittingExpandedSize.width, height: 80)
-        let size = contentView.systemLayoutSizeFitting(targetSize, withHorizontalFittingPriority: .fittingSizeLevel, verticalFittingPriority: .required)
-        attributes.frame = CGRect(origin: attributes.frame.origin, size: size)
-        return attributes
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
     }
 }

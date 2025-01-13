@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import RealmSwift
 
 class SCCameraSettingsManager {
@@ -10,6 +11,9 @@ class SCCameraSettingsManager {
     
     // 当前设置
     private var currentSettings: SCCameraSettings?
+    
+    // 持有当前的 captureDevice
+    private weak var currentDevice: AVCaptureDevice?
     
     private init() {
         // 配置 Realm
@@ -174,5 +178,32 @@ class SCCameraSettingsManager {
         } catch {
             print("清除数据失败: \(error)")
         }
+    }
+    
+    // MARK: - Device Management
+    func setCurrentDevice(_ device: AVCaptureDevice) {
+        self.currentDevice = device
+        print("📸 [Settings] 更新当前设备：\(device.localizedName)")
+    }
+    
+    func getCurrentDevice() -> AVCaptureDevice? {
+        return currentDevice
+    }
+    
+    // MARK: - Device Parameters
+    // 获取曝光值范围
+    var exposureRange: (min: Float, max: Float) {
+        guard let device = currentDevice else {
+            return (-2.0, 2.0) // 默认值
+        }
+        return (device.minExposureTargetBias, device.maxExposureTargetBias)
+    }
+    
+    // 获取ISO范围
+    var isoRange: (min: Float, max: Float) {
+        guard let device = currentDevice else {
+            return (100, 800) // 默认值
+        }
+        return (Float(device.activeFormat.minISO), Float(device.activeFormat.maxISO))
     }
 } 

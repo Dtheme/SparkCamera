@@ -16,7 +16,7 @@ class SCHorizontalIndicatorView: UIView {
     
     private let verticalLine: UIView = {
         let line = UIView()
-        line.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.0) // 初始透明
+        line.backgroundColor = SCConstants.themeColor.withAlphaComponent(0.0) // 初始透明
         line.layer.cornerRadius = 1
         return line
     }()
@@ -82,8 +82,8 @@ class SCHorizontalIndicatorView: UIView {
     private func triggerHighlightAnimation() {
         // 实现高亮动画
         UIView.animate(withDuration: 0.2) {
-            self.indicatorLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)
-            self.verticalLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.9)
+            self.indicatorLine.backgroundColor = SCConstants.themeColor.withAlphaComponent(0.9)
+            self.verticalLine.backgroundColor = SCConstants.themeColor.withAlphaComponent(0.9)
         }
         
         // 触觉反馈
@@ -95,7 +95,7 @@ class SCHorizontalIndicatorView: UIView {
         // 恢复正常状态
         UIView.animate(withDuration: 0.2) {
             self.indicatorLine.backgroundColor = UIColor.white.withAlphaComponent(0.7)
-            self.verticalLine.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.0)
+            self.verticalLine.backgroundColor = SCConstants.themeColor.withAlphaComponent(0.0)
         }
     }
 } 

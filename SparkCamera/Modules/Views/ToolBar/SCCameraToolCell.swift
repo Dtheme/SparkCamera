@@ -1,3 +1,11 @@
+//
+//  SCCameraToolCell.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/20.
+//
+
+
 import UIKit
 import SnapKit
 
@@ -29,13 +37,6 @@ class SCCameraToolCell: UICollectionViewCell {
         return label
     }()
     
-//    private lazy var selectedIndicator: UIView = {
-//        let view = UIView()
-//        view.backgroundColor = .yellow
-//        view.layer.cornerRadius = 2
-//        view.isHidden = true
-//        return view
-//    }()
     
     // MARK: - Properties
     var item: SCToolItem? {
@@ -163,7 +164,7 @@ class SCCameraToolCell: UICollectionViewCell {
         
         // 更新阴影
         if item?.isSelected == true {
-            layer.shadowColor = UIColor.yellow.cgColor
+            layer.shadowColor = SCConstants.themeColor.cgColor
             layer.shadowOpacity = 0.3
             layer.shadowOffset = .zero
             layer.shadowRadius = 4
@@ -188,7 +189,7 @@ class SCCameraToolCell: UICollectionViewCell {
         // 更新选中状态
         if item.isSelected {
             containerView.backgroundColor = UIColor(white: 1.0, alpha: 0.2)
-            titleLabel.textColor = .yellow
+            titleLabel.textColor = SCConstants.themeColor
         } else {
             containerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
             titleLabel.textColor = .white

@@ -40,6 +40,7 @@
 		7817491F2D1D2DE800521F2D /* ProFont-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */; };
 		781749202D1D2DE800521F2D /* ProFont-regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */; };
 		783345CE2D2BC01700CD3D67 /* SCScaleSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */; };
+		78463F542D2F7C2000D7FA4C /* SCConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78463F532D2F7C2000D7FA4C /* SCConstants.swift */; };
 		7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7868A90B2D1412D700CBB2FB /* AppDelegate.swift */; };
 		7868A91A2D1412D700CBB2FB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90C2D1412D700CBB2FB /* Assets.xcassets */; };
 		7868A91C2D1412D700CBB2FB /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */; };
@@ -84,6 +85,7 @@
 		7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-Bold.ttf"; sourceTree = "<group>"; };
 		7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-regular.ttf"; sourceTree = "<group>"; };
 		783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCScaleSlider.swift; sourceTree = "<group>"; };
+		78463F532D2F7C2000D7FA4C /* SCConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SCConstants.swift; path = SparkCamera/Utilities/SCConstants.swift; sourceTree = SOURCE_ROOT; };
 		7868A8B92D140E8F00CBB2FB /* SparkCamera.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7868A90B2D1412D700CBB2FB /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7868A90C2D1412D700CBB2FB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 		780DDC212D267B66000CA610 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				78463F532D2F7C2000D7FA4C /* SCConstants.swift */,
 				783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */,
 				780D51032D27C0AC0014A9E1 /* SCSVGImageLoader.swift */,
 				780DDC202D267B66000CA610 /* UIFont+Custom.swift */,
@@ -423,6 +426,7 @@
 				780DDD162D26876D000CA610 /* SCCameraToolCell.swift in Sources */,
 				780DDD132D26876D000CA610 /* SCCameraSettingsManager.swift in Sources */,
 				780D51042D27C0AC0014A9E1 /* SCSVGImageLoader.swift in Sources */,
+				78463F542D2F7C2000D7FA4C /* SCConstants.swift in Sources */,
 				7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */,
 				780DDCD72D268365000CA610 /* SCPhotoSession.swift in Sources */,
 				780DDD182D26876D000CA610 /* SCLoadingView.swift in Sources */,

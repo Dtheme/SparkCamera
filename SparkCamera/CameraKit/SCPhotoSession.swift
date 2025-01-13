@@ -463,17 +463,30 @@ extension SCSession.FlashMode {
     // MARK: - Camera Settings
     public func setExposure(_ value: Float) -> Bool {
         guard let device = captureDeviceInput?.device else { return false }
-        
+
         do {
             try device.lockForConfiguration()
-            
+    
             if device.isExposureModeSupported(.custom) {
                 device.exposureMode = .custom
-                let exposureValue = value * device.maxExposureTargetBias
-                device.setExposureTargetBias(exposureValue)
-                print("设置曝光值为：\(exposureValue)")
+                
+                // 获取设备支持的曝光范围
+                let minExposure = device.minExposureTargetBias
+                let maxExposure = device.maxExposureTargetBias
+                
+                // 将输入值 (-2.0 到 +2.0) 映射到设备支持的范围
+                let normalizedValue = (value + 2.0) / 4.0  // 将 -2.0~2.0 映射到 0~1
+                let exposureValue = minExposure + (maxExposure - minExposure) * normalizedValue
+                
+                // 确保值在设备支持的范围内
+                let clampedValue = min(max(exposureValue, minExposure), maxExposure)
+                
+                // 应用曝光值
+                device.setExposureTargetBias(clampedValue)
+                print("📸 [Exposure] 设置曝光值：\(clampedValue) (原始值：\(value))")
+                print("📸 [Exposure] 设备支持范围：[\(minExposure), \(maxExposure)]")
             } else {
-                print("设备不支持自定义曝光模式")
+                print("⚠️ [Exposure] 设备不支持自定义曝光模式")
                 device.unlockForConfiguration()
                 return false
             }
@@ -481,7 +494,7 @@ extension SCSession.FlashMode {
             device.unlockForConfiguration()
             return true
         } catch {
-            print("设置曝光值失败: \(error.localizedDescription)")
+            print("⚠️ [Exposure] 设置曝光值失败: \(error.localizedDescription)")
             return false
         }
     }

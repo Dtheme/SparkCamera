@@ -13,7 +13,7 @@ class SCFocusBoxView: UIView {
     }
     
     private func setupView() {
-        self.layer.borderColor = UIColor.yellow.cgColor
+        self.layer.borderColor = SCConstants.themeColor.cgColor
         self.layer.borderWidth = 2
         self.layer.cornerRadius = 6
         self.alpha = 0
