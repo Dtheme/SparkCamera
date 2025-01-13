@@ -1,3 +1,11 @@
+//
+//  SCToolItem.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
+
 import UIKit
 
 public class SCToolItem {
@@ -36,7 +44,9 @@ public class SCToolItem {
         case .whiteBalance:
             return "白平衡"
         case .exposure:
-            return "曝光"
+            return "曝光补偿"
+        case .shutterSpeed:
+            return "快门速度"
         case .iso:
             return "ISO"
         case .timer:

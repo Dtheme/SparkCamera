@@ -1,3 +1,12 @@
+//
+//  SCToolOption.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
+
+
 import UIKit
 
 /// 工具选项协议
@@ -258,6 +267,50 @@ public enum SCTimerOption: SCToolOption {
             }
         }
         set { }
+    }
+}
+
+// MARK: - ShutterSpeed Options
+public enum SCShutterSpeedOption: SCToolOption {
+    case auto, speed1_1000, speed1_500, speed1_250, speed1_125, speed1_60, speed1_30
+    
+    public var title: String {
+        switch self {
+        case .auto: return "自动"
+        case .speed1_1000: return "1/1000s"
+        case .speed1_500: return "1/500s"
+        case .speed1_250: return "1/250s"
+        case .speed1_125: return "1/125s"
+        case .speed1_60: return "1/60s"
+        case .speed1_30: return "1/30s"
+        }
+    }
+    
+    public var state: SCToolState {
+        switch self {
+        case .auto: return SCShutterSpeedState.auto
+        case .speed1_1000: return SCShutterSpeedState.speed1_1000
+        case .speed1_500: return SCShutterSpeedState.speed1_500
+        case .speed1_250: return SCShutterSpeedState.speed1_250
+        case .speed1_125: return SCShutterSpeedState.speed1_125
+        case .speed1_60: return SCShutterSpeedState.speed1_60
+        case .speed1_30: return SCShutterSpeedState.speed1_30
+        }
+    }
+    
+    public var isSelected: Bool {
+        get {
+            switch self {
+            case .auto: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.auto.rawValue
+            case .speed1_1000: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_1000.rawValue
+            case .speed1_500: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_500.rawValue
+            case .speed1_250: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_250.rawValue
+            case .speed1_125: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_125.rawValue
+            case .speed1_60: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_60.rawValue
+            case .speed1_30: return SCCameraSettingsManager.shared.shutterSpeedValue == SCShutterSpeedState.speed1_30.rawValue
+            }
+        }
+        set { }  // 不需要实现set，因为状态由SCCameraSettingsManager管理
     }
 }
 

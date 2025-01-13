@@ -1,3 +1,11 @@
+//
+//  SCCameraSettingsManager.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
+
 import Foundation
 import AVFoundation
 import RealmSwift
@@ -205,5 +213,69 @@ class SCCameraSettingsManager {
             return (100, 800) // 默认值
         }
         return (Float(device.activeFormat.minISO), Float(device.activeFormat.maxISO))
+    }
+    
+    // MARK: - Focus Settings
+    public var focusMode: SCFocusMode {
+        get {
+            guard let settings = currentSettings else {
+                return .continuous // 默认使用连续对焦
+            }
+            return SCFocusMode(rawValue: settings.focusMode) ?? .continuous
+        }
+        set {
+            if let settings = currentSettings {
+                try? realm.write {
+                    settings.focusMode = newValue.rawValue
+                    settings.updateTimestamp()
+                }
+            }
+        }
+    }
+    
+    public var isFocusLocked: Bool {
+        get {
+            guard let settings = currentSettings else { return false }
+            return settings.isFocusLocked
+        }
+        set {
+            if let settings = currentSettings {
+                try? realm.write {
+                    settings.isFocusLocked = newValue
+                    settings.updateTimestamp()
+                }
+            }
+        }
+    }
+    
+    // 快门速度值
+    public var shutterSpeedValue: Float {
+        get {
+            guard let settings = currentSettings else { return 0.0 }
+            return settings.shutterSpeedValue
+        }
+        set {
+            if let settings = currentSettings {
+                try? realm.write {
+                    settings.shutterSpeedValue = newValue
+                    settings.updateTimestamp()
+                }
+            }
+        }
+    }
+    
+    // 快门速度范围
+    var shutterSpeedRange: ClosedRange<Float> {
+        return 0.001...1.0
+    }
+    
+    // 获取当前快门速度状态
+    var currentShutterSpeedState: SCShutterSpeedState {
+        let value = shutterSpeedValue
+        if value == 0.0 {
+            return .auto
+        }
+        // 查找最接近的预设值
+        return SCShutterSpeedState.allCases.min(by: { abs($0.rawValue - value) < abs($1.rawValue - value) }) ?? .auto
     }
 } 

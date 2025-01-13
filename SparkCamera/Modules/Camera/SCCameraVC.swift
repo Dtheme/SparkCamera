@@ -95,9 +95,7 @@ class SCCameraVC: UIViewController {
         label.textColor = .white
         label.font = .systemFont(ofSize: 16, weight: .bold)
         label.textAlignment = .center
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.5)
-        label.layer.cornerRadius = 15
-        label.clipsToBounds = true
+        label.backgroundColor = .clear
         return label
     }()
     
@@ -113,6 +111,15 @@ class SCCameraVC: UIViewController {
         let toolBar = SCCameraToolBar()
         toolBar.delegate = self
         return toolBar
+    }()
+    
+    // MARK: - Focus UI
+    private lazy var focusModeButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "camera.focus"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(focusModeButtonTapped), for: .touchUpInside)
+        return button
     }()
     
     // MARK: - Lifecycle
@@ -187,24 +194,42 @@ class SCCameraVC: UIViewController {
             guard let self = self else { return }
             let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(self.toggleHorizontalIndicator))
             doubleTapGesture.numberOfTapsRequired = 2
-            self.view.addGestureRecognizer(doubleTapGesture)
+            self.previewView.addGestureRecognizer(doubleTapGesture)
             
             let singleTapGesture = UITapGestureRecognizer(target: self, action: #selector(self.handleSingleTap))
             singleTapGesture.require(toFail: doubleTapGesture)
-            self.view.addGestureRecognizer(singleTapGesture)
+            self.previewView.addGestureRecognizer(singleTapGesture)
             
             let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(self.handlePinch))
-            self.view.addGestureRecognizer(pinchGesture)
+            self.previewView.addGestureRecognizer(pinchGesture)
         }
     }
 
     @objc private func handleSingleTap(recognizer: UITapGestureRecognizer) {
-        let location = recognizer.location(in: view)
+        let location = recognizer.location(in: previewView)
+        
+        // 确保点击位置在预览视图范围内
+        guard location.x >= 0 && location.x <= previewView.bounds.width &&
+              location.y >= 0 && location.y <= previewView.bounds.height else {
+            return
+        }
+        
+        // 将点击位置转换为预览层的坐标
+        guard let previewLayer = previewView.previewLayer else { return }
+        
+        // 将点击位置转换为 AVCaptureDevice 可用的坐标（范围在 0-1 之间）
+        let normalizedPoint = CGPoint(
+            x: location.x / previewView.bounds.width,
+            y: location.y / previewView.bounds.height
+        )
+        
+        // 在点击位置显示对焦动画
         showFocusAnimation(at: location)
         
-        if let focusPoint = previewView.previewLayer?.captureDevicePointConverted(fromLayerPoint: location) {
-            photoSession.focus(at: focusPoint)
-        }
+        // 设置对焦点
+        photoSession.focus(at: normalizedPoint)
+        
+        print("📸 [Focus] 点击位置: \(location), 归一化坐标: \(normalizedPoint)")
     }
 
     @objc private func handlePinch(recognizer: UIPinchGestureRecognizer) {
@@ -424,14 +449,35 @@ class SCCameraVC: UIViewController {
         timerItem.isSelected = false    // 确保初始状态未选中
         print("📸 [Timer] 初始化定时器状态: \(timerState.title)")
 
+        // 获取保存的快门速度设置
+        let savedShutterSpeedValue = SCCameraSettingsManager.shared.shutterSpeedValue
+        print("📸 [ShutterSpeed] 数据库中保存的快门速度值: \(savedShutterSpeedValue)")
+        let shutterSpeedStates: [SCShutterSpeedState] = [.auto, .speed1_1000, .speed1_500, .speed1_250, .speed1_125, .speed1_60, .speed1_30]
+        let shutterSpeedState = shutterSpeedStates.first(where: { $0.value == savedShutterSpeedValue }) ?? .auto
+        
+        // 如果是第一次使用，保存默认的快门速度值
+        if SCCameraSettingsManager.shared.shutterSpeedValue == 0 {
+            SCCameraSettingsManager.shared.shutterSpeedValue = SCShutterSpeedState.auto.value
+            print("📸 [ShutterSpeed] 首次使用，设置默认快门速度为自动")
+        }
+
+        // 初始化快门速度工具项
+        let shutterSpeedItem = SCToolItem(type: .shutterSpeed)
+        shutterSpeedItem.setState(shutterSpeedState)
+        shutterSpeedItem.isSelected = false
+        print("📸 [ShutterSpeed] 初始化快门速度状态: \(shutterSpeedState.title)")
+        print("📸 [ShutterSpeed] 快门速度值: \(shutterSpeedState.value)")
+        print("📸 [ShutterSpeed] 当前实际快门速度状态: \(shutterSpeedState)")
+
         // 初始化工具栏项目
         let toolItems: [SCToolItem] = [
-            flashItem,          // 使用已设置状态的闪光灯项
-            ratioItem,          // 使用已设置状态的比例项
-            whiteBalanceItem,   // 使用已设置状态的白平衡项
-            exposureItem,       // 使用已设置状态的曝光项
-            isoItem,            // 使用已设置状态的ISO项
-            timerItem           // 使用已设置状态的定时器项
+            flashItem,          // 闪光灯
+            ratioItem,          // 比例
+            whiteBalanceItem,   // 白平衡
+            exposureItem,       // 曝光
+            isoItem,            // ISO
+            shutterSpeedItem,   // 快门速度
+            timerItem           // 上次选的延时摄影
         ]
         toolBar.setItems(toolItems)
         
@@ -448,8 +494,8 @@ class SCCameraVC: UIViewController {
         view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
         
-        // 8. 添加对焦框
-        view.addSubview(focusView)
+        // 8. 添加对焦框 - 确保添加到预览视图上
+        previewView.addSubview(focusView)
         
         // 9. 添加镜头选择器
         view.addSubview(lensSelectorView)
@@ -471,6 +517,8 @@ class SCCameraVC: UIViewController {
         case .ratio16_9:
             updatePreviewRatio(16.0 / 9.0)
         }
+        
+        setupFocusUI()
     }
     
     private func updatePreviewRatio(_ ratio: CGFloat) {
@@ -628,6 +676,10 @@ class SCCameraVC: UIViewController {
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.width.equalTo(70)
             make.height.equalTo(30)
+        }
+        
+        zoomLabel.snp.makeConstraints { make in
+            make.edges.equalTo(zoomIndicatorView)
         }
         
         // 8. 水平指示器
@@ -925,13 +977,34 @@ class SCCameraVC: UIViewController {
     }
     
     private func showFocusAnimation(at point: CGPoint) {
-        focusView.center = point
+        // 确保对焦框在预览视图内
+        let focusViewSize = focusView.bounds.size
+        let minX = focusViewSize.width / 2
+        let maxX = previewView.bounds.width - focusViewSize.width / 2
+        let minY = focusViewSize.height / 2
+        let maxY = previewView.bounds.height - focusViewSize.height / 2
+        
+        let clampedPoint = CGPoint(
+            x: min(maxX, max(minX, point.x)),
+            y: min(maxY, max(minY, point.y))
+        )
+        
+        // 确保对焦框在最上层
+        previewView.bringSubviewToFront(focusView)
+        
+        // 更新对焦框的位置
+        focusView.center = clampedPoint
         focusView.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
+        focusView.alpha = 1.0
         focusView.isHidden = false
+        
+        // 执行动画
         UIView.animate(withDuration: 0.3, animations: {
             self.focusView.transform = .identity
         }) { _ in
             UIView.animate(withDuration: 0.2, delay: 0.5) {
+                self.focusView.alpha = 0
+            } completion: { _ in
                 self.focusView.isHidden = true
             }
         }
@@ -1232,35 +1305,143 @@ class SCCameraVC: UIViewController {
             }
         }
     }
+    
+    // MARK: - Focus UI
+    private func setupFocusUI() {
+        view.addSubview(focusModeButton)
+        
+        focusModeButton.snp.makeConstraints { make in
+            make.right.equalTo(view.safeAreaLayoutGuide).offset(-16)
+            make.centerY.equalTo(captureButton)
+        }
+        
+        updateFocusModeButton()
+    }
+    
+    private func updateFocusModeButton() {
+        guard let session = photoSession else { return }
+        
+        let imageName: String
+        switch session.focusMode {
+        case .auto:
+            imageName = "camera.focus"
+        case .continuous:
+            imageName = "camera.focus.auto"
+        case .locked:
+            imageName = "camera.focus.locked"
+        case .manual:
+            imageName = "camera.focus.manual"
+        }
+        
+        focusModeButton.setImage(UIImage(systemName: imageName), for: .normal)
+    }
+    
+    @objc private func focusModeButtonTapped() {
+        guard let session = photoSession else { return }
+        
+        // 循环切换对焦模式
+        let nextMode: SCFocusMode
+        switch session.focusMode {
+        case .auto:
+            nextMode = .continuous
+        case .continuous:
+            nextMode = .locked
+        case .locked:
+            nextMode = .auto
+        case .manual:
+            nextMode = .auto
+        }
+        
+        session.setFocusMode(nextMode)
+        updateFocusModeButton()
+        
+        // 显示提示
+        let message: String
+        switch nextMode {
+        case .auto:
+            message = "单次自动对焦"
+        case .continuous:
+            message = "连续自动对焦"
+        case .locked:
+            message = "对焦已锁定"
+        case .manual:
+            message = "手动对焦"
+        }
+        
+        showSuccess(message)
+    }
+    
+    private func handleFocusStateChange(_ state: SCFocusState) {
+        let focusBoxView = SCFocusBoxView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
+        focusBoxView.animate(for: state)
+        
+        switch state {
+        case .focusing:
+            print("📸 [Focus] 正在对焦...")
+        case .focused:
+            print("📸 [Focus] 对焦成功")
+        case .failed:
+            print("📸 [Focus] 对焦失败")
+            let error = NSError(domain: "com.sparkcamera.focus", code: -1, userInfo: [NSLocalizedDescriptionKey: "对焦失败"])
+            showError(error)
+        case .locked:
+            print("📸 [Focus] 对焦已锁定")
+        }
+    }
 }
 
 // MARK: - SCSessionDelegate
 extension SCCameraVC: SCSessionDelegate {
     func didChangeValue(session: SCSession, value: Any, key: String) {
-        if key == "zoom", let zoomValue = value as? Double {
-            // 更新变焦指示器
-            zoomLabel.text = String(format: "%.1fx", zoomValue)
-            
-            // 显示变焦指示器
-            if zoomIndicatorView.isHidden {
-                zoomIndicatorView.alpha = 0
-                zoomIndicatorView.isHidden = false
-                UIView.animate(withDuration: 0.2) {
-                    self.zoomIndicatorView.alpha = 1
+        switch key {
+        case "zoom":
+            if let zoomValue = value as? Double {
+                // 更新变焦指示器
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
+                    // 更新文字
+                    self.zoomLabel.text = String(format: "%.1fx", zoomValue)
+                    
+                    // 确保 zoomLabel 在 zoomIndicatorView 内部
+                    self.zoomLabel.frame = self.zoomIndicatorView.bounds
+                    
+                    // 显示变焦指示器
+                    if self.zoomIndicatorView.isHidden {
+                        self.zoomIndicatorView.alpha = 0
+                        self.zoomIndicatorView.isHidden = false
+                        
+                        UIView.animate(withDuration: 0.2) {
+                            self.zoomIndicatorView.alpha = 1
+                            self.zoomLabel.alpha = 1
+                        }
+                    }
+                    
+                    // 延迟隐藏变焦指示器
+                    NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(self.hideZoomIndicator), object: nil)
+                    self.perform(#selector(self.hideZoomIndicator), with: nil, afterDelay: 1.5)
                 }
             }
             
-            // 延迟隐藏变焦指示器
-            NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(hideZoomIndicator), object: nil)
-            perform(#selector(hideZoomIndicator), with: nil, afterDelay: 1.5)
+        case "focusState":
+            if let focusState = value as? SCFocusState {
+                DispatchQueue.main.async { [weak self] in
+                    self?.handleFocusStateChange(focusState)
+                }
+            }
+            
+        default:
+            break
         }
     }
     
-    // 将 hideZoomIndicator 方法移到 extension 内部
     @objc private func hideZoomIndicator() {
-        UIView.animate(withDuration: 0.2) {
+        UIView.animate(withDuration: 0.2) { [weak self] in
+            guard let self = self else { return }
             self.zoomIndicatorView.alpha = 0
-        } completion: { _ in
+            self.zoomLabel.alpha = 0
+        } completion: { [weak self] _ in
+            guard let self = self else { return }
             self.zoomIndicatorView.isHidden = true
         }
     }
@@ -1292,7 +1473,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [Ratio] 比例值: \(ratioState.aspectRatio)")
                 print("📸 [Ratio] 当前实际比例状态: \(ratioState)")
             }
-            
+
         case .flash:
             // 获取保存的闪光灯设置
             let savedFlashMode = SCCameraSettingsManager.shared.flashMode
@@ -1305,7 +1486,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [Flash] 闪光灯模式: \(flashState.avFlashMode.rawValue)")
                 print("📸 [Flash] 当前实际闪光灯状态: \(flashState)")
             }
-            
+
         case .whiteBalance:
             // 获取保存的白平衡设置
             let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
@@ -1318,7 +1499,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [WhiteBalance] 色温值: \(whiteBalanceState.temperature)")
                 print("📸 [WhiteBalance] 当前实际白平衡状态: \(whiteBalanceState)")
             }
-            
+
         case .exposure:
             // 获取保存的曝光值
             let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
@@ -1332,7 +1513,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [Exposure] 曝光值: \(exposureState.value)")
                 print("📸 [Exposure] 当前实际曝光状态: \(exposureState)")
             }
-            
+
         case .iso:
             // 获取保存的 ISO 值
             let savedISOValue = SCCameraSettingsManager.shared.isoValue
@@ -1346,7 +1527,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [ISO] ISO 值: \(isoState.value)")
                 print("📸 [ISO] 当前实际ISO状态: \(isoState)")
             }
-            
+
         case .timer:
             // 获取保存的定时器设置
             let savedTimerMode = SCCameraSettingsManager.shared.timerMode
@@ -1359,7 +1540,7 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                 print("📸 [Timer] 定时秒数: \(timerState.seconds)")
                 print("📸 [Timer] 当前实际定时器状态: \(timerState)")
             }
-            
+
         case .livePhoto:
             print("📸 [LivePhoto] 功能未实现，使用默认关闭状态")
             let defaultState = SCLivePhotoState.off
@@ -1368,6 +1549,20 @@ extension SCCameraVC: SCCameraToolBarDelegate {
             toolBar.updateItem(item)
             print("📸 [LivePhoto] 使用默认状态: \(defaultState.title)")
             print("📸 [LivePhoto] 当前实际实况照片状态: \(defaultState)")
+        case .shutterSpeed:
+            // 获取保存的快门速度设置
+            let savedShutterSpeedValue = SCCameraSettingsManager.shared.shutterSpeedValue
+            print("📸 [ShutterSpeed] 数据库中保存的快门速度值: \(savedShutterSpeedValue)")
+            let shutterSpeedStates: [SCShutterSpeedState] = [.auto, .speed1_1000, .speed1_500, .speed1_250, .speed1_125, .speed1_60, .speed1_30]
+            if let shutterSpeedState = shutterSpeedStates.first(where: { $0.value == savedShutterSpeedValue }) {
+                item.setState(shutterSpeedState)
+                item.isSelected = true
+                toolBar.updateItem(item)
+                print("📸 [ShutterSpeed] 选中保存的状态: \(shutterSpeedState.title)")
+                print("📸 [ShutterSpeed] 快门速度值: \(shutterSpeedState.value)")
+                print("📸 [ShutterSpeed] 当前实际快门速度状态: \(shutterSpeedState)")
+            }
+
         }
     }
     
@@ -1523,6 +1718,34 @@ extension SCCameraVC: SCCameraToolBarDelegate {
                     generator.impactOccurred()
                 }
             }
+        } else if item.type == .shutterSpeed {
+            if let shutterSpeedState = item.state as? SCShutterSpeedState {
+                print("📸 [ShutterSpeed] 选择快门速度状态：\(shutterSpeedState.title)")
+                // 更新相机快门速度
+                photoSession.setShutterSpeed(shutterSpeedState.value) { success in
+                    if success {
+                        // 保存到数据库
+                        SCCameraSettingsManager.shared.shutterSpeedValue = shutterSpeedState.value
+                        
+                        // 显示状态更新提示
+                        DispatchQueue.main.async {
+                            let view = MessageView.viewFromNib(layout: .statusLine)
+                            view.configureTheme(.success)
+                            view.configureContent(title: "", body: shutterSpeedState == .auto ? "自动快门速度" : "快门速度：1/\(Int(1/shutterSpeedState.value))秒")
+                            SwiftMessages.show(view: view)
+                            
+                            // 添加触觉反馈
+                            let generator = UIImpactFeedbackGenerator(style: .light)
+                            generator.impactOccurred()
+                        }
+                    } else {
+                        // 设置失败时显示错误提示
+                        DispatchQueue.main.async {
+                            SwiftMessages.showErrorMessage("设置快门速度失败")
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -1546,6 +1769,36 @@ extension SCCameraVC: SCCameraToolBarDelegate {
             SwiftMessages.showInfoMessage("实况照片功能待开发")
         case .ratio, .whiteBalance, .exposure, .iso, .timer:
             break
+        case .shutterSpeed:
+            if let shutterSpeedState = item.state as? SCShutterSpeedState {
+                let nextState = shutterSpeedState.nextState()
+                // 更新工具项状态
+                item.setState(nextState)
+                toolBar.updateItem(item)
+                
+                // 设置快门速度
+                photoSession.setShutterSpeed(nextState.value) { success in
+                    if success {
+                        // 保存快门速度状态
+                        SCCameraSettingsManager.shared.shutterSpeedValue = nextState.value
+                        
+                        // 添加触觉反馈
+                        let generator = UIImpactFeedbackGenerator(style: .light)
+                        generator.impactOccurred()
+                        
+                        // 显示状态更新提示
+                        let message = nextState.value == 0 ? "自动快门速度" : "快门速度: 1/\(Int(1/nextState.value))秒"
+                        DispatchQueue.main.async {
+                            SwiftMessages.showSuccessMessage(message)
+                        }
+                    } else {
+                        // 设置失败时显示错误提示
+                        DispatchQueue.main.async {
+                            SwiftMessages.showErrorMessage("设置快门速度失败")
+                        }
+                    }
+                }
+            }
         }
     }
     

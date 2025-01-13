@@ -1,3 +1,13 @@
+//
+//  SCToolType.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
+
+
+
 import UIKit
 
 /// 相机工具类型
@@ -7,6 +17,7 @@ public enum SCToolType {
     case ratio        // 预览比例
     case whiteBalance // 白平衡
     case exposure     // 曝光补偿
+    case shutterSpeed // 快门速度
     case iso          // ISO
     case timer        // 计时器
     
@@ -23,6 +34,8 @@ public enum SCToolType {
             return UIImage(systemName: "circle.lefthalf.filled")
         case .exposure:
             return UIImage(systemName: "plusminus")
+        case .shutterSpeed:
+            return UIImage(systemName: "speedometer")
         case .iso:
             return UIImage(systemName: "camera.aperture")
         case .timer:
@@ -42,7 +55,9 @@ public enum SCToolType {
         case .whiteBalance:
             return "白平衡"
         case .exposure:
-            return "曝光"
+            return "曝光补偿"
+        case .shutterSpeed:
+            return "快门速度"
         case .iso:
             return "ISO"
         case .timer:
@@ -95,6 +110,16 @@ public enum SCToolType {
                 SCExposureOption.zero,
                 SCExposureOption.positive1,
                 SCExposureOption.positive2
+            ]
+        case .shutterSpeed:
+            return [
+                SCShutterSpeedOption.auto,
+                SCShutterSpeedOption.speed1_1000,
+                SCShutterSpeedOption.speed1_500,
+                SCShutterSpeedOption.speed1_250,
+                SCShutterSpeedOption.speed1_125,
+                SCShutterSpeedOption.speed1_60,
+                SCShutterSpeedOption.speed1_30
             ]
         case .iso:
             return [

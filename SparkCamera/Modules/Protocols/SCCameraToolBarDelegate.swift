@@ -1,3 +1,10 @@
+//
+//  SCCameraToolBarDelegate.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
 import UIKit
 
 protocol SCCameraToolBarDelegate: AnyObject {

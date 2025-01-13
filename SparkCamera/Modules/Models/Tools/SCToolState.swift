@@ -1,3 +1,12 @@
+//
+//  SCToolState.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/12/21.
+//
+
+
+
 import UIKit
 import AVFoundation
 
@@ -289,4 +298,45 @@ public enum SCTimerState: Int {
 
 extension SCTimerState: SCToolState {
     public func nextState() -> SCTimerState { return self }
+}
+
+// 快门速度状态
+public enum SCShutterSpeedState: Float, CaseIterable {
+    case auto = 0.0
+    case speed1_1000 = 0.001    // 1/1000s
+    case speed1_500 = 0.002     // 1/500s
+    case speed1_250 = 0.004     // 1/250s
+    case speed1_125 = 0.008     // 1/125s
+    case speed1_60 = 0.0167     // 1/60s
+    case speed1_30 = 0.0333     // 1/30s
+    case speed1_15 = 0.0667     // 1/15s
+    case speed1_8 = 0.125       // 1/8s
+    case speed1_4 = 0.25        // 1/4s
+    case speed1_2 = 0.5         // 1/2s
+    case speed1 = 1.0           // 1s
+    
+    public var title: String {
+        switch self {
+        case .auto:
+            return "自动"
+        default:
+            if self.rawValue < 0.1 {
+                return "1/\(Int(1/self.rawValue))s"
+            } else {
+                return String(format: "%.1fs", self.rawValue)
+            }
+        }
+    }
+    
+    public var value: Float {
+        return self.rawValue
+    }
+}
+
+extension SCShutterSpeedState: SCToolState {
+    public var icon: UIImage? {
+        return UIImage(systemName: "camera.shutter")
+    }
+    
+    public func nextState() -> SCShutterSpeedState { return self }
 } 

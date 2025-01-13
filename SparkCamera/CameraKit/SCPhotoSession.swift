@@ -8,6 +8,21 @@
 import UIKit
 import AVFoundation
 
+// MARK: - Focus Enums
+public enum SCFocusMode: Int {
+    case auto = 0          // 单次自动对焦
+    case continuous = 1    // 连续自动对焦
+    case locked = 2        // 锁定对焦
+    case manual = 3        // 手动对焦
+}
+
+public enum SCFocusState {
+    case focusing       // 正在对焦
+    case focused        // 对焦成功
+    case failed        // 对焦失败
+    case locked        // 对焦已锁定
+}
+
 extension SCSession.FlashMode {
     
     var captureFlashMode: AVCaptureDevice.FlashMode {
@@ -105,6 +120,19 @@ extension SCSession.FlashMode {
 
         let settings = AVCapturePhotoSettings()
         settings.flashMode = self.flashMode.captureFlashMode
+        
+        // 确保使用当前的曝光设置
+        if let device = videoInput?.device {
+            settings.isAutoStillImageStabilizationEnabled = false  // 禁用自动图像稳定
+            if device.exposureMode == .custom {
+                print("📸 [Capture] 使用自定义曝光设置")
+                print("📸 [Capture] 当前快门速度：\(CMTimeGetSeconds(device.exposureDuration))秒")
+                print("📸 [Capture] 当前 ISO：\(device.iso)")
+                settings.isAutoStillImageStabilizationEnabled = false
+            } else {
+                print("📸 [Capture] 使用自动曝光设置")
+            }
+        }
 
         if let connection = self.photoOutput.connection(with: .video) {
             if self.resolution.width > 0, self.resolution.height > 0 {
@@ -167,16 +195,89 @@ extension SCSession.FlashMode {
     }
     
     @objc public override func focus(at point: CGPoint) {
-        if let device = self.captureDeviceInput?.device, device.isFocusPointOfInterestSupported {
-            do {
-                try device.lockForConfiguration()
+        guard let device = captureDeviceInput?.device else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            // 更新对焦状态
+            focusState = .focusing
+            
+            // 设置对焦点
+            if device.isFocusPointOfInterestSupported {
                 device.focusPointOfInterest = point
-                device.focusMode = .continuousAutoFocus
-                device.unlockForConfiguration()
-            } catch let error {
-                print("Error while focusing at point \(point): \(error)")
+                print("📸 [Focus] 设置对焦点：\(point)")
+            }
+            
+            // 根据当前模式设置对焦
+            switch focusMode {
+            case .auto:
+                if device.isFocusModeSupported(.autoFocus) {
+                    device.focusMode = .autoFocus
+                }
+            case .continuous:
+                if device.isFocusModeSupported(.continuousAutoFocus) {
+                    device.focusMode = .continuousAutoFocus
+                }
+            case .locked:
+                if device.isFocusModeSupported(.locked) {
+                    device.focusMode = .locked
+                }
+            case .manual:
+                // 手动对焦模式将在后续实现
+                break
+            }
+            
+            // 添加对焦观察者
+            NotificationCenter.default.addObserver(self,
+                                                 selector: #selector(subjectAreaDidChange),
+                                                 name: .AVCaptureDeviceSubjectAreaDidChange,
+                                                 object: device)
+            
+            device.unlockForConfiguration()
+            
+            // 延迟更新对焦状态
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.focusState = .focused
+            }
+            
+            print("📸 [Focus] 对焦模式：\(focusMode)")
+            
+        } catch {
+            print("⚠️ [Focus] 设置对焦失败: \(error.localizedDescription)")
+            focusState = .failed
+        }
+    }
+    
+    @objc private func subjectAreaDidChange(notification: NSNotification) {
+        // 主体区域发生变化时，如果是连续对焦模式，更新对焦状态
+        if focusMode == .continuous {
+            focusState = .focusing
+            
+            // 延迟更新状态
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.focusState = .focused
             }
         }
+    }
+    
+    // 设置对焦模式
+    public func setFocusMode(_ mode: SCFocusMode) {
+        focusMode = mode
+        print("📸 [Focus] 切换对焦模式：\(mode)")
+    }
+    
+    // 锁定当前对焦
+    public func lockFocus() {
+        setFocusMode(.locked)
+        focusState = .locked
+        print("📸 [Focus] 锁定对焦")
+    }
+    
+    // 解锁对焦
+    public func unlockFocus() {
+        setFocusMode(.continuous)
+        print("📸 [Focus] 解锁对焦")
     }
     
     @available(iOS 11.0, *)
@@ -323,6 +424,22 @@ extension SCSession.FlashMode {
         }
     }
 
+    // MARK: - Focus Methods
+    private func loadFocusSettings() {
+        let settings = SCCameraSettingsManager.shared
+        focusMode = settings.focusMode
+        
+        if settings.isFocusLocked {
+            lockFocus()
+        }
+    }
+    
+    // MARK: - Camera Setup
+    private func setupCamera() {
+        setupSession()
+        loadFocusSettings()
+    }
+    
     // MARK: - Session Setup
     private func setupSession() {
         session.beginConfiguration()
@@ -537,6 +654,130 @@ extension SCSession.FlashMode {
             return true
         } catch {
             print("设置 ISO 失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    // MARK: - Focus Mode
+    public private(set) var focusMode: SCFocusMode = .continuous {
+        didSet {
+            updateFocusMode()
+            // 保存设置
+            SCCameraSettingsManager.shared.focusMode = focusMode
+        }
+    }
+    
+    public private(set) var focusState: SCFocusState = .focused {
+        didSet {
+            // 通知代理焦点状态变化
+            if let delegate = self.delegate {
+                delegate.didChangeValue(session: self, value: focusState, key: "focusState")
+            }
+            
+            // 更新对焦锁定状态
+            if focusState == .locked {
+                SCCameraSettingsManager.shared.isFocusLocked = true
+            } else if focusState == .focused && focusMode != .locked {
+                SCCameraSettingsManager.shared.isFocusLocked = false
+            }
+        }
+    }
+    
+    private func updateFocusMode() {
+        guard let device = captureDeviceInput?.device else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            switch focusMode {
+            case .auto:
+                if device.isFocusModeSupported(.autoFocus) {
+                    device.focusMode = .autoFocus
+                }
+            case .continuous:
+                if device.isFocusModeSupported(.continuousAutoFocus) {
+                    device.focusMode = .continuousAutoFocus
+                }
+            case .locked:
+                if device.isFocusModeSupported(.locked) {
+                    device.focusMode = .locked
+                }
+            case .manual:
+                // 手动对焦模式将在后续实现
+                break
+            }
+            
+            device.unlockForConfiguration()
+        } catch {
+            print("⚠️ [Focus] 更新对焦模式失败: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Shutter Speed Control
+    public func setShutterSpeed(_ value: Float, completion: ((Bool) -> Void)? = nil) -> Bool {
+        guard let device = videoInput?.device else {
+            print("📸 [Shutter Speed] 无法获取相机设备")
+            completion?(false)
+            return false
+        }
+        
+        do {
+            try device.lockForConfiguration()
+            
+            // 检查设备是否支持自定义曝光模式
+            if device.isExposureModeSupported(.custom) {
+                if value == 0 {
+                    // 值为0时，切换到自动曝光模式
+                    device.exposureMode = .continuousAutoExposure
+                    print("📸 [Shutter Speed] 切换到自动曝光模式")
+                    device.unlockForConfiguration()
+                    completion?(true)
+                    return true
+                } else {
+                    // 设置自定义曝光模式
+                    device.exposureMode = .custom
+                    
+                    // 禁用自动曝光补偿
+                    if device.isExposurePointOfInterestSupported {
+                        device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
+                    }
+                    
+                    // 将快门速度值转换为 CMTime
+                    // value 表示秒数，例如 value = 0.001 表示 1/1000 秒
+                    let seconds = value
+                    print("📸 [Shutter Speed] 设置快门速度：\(seconds)秒 (1/\(Int(1/seconds))秒)")
+                    let shutterSpeed = CMTimeMakeWithSeconds(Float64(seconds), preferredTimescale: 1000000)
+                    
+                    // 获取设备支持的快门速度范围
+                    let minDuration = device.activeFormat.minExposureDuration
+                    let maxDuration = device.activeFormat.maxExposureDuration
+                    print("📸 [Shutter Speed] 设备支持的快门速度范围：[\(CMTimeGetSeconds(minDuration))秒, \(CMTimeGetSeconds(maxDuration))秒]")
+                    
+                    // 确保快门速度在有效范围内
+                    let clampedDuration = min(max(shutterSpeed, minDuration), maxDuration)
+                    
+                    // 使用固定的 ISO 值
+                    let baseISO = device.activeFormat.minISO
+                    print("📸 [Shutter Speed] 使用固定 ISO 值：\(baseISO)")
+                    
+                    // 设置曝光时间和 ISO
+                    device.setExposureModeCustom(duration: clampedDuration, iso: baseISO) { _ in
+                        print("📸 [Shutter Speed] 设置完成 - 快门速度: \(CMTimeGetSeconds(clampedDuration))秒, ISO: \(baseISO)")
+                        completion?(true)
+                    }
+                }
+                
+                device.unlockForConfiguration()
+                return true
+            } else {
+                print("📸 [Shutter Speed] 设备不支持自定义曝光模式")
+                device.unlockForConfiguration()
+                completion?(false)
+                return false
+            }
+        } catch {
+            print("📸 [Shutter Speed] 设置失败: \(error.localizedDescription)")
+            completion?(false)
             return false
         }
     }
