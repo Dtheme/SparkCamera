@@ -2,54 +2,58 @@
 //  SCGridView.swift
 //  SparkCamera
 //
-//  Created by dzw on 2024/12/19.
+//  Created by dzw on 2024/1/13.
 //
 
 import UIKit
 
-@objc public class SCGridView: UIView {
+public class SCGridView: UIView {
     
-    @objc public var color: UIColor = UIColor.white.withAlphaComponent(0.5) {
-        didSet {
-            self.setNeedsDisplay()
-        }
-    }
+    private let lineWidth: CGFloat = 1.0
+    private let lineColor: UIColor = .white.withAlphaComponent(0.5)
     
-    @objc public override init(frame: CGRect) {
+    public override init(frame: CGRect) {
         super.init(frame: frame)
-        self.setupView()
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
     }
     
-    @objc public required init?(coder aDecoder: NSCoder) {
-        super.init(coder: aDecoder)
-        self.setupView()
-    }
-    
-    private func setupView() {
-        self.backgroundColor = UIColor.clear
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        backgroundColor = .clear
+        isUserInteractionEnabled = false
     }
     
     public override func draw(_ rect: CGRect) {
         super.draw(rect)
         
-        guard let context = UIGraphicsGetCurrentContext() else {
-            return
+        guard let context = UIGraphicsGetCurrentContext() else { return }
+        
+        // 设置线条样式
+        context.setLineWidth(lineWidth)
+        context.setStrokeColor(lineColor.cgColor)
+        
+        // 计算网格线位置
+        let width = rect.width
+        let height = rect.height
+        
+        // 绘制水平线
+        let horizontalSpacing = height / 3.0
+        for i in 1...2 {
+            let y = horizontalSpacing * CGFloat(i)
+            context.move(to: CGPoint(x: 0, y: y))
+            context.addLine(to: CGPoint(x: width, y: y))
         }
         
-        context.setStrokeColor(self.color.cgColor)
-        context.setLineWidth(1.0)
-        
-        let pairs: [[CGPoint]] = [
-            [CGPoint(x: rect.width / 3.0, y: rect.minY), CGPoint(x: rect.width / 3.0, y: rect.maxY)],
-            [CGPoint(x: 2 * rect.width / 3.0, y: rect.minY), CGPoint(x: 2 * rect.width / 3.0, y: rect.maxY)],
-            [CGPoint(x: rect.minX, y: rect.height / 3.0), CGPoint(x: rect.maxX, y: rect.height / 3.0)],
-            [CGPoint(x: rect.minX, y: 2 * rect.height / 3.0), CGPoint(x: rect.maxX, y: 2 * rect.height / 3.0)]
-        ]
-        
-        for pair in pairs {
-            context.addLines(between: pair)
+        // 绘制垂直线
+        let verticalSpacing = width / 3.0
+        for i in 1...2 {
+            let x = verticalSpacing * CGFloat(i)
+            context.move(to: CGPoint(x: x, y: 0))
+            context.addLine(to: CGPoint(x: x, y: height))
         }
         
+        // 绘制线条
         context.strokePath()
     }
-}
+} 

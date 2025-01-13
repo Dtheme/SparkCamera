@@ -47,6 +47,17 @@ class SCCameraVC: UIViewController {
         return label
     }()
     
+    // 添加网格相关属性
+    private var gridView: SCGridView?
+    private var isGridVisible = false
+    private lazy var gridButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "grid"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(toggleGrid), for: .touchUpInside)
+        return button
+    }()
+    
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
         let button = UIButton(type: .system)
@@ -346,7 +357,8 @@ class SCCameraVC: UIViewController {
         
         // 2. 添加关闭按钮
         view.addSubview(closeButton)
-        
+
+
         // 3. 添加工具栏
         view.addSubview(toolBar)
         toolBar.delegate = self
@@ -518,6 +530,9 @@ class SCCameraVC: UIViewController {
             updatePreviewRatio(16.0 / 9.0)
         }
         
+        // 11. 添加网格按钮
+        view.addSubview(gridButton)
+
         setupFocusUI()
     }
     
@@ -687,6 +702,12 @@ class SCCameraVC: UIViewController {
             make.center.equalTo(previewView)
             make.width.equalTo(200)
             make.height.equalTo(4)
+        }
+        
+        // 添加网格按钮约束
+        gridButton.snp.makeConstraints { make in
+            make.centerY.equalTo(lensSelectorView)
+            make.leading.equalTo(view.safeAreaLayoutGuide).offset(16)
         }
     }
     
@@ -1387,6 +1408,39 @@ class SCCameraVC: UIViewController {
         case .locked:
             print("📸 [Focus] 对焦已锁定")
         }
+    }
+    
+    // 添加网格切换方法
+    @objc private func toggleGrid() {
+        isGridVisible.toggle()
+        
+        if isGridVisible {
+            // 创建并显示网格
+            let gridView = SCGridView(frame: previewView.bounds)
+            gridView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            previewView.addSubview(gridView)
+            self.gridView = gridView
+            
+            // 更新按钮状态
+            gridButton.tintColor = SCConstants.themeColor
+        } else {
+            // 移除网格
+            gridView?.removeFromSuperview()
+            gridView = nil
+            
+            // 更新按钮状态
+            gridButton.tintColor = .white
+        }
+        
+        // 添加触觉反馈
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        
+        // 显示状态更新提示
+        let view = MessageView.viewFromNib(layout: .statusLine)
+        view.configureTheme(.success)
+        view.configureContent(title: "", body: isGridVisible ? "网格已开启" : "网格已关闭")
+        SwiftMessages.show(view: view)
     }
 }
 
