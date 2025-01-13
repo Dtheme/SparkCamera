@@ -26,7 +26,22 @@ public class SCToolItem {
     }
     
     public var title: String {
-        return state?.title ?? type.defaultTitle
+        switch type {
+        case .flash:
+            return "闪光灯"
+        case .livePhoto:
+            return "实况照片"
+        case .ratio:
+            return "比例"
+        case .whiteBalance:
+            return "白平衡"
+        case .exposure:
+            return "曝光"
+        case .iso:
+            return "ISO"
+        case .timer:
+            return "延时拍摄"
+        }
     }
     
     public func setState(_ newState: SCToolState) {

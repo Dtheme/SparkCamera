@@ -466,9 +466,10 @@ extension SCSession.FlashMode {
 
         do {
             try device.lockForConfiguration()
-    
-            if device.isExposureModeSupported(.custom) {
-                device.exposureMode = .custom
+            
+            // 首先切换到自动曝光模式
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
                 
                 // 获取设备支持的曝光范围
                 let minExposure = device.minExposureTargetBias
@@ -485,8 +486,11 @@ extension SCSession.FlashMode {
                 device.setExposureTargetBias(clampedValue)
                 print("📸 [Exposure] 设置曝光值：\(clampedValue) (原始值：\(value))")
                 print("📸 [Exposure] 设备支持范围：[\(minExposure), \(maxExposure)]")
+                
+                // 等待曝光调整生效
+                device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
             } else {
-                print("⚠️ [Exposure] 设备不支持自定义曝光模式")
+                print("⚠️ [Exposure] 设备不支持自动曝光模式")
                 device.unlockForConfiguration()
                 return false
             }

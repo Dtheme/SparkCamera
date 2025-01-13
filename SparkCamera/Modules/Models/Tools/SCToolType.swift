@@ -34,19 +34,19 @@ public enum SCToolType {
     public var defaultTitle: String {
         switch self {
         case .flash:
-            return "关闭"
+            return "闪光灯"
         case .livePhoto:
-            return "实况"
+            return "实况照片"
         case .ratio:
-            return "4:3"
+            return "比例"
         case .whiteBalance:
             return "白平衡"
         case .exposure:
-            return "曝光补偿"
+            return "曝光"
         case .iso:
             return "ISO"
         case .timer:
-            return "计时器"
+            return "延时拍摄"
         }
     }
     

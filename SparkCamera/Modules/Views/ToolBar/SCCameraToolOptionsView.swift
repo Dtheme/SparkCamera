@@ -18,7 +18,7 @@ class SCCameraToolOptionCell: UICollectionViewCell {
         let label = UILabel()
         label.textAlignment = .center
         label.font = .systemFont(ofSize: 14)
-        label.textColor = .white
+        label.textColor = .systemGray6
         return label
     }()
     
@@ -36,14 +36,14 @@ class SCCameraToolOptionCell: UICollectionViewCell {
     private func setupUI() {
         contentView.addSubview(titleLabel)
         titleLabel.snp.makeConstraints { make in
-            make.edges.equalToSuperview().inset(8)
+           make.edges.equalToSuperview().inset(8)
         }
     }
     
     // MARK: - Configuration
     func configure(with title: String, isSelected: Bool) {
         titleLabel.text = title
-        titleLabel.textColor = isSelected ? SCConstants.themeColor : .white
+        titleLabel.textColor = isSelected ? SCConstants.themeColor : .systemGray6
         titleLabel.font = isSelected ? .systemFont(ofSize: 14, weight: .medium) : .systemFont(ofSize: 14)
     }
 }
@@ -69,7 +69,16 @@ class SCCameraToolOptionsView: UIView {
     private var selectedOption: SCToolOption?
     private var toolType: SCToolType?
     private var selectedIndex: Int = 0
-    
+    //标题label
+    private lazy var titleLabel: UILabel = {
+        let label = UILabel()
+        label.textAlignment = .center
+        label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        label.textColor = .systemGray6
+        return label
+    }()
+
+
     var didSelectOption: ((SCToolOption) -> Void)?
 //    var didChangeValue: ((Float) -> Void)?
     
@@ -130,7 +139,7 @@ class SCCameraToolOptionsView: UIView {
         
         // 根据工具类型决定视图类型
         self.type = toolType == .exposure ? .scale : .normal
-        
+        self.titleLabel.text = itemTitle
         setupUI()
         configure(with: options)
     }
@@ -150,7 +159,13 @@ class SCCameraToolOptionsView: UIView {
         
         addSubview(collectionView)
         addSubview(scaleSlider)
-        
+        addSubview(titleLabel)
+
+        titleLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(16)
+            make.right.equalToSuperview().offset(-16)
+        }
+
         collectionView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
