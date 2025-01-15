@@ -207,7 +207,15 @@ class SCCameraVC: UIViewController {
 //            cameraManager = nil
 //        }
     }
-    
+    // 禁止该视图控制器旋转
+    override var shouldAutorotate: Bool {
+        return false
+    }
+
+    // 限制该视图控制器支持的方向
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        return .portrait // 仅支持竖屏
+    }
     private func setupHorizontalIndicator() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }

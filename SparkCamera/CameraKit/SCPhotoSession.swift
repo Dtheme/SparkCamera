@@ -7,6 +7,7 @@
 
 import UIKit
 import AVFoundation
+import CoreMotion
 
 // MARK: - Focus Enums
 public enum SCFocusMode: Int {
@@ -175,10 +176,70 @@ extension SCSession.FlashMode {
         
         self.session.addOutput(self.photoOutput)
         configureInputs()
+        
+        // 开始监听设备方向变化
+        startDeviceOrientationNotifier()
     }
     
-    @objc deinit {
-        self.faceDetectionBoxes.forEach({ $0.removeFromSuperview() })
+    // 添加设备方向监听
+    private var deviceOrientationNotifier: Any?
+    private var currentDeviceOrientation: UIDeviceOrientation = .portrait
+    private let motionManager = CMMotionManager()
+    
+    private func startDeviceOrientationNotifier() {
+        // 确保设备支持陀螺仪
+        guard motionManager.isDeviceMotionAvailable else {
+            print("⚠️ [Orientation] 设备不支持运动检测")
+            return
+        }
+        
+        // 设置更新频率
+        motionManager.deviceMotionUpdateInterval = 0.5
+        
+        // 开始监听设备运动
+        motionManager.startDeviceMotionUpdates(to: .main) { [weak self] (motion, error) in
+            guard let self = self,
+                  let motion = motion else {
+                if let error = error {
+                    print("⚠️ [Orientation] 运动更新错误: \(error.localizedDescription)")
+                }
+                return
+            }
+            
+            // 获取重力向量
+            let gravity = motion.gravity
+            
+            // 根据重力方向判断设备方向
+            let orientation: UIDeviceOrientation
+            if gravity.z < -0.75 {
+                orientation = .faceUp
+            } else if gravity.z > 0.75 {
+                orientation = .faceDown
+            } else {
+                let x = gravity.x
+                let y = gravity.y
+                
+                if abs(y) < 0.45 {
+                    orientation = x < 0 ? .landscapeRight : .landscapeLeft
+                } else {
+                    orientation = y < 0 ? .portrait : .portraitUpsideDown
+                }
+            }
+            
+            // 如果方向发生变化，更新当前方向
+            if orientation != self.currentDeviceOrientation {
+                self.currentDeviceOrientation = orientation
+                print("📸 [Orientation] 设备方向更新: \(orientation.rawValue)")
+            }
+        }
+        
+        print("📸 [Orientation] 开始监听设备方向")
+    }
+    
+    deinit {
+        // 停止运动更新
+        motionManager.stopDeviceMotionUpdates()
+        print("📸 [Orientation] 停止监听设备方向")
     }
     
     var captureCallback: (UIImage, AVCaptureResolvedPhotoSettings) -> Void = { (_, _) in }
@@ -424,45 +485,59 @@ extension SCSession.FlashMode {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
             
-            // 获取设备方向
-            let deviceOrientation = UIDevice.current.orientation
+            // 获取当前设备方向
+            let deviceOrientation = self.currentDeviceOrientation
             print("📸 [Photo Process] 设备方向: \(deviceOrientation.rawValue)")
             
-            // 根据设备方向和相机位置确定旋转角度
-            let rotationAngle: CGFloat = {
+            // 确定图片方向
+            let imageOrientation: UIImage.Orientation = {
                 switch deviceOrientation {
                 case .portrait:
-                    return self.cameraPosition == .front ? .pi / 2 : .pi / 2
+                    return self.cameraPosition == .front ? .rightMirrored : .right
                 case .portraitUpsideDown:
-                    return self.cameraPosition == .front ? -.pi / 2 : -.pi / 2
+                    return self.cameraPosition == .front ? .leftMirrored : .left
                 case .landscapeLeft:
-                    return self.cameraPosition == .front ? .pi : 0
+                    return self.cameraPosition == .front ? .upMirrored : .up
                 case .landscapeRight:
-                    return self.cameraPosition == .front ? 0 : .pi
+                    return self.cameraPosition == .front ? .downMirrored : .down
+                case .faceUp, .faceDown:
+                    // 如果设备平放，使用预览层的方向
+                    if let connection = self.previewLayer?.connection,
+                       connection.isVideoOrientationSupported {
+                        switch connection.videoOrientation {
+                        case .portrait:
+                            return self.cameraPosition == .front ? .rightMirrored : .right
+                        case .portraitUpsideDown:
+                            return self.cameraPosition == .front ? .leftMirrored : .left
+                        case .landscapeLeft:
+                            return self.cameraPosition == .front ? .upMirrored : .up
+                        case .landscapeRight:
+                            return self.cameraPosition == .front ? .downMirrored : .down
+                        @unknown default:
+                            return self.cameraPosition == .front ? .rightMirrored : .right
+                        }
+                    }
+                    return self.cameraPosition == .front ? .rightMirrored : .right
                 default:
-                    return self.cameraPosition == .front ? .pi / 2 : .pi / 2
+                    return self.cameraPosition == .front ? .rightMirrored : .right
                 }
             }()
             
-            // 旋转图片
-            let rotatedImage = image.SCRotate(by: rotationAngle)
-            print("📸 [Photo Process] 旋转后尺寸: \(rotatedImage.size.width) x \(rotatedImage.size.height)")
-            print("📸 [Photo Process] 旋转后方向: \(rotatedImage.imageOrientation.rawValue)")
+            print("📸 [Photo Process] 目标图片方向: \(imageOrientation.rawValue)")
             
-            // 如果是前置相机，需要水平翻转
+            // 创建正确方向的图片
             let finalImage: UIImage
-            if self.cameraPosition == .front {
-                UIGraphicsBeginImageContextWithOptions(rotatedImage.size, false, rotatedImage.scale)
-                let context = UIGraphicsGetCurrentContext()!
-                context.translateBy(x: rotatedImage.size.width, y: 0)
-                context.scaleBy(x: -1, y: 1)
-                rotatedImage.draw(in: CGRect(origin: .zero, size: rotatedImage.size))
-                finalImage = UIGraphicsGetImageFromCurrentImageContext() ?? rotatedImage
-                UIGraphicsEndImageContext()
-                print("📸 [Photo Process] 前置相机图片已水平翻转")
+            if let cgImage = image.cgImage {
+                finalImage = UIImage(cgImage: cgImage, scale: image.scale, orientation: imageOrientation)
+                print("📸 [Photo Process] 已调整图片方向")
             } else {
-                finalImage = rotatedImage
+                finalImage = image
+                print("⚠️ [Photo Process] 无法获取 CGImage，使用原始图片")
             }
+            
+            print("📸 [Photo Process] 最终图片信息:")
+            print("📸 [Photo Process] - 尺寸: \(finalImage.size.width) x \(finalImage.size.height)")
+            print("📸 [Photo Process] - 方向: \(finalImage.imageOrientation.rawValue)")
             
             DispatchQueue.main.async {
                 self.captureCallback(finalImage, resolvedSettings)
