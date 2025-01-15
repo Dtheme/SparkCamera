@@ -32,13 +32,11 @@ public class SCSVGImageLoader {
         }
         
         // 调整大小（如果需要）
-        if let size = size {
-            UIGraphicsBeginImageContextWithOptions(size, false, 0)
-            image.draw(in: CGRect(origin: .zero, size: size))
-            if let resizedImage = UIGraphicsGetImageFromCurrentImageContext() {
-                image = resizedImage
+        if let size = size, size.width > 0, size.height > 0 {
+            let renderer = UIGraphicsImageRenderer(size: size)
+            image = renderer.image { context in
+                image.draw(in: CGRect(origin: .zero, size: size))
             }
-            UIGraphicsEndImageContext()
         }
         
         // 着色（如果需要）

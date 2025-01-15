@@ -1,3 +1,10 @@
+//
+//  SCLensSelectorView.swift
+//  SparkCamera
+//
+//  Created by dzw on 2024/1/14.
+//
+
 import UIKit
 import SnapKit
 

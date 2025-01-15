@@ -26,6 +26,7 @@ class SCCameraToolBar: UIView {
     private var originalCenter: CGPoint = .zero
     private var originalCellFrames: [IndexPath: CGRect] = [:]
     private var originalLayoutAttributes: [IndexPath: UICollectionViewLayoutAttributes] = [:]
+    private var originalContentOffset: CGPoint = .zero
     
     // MARK: - UI Components
     private lazy var blurView: UIVisualEffectView = {
@@ -82,9 +83,11 @@ class SCCameraToolBar: UIView {
             originalFrame = frame
             originalCenter = center
             
-            collectionView.visibleCells.forEach { cell in
-                if let indexPath = collectionView.indexPath(for: cell) {
-                    originalCellFrames[indexPath] = cell.frame
+            // 遍历所有items而不是visibleCells
+            for (index, _) in items.enumerated() {
+                let indexPath = IndexPath(item: index, section: 0)
+                if let attributes = collectionView.layoutAttributesForItem(at: indexPath)?.copy() as? UICollectionViewLayoutAttributes {
+                    originalCellFrames[indexPath] = attributes.frame
                 }
             }
         }
@@ -111,11 +114,13 @@ class SCCameraToolBar: UIView {
         
         // 保存所有cell的布局属性
         originalLayoutAttributes.removeAll()
-        collectionView.visibleCells.forEach { cell in
-            if let indexPath = collectionView.indexPath(for: cell),
-               let attributes = collectionView.layoutAttributesForItem(at: indexPath)?.copy() as? UICollectionViewLayoutAttributes {
+        originalCellFrames.removeAll()
+        
+        for (index, _) in items.enumerated() {
+            let indexPath = IndexPath(item: index, section: 0)
+            if let attributes = collectionView.layoutAttributesForItem(at: indexPath)?.copy() as? UICollectionViewLayoutAttributes {
                 originalLayoutAttributes[indexPath] = attributes
-                originalCellFrames[indexPath] = cell.frame
+                originalCellFrames[indexPath] = attributes.frame
             }
         }
         
@@ -129,9 +134,9 @@ class SCCameraToolBar: UIView {
         let safeAreaInsets = superview?.safeAreaInsets ?? .zero
         let finalX = -(frame.width - (cellWidth + sectionInset.right + sectionInset.left)) + safeAreaInsets.left
         
-        // 计算选中cell的最终位置
+        // 计算选中cell的最终位置，考虑 contentOffset
         let rightEdgeX = collectionView.bounds.width - cellWidth - sectionInset.right
-        let selectedCellTargetFrame = CGRect(x: rightEdgeX,
+        let selectedCellTargetFrame = CGRect(x: rightEdgeX + collectionView.contentOffset.x,
                                            y: 0,
                                            width: cellWidth,
                                            height: cellHeight)
@@ -141,22 +146,20 @@ class SCCameraToolBar: UIView {
                       delay: 0, 
                       options: [.curveEaseInOut], 
                       animations: {
-            // 重置 collectionView 的滚动位置
-            self.collectionView.contentOffset = .zero
+            // 保存当前滚动位置
+            self.originalContentOffset = self.collectionView.contentOffset
+            
+            // 停止滚动
+            self.collectionView.setContentOffset(self.collectionView.contentOffset, animated: false)
             self.collectionView.layoutIfNeeded()
             
-            // 统一所有cell的尺寸
-            self.collectionView.visibleCells.forEach { cell in
-                if cell == selectedCell {
-                    cell.frame = CGRect(x: cell.frame.origin.x,
-                                      y: 0,
-                                      width: cellWidth,
-                                      height: cellHeight)
-                    cell.isHidden = false
-                    cell.alpha = 1
-                } else {
-                    cell.isHidden = true
-                    cell.alpha = 0
+            // 遍历所有items处理cell
+            for (index, _) in self.items.enumerated() {
+                let indexPath = IndexPath(item: index, section: 0)
+                if let cell = self.collectionView.cellForItem(at: indexPath) {
+                    if cell == selectedCell {
+                        // 设置选中cell的初始位置，考虑 contentOffset
+                        cell.frame = CGRect(x: cell.frame.origin.x,
                 }
             }
         }) { _ in
@@ -233,11 +236,6 @@ class SCCameraToolBar: UIView {
             
             // 恢复所有 cell 的位置
             for (indexPath, originalFrame) in self.originalCellFrames {
-                if let cell = self.collectionView.cellForItem(at: indexPath) {
-                    if let activeItem = self.activeItem, 
-                       let index = self.items.firstIndex(where: { $0.type == activeItem.type }),
-                       indexPath.item == index {
-                        cell.frame = originalFrame
                         cell.isHidden = false
                         cell.alpha = 1
                     } else {
@@ -276,29 +274,54 @@ class SCCameraToolBar: UIView {
                                     self.isCollapsed = false
                                     self.isAnimating = false
                                     
-                                    // 通知代理动画完成
-                                    if let activeItem = self.activeItem {
-                                        // 根据工具类型确定选项类型
-                                        let optionType: SCCameraToolOptionsViewType
-                                        switch activeItem.type {
-                                        case .exposure, .iso:
-                                            // 对于支持滑块的工具，使用 scale 类型
-                                            optionType = .scale
-                                        default:
-                                            // 对于其他工具，使用 normal 类型
-                                            optionType = .normal
-                                        }
-                                        
-                                        // 通知代理动画完成，让代理根据工具类型和状态进行相应处理
-                                        self.delegate?.toolBar(self, didFinishAnimate: activeItem, optionType: optionType)
-                                        
-                                        // 最后清除 activeItem
-                                        self.activeItem = nil
-                                    }
+            // 显示所有 cells
+            for (indexPath, originalFrame) in self.originalCellFrames {
+                // 获取 cell 或创建新的 cell 如果不可见
+                let cell = self.collectionView.cellForItem(at: indexPath) ?? {
+                    let cell = self.collectionView.dequeueReusableCell(withReuseIdentifier: SCCameraToolCell.reuseIdentifier, for: indexPath)
+                    cell.frame = originalFrame
+                    return cell
+                }()
+                
+                cell.frame = originalFrame
+                cell.isHidden = false
+                UIView.animate(withDuration: 0.2,
+                             delay: 0,
+                             options: [.curveEaseOut],
+                             animations: {
+                        cell.alpha = 1
+                    }, completion: { _ in
+                        completedCells += 1
+                        // 当所有 cell 动画都完成时
+                        if completedCells == totalCells {
+                            // 清理状态
+                            self.originalLayoutAttributes.removeAll()
+                            self.originalCellFrames.removeAll()
+                            self.isCollapsed = false
+                            self.isAnimating = false
+                            
+                            // 通知代理动画完成
+                            if let activeItem = self.activeItem {
+                                // 根据工具类型确定选项类型
+                                let optionType: SCCameraToolOptionsViewType
+                                switch activeItem.type {
+                                case .exposure, .iso:
+                                    // 对于支持滑块的工具，使用 scale 类型
+                                    optionType = .scale
+                                default:
+                                    // 对于其他工具，使用 normal 类型
+                                    optionType = .normal
                                 }
-                            })
-                    }
-                }
+                                
+                                // 通知代理动画完成，让代理根据工具类型和状态进行相应处理
+                                self.delegate?.toolBar(self, didFinishAnimate: activeItem, optionType: optionType)
+                                
+                                // 最后清除 activeItem
+                                self.activeItem = nil
+                            }
+                        }
+                    })
+            }
             }) { _ in
                 // 这里不需要做任何事情，因为我们在每个 cell 的动画完成后处理
             }
@@ -517,5 +540,4 @@ extension SCCameraToolBar: SCToolItemDelegate {
             }
         }
     }
-} 
-
+}

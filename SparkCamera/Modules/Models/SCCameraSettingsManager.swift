@@ -23,17 +23,36 @@ class SCCameraSettingsManager {
     // 持有当前的 captureDevice
     private weak var currentDevice: AVCaptureDevice?
     
+    // 获取当前 App 版本作为数据库版本
+    private static var currentSchemaVersion: UInt64 {
+        if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String,
+           let versionNumber = UInt64(version.replacingOccurrences(of: ".", with: "")) {
+            return versionNumber
+        }
+        return 1
+    }
+    
     private init() {
         // 配置 Realm
         let config = Realm.Configuration(
             fileURL: try! FileManager.default
                 .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
                 .appendingPathComponent("SparkCamera.realm"),
-            schemaVersion: 1,
+            schemaVersion: Self.currentSchemaVersion,
             migrationBlock: { migration, oldSchemaVersion in
-                // 处理未来可能的数据库迁移
+                // 数据库迁移逻辑
+                migration.enumerateObjects(ofType: SCCameraSettings.className()) { oldObject, newObject in
+                    // 检查并设置新增属性的默认值
+                    if oldObject != nil && !oldObject!.objectSchema.properties.contains(where: { $0.name == "isAutoSaveEnabled" }) {
+                        newObject!["isAutoSaveEnabled"] = false
+                    }
+                    // 这里可以添加其他新属性的迁移逻辑
+                }
             }
         )
+        
+        print("📸 [Settings] 当前 App 版本：\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")")
+        print("📸 [Settings] 当前数据库版本：\(Self.currentSchemaVersion)")
         
         // 设置默认配置
         Realm.Configuration.defaultConfiguration = config
@@ -41,9 +60,21 @@ class SCCameraSettingsManager {
         // 初始化 Realm
         do {
             realm = try Realm()
-            print("Realm 文件路径: \(realm.configuration.fileURL?.path ?? "未知")")
+            print("📸 [Settings] Realm 文件路径: \(realm.configuration.fileURL?.path ?? "未知")")
         } catch {
-            fatalError("Realm 初始化失败: \(error)")
+            print("⚠️ [Settings] Realm 初始化失败: \(error)")
+            // 如果初始化失败，尝试删除现有的 Realm 文件并重新创建
+            if let fileURL = config.fileURL {
+                try? FileManager.default.removeItem(at: fileURL)
+                print("📸 [Settings] 已删除旧的 Realm 文件，准备重新创建")
+            }
+            
+            do {
+                realm = try Realm()
+                print("📸 [Settings] Realm 重新创建成功")
+            } catch {
+                fatalError("❌ [Settings] Realm 重新创建失败: \(error)")
+            }
         }
         
         // 加载或创建默认设置
@@ -85,6 +116,17 @@ class SCCameraSettingsManager {
     }
     
     // MARK: - 设置访问器
+    
+    // 自动保存开关
+    var isAutoSaveEnabled: Bool {
+        get { return currentSettings?.isAutoSaveEnabled ?? false }
+        set {
+            try? realm.write {
+                currentSettings?.isAutoSaveEnabled = newValue
+                currentSettings?.updateTimestamp()
+            }
+        }
+    }
     
     // Flash 模式
     var flashMode: Int {
@@ -277,5 +319,97 @@ class SCCameraSettingsManager {
         }
         // 查找最接近的预设值
         return SCShutterSpeedState.allCases.min(by: { abs($0.rawValue - value) < abs($1.rawValue - value) }) ?? .auto
+    }
+    
+    // 获取所有相机设置
+    public func getCameraSettings() -> CameraSettings {
+        // 如果是第一次使用（没有保存过状态），保存默认的自动模式
+        if flashMode == 0 {
+            flashMode = SCFlashState.auto.rawValue
+        }
+        let savedFlashMode = flashMode
+        let flashState = SCFlashState(rawValue: savedFlashMode) ?? .auto
+        
+        // 获取保存的曝光设置，如果没有保存过，默认为0
+        let savedExposureValue = exposureValue
+        let exposureStates: [SCExposureState] = [.negative2, .negative1, .zero, .positive1, .positive2]
+        let exposureState = exposureStates.first { $0.value == savedExposureValue } ?? .zero
+        if exposureValue == 0 {
+            exposureValue = SCExposureState.zero.value
+        }
+        
+        // 获取比例设置
+        let savedRatioMode = ratioMode
+        let ratioState = SCRatioState(rawValue: savedRatioMode) ?? .ratio4_3
+        if ratioMode == 0 {
+            ratioMode = SCRatioState.ratio4_3.rawValue
+        }
+        
+        // 获取定时器设置
+        let savedTimerMode = timerMode
+        let timerState = SCTimerState(rawValue: savedTimerMode) ?? .off
+        if timerMode == 0 {
+            timerMode = SCTimerState.off.rawValue
+        }
+        
+        // 获取白平衡设置
+        let savedWhiteBalanceMode = whiteBalanceMode
+        let whiteBalanceState = SCWhiteBalanceState(rawValue: savedWhiteBalanceMode) ?? .auto
+        if whiteBalanceMode == 0 {
+            whiteBalanceMode = SCWhiteBalanceState.auto.rawValue
+        }
+        
+        // 获取ISO设置
+        let savedISOValue = isoValue
+        let isoStates: [SCISOState] = [.auto, .iso100, .iso200, .iso400, .iso800]
+        let isoState = isoStates.first { $0.value == savedISOValue } ?? .auto
+        if isoValue == 0 {
+            isoValue = SCISOState.auto.value
+        }
+        
+        // 获取其他设置
+        let isAutoSaveEnabled = self.isAutoSaveEnabled
+        let isFocusLocked = self.isFocusLocked
+        let focusMode = self.focusMode
+        
+        return CameraSettings(
+            flashState: flashState,
+            ratioState: ratioState,
+            timerState: timerState,
+            whiteBalanceState: whiteBalanceState,
+            exposureState: exposureState,
+            isoState: isoState,
+            isAutoSaveEnabled: isAutoSaveEnabled,
+            isFocusLocked: isFocusLocked,
+            focusMode: focusMode
+        )
+    }
+    
+    // 相机设置结构体
+    public struct CameraSettings {
+        public let flashState: SCFlashState
+        public let ratioState: SCRatioState
+        public let timerState: SCTimerState
+        public let whiteBalanceState: SCWhiteBalanceState
+        public let exposureState: SCExposureState
+        public let isoState: SCISOState
+        public let isAutoSaveEnabled: Bool
+        public let isFocusLocked: Bool
+        public let focusMode: SCFocusMode
+        
+        public var description: String {
+            return """
+            📸 [Camera Settings]
+            - 闪光灯: \(flashState.title)
+            - 比例: \(ratioState.title)
+            - 定时器: \(timerState.title)
+            - 白平衡: \(whiteBalanceState.title)
+            - 曝光值: \(exposureState.value)
+            - ISO: \(isoState.title)
+            - 自动保存: \(isAutoSaveEnabled)
+            - 对焦锁定: \(isFocusLocked)
+            - 对焦模式: \(focusMode)
+            """
+        }
     }
 } 

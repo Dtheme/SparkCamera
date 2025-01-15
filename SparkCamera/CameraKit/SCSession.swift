@@ -114,9 +114,9 @@ extension SCSession.CameraPosition {
     }
     
     @objc deinit {
-        DispatchQueue.main.async {  
+//        DispatchQueue.main.async {  
             self.session.stopRunning()
-        }
+//        }
     }
     
     @objc public func start() {

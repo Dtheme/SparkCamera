@@ -94,6 +94,69 @@ extension SCSession.FlashMode {
     private var isPreviewLayerSetup = false
     private var isSessionRunning = false
     
+    @objc public var resolution: CGSize = .zero {
+        didSet {
+            print("📸 [Photo Session] 设置分辨率: \(resolution.width) x \(resolution.height)")
+            
+            // 如果分辨率为零，使用设备支持的最大分辨率
+            if resolution.width == 0 || resolution.height == 0 {
+                if let device = videoInput?.device {
+                    let maxResolution = device.activeFormat.highResolutionStillImageDimensions
+                    resolution = CGSize(width: CGFloat(maxResolution.width), height: CGFloat(maxResolution.height))
+                    print("📸 [Photo Session] 使用设备最大分辨率: \(resolution.width) x \(resolution.height)")
+                }
+                return
+            }
+            
+            // 开始配置会话
+            session.beginConfiguration()
+            
+            // 计算目标比例
+            let targetAspectRatio = resolution.width / resolution.height
+            print("📸 [Photo Session] 目标比例: \(targetAspectRatio)")
+            
+            // 根据目标比例选择合适的预设
+            if abs(targetAspectRatio - 3.0/4.0) < 0.01 {
+                // 3:4 比例
+                session.sessionPreset = .photo
+                print("📸 [Photo Session] 设置会话预设为: photo (3:4)")
+            } else if abs(targetAspectRatio - 9.0/16.0) < 0.01 {
+                // 9:16 比例
+                session.sessionPreset = .hd1920x1080
+                print("📸 [Photo Session] 设置会话预设为: 1920x1080 (16:9)")
+            } else if abs(targetAspectRatio - 1.0) < 0.01 {
+                // 1:1 比例
+                session.sessionPreset = .high
+                print("📸 [Photo Session] 设置会话预设为: high (1:1)")
+            }
+            
+            // 确保不超过设备支持的最大分辨率
+            if let device = videoInput?.device {
+                let maxResolution = device.activeFormat.highResolutionStillImageDimensions
+                let finalWidth = min(resolution.width, CGFloat(maxResolution.width))
+                let finalHeight = min(resolution.height, CGFloat(maxResolution.height))
+                resolution = CGSize(width: finalWidth, height: finalHeight)
+                print("📸 [Photo Session] 最终分辨率: \(resolution.width) x \(resolution.height)")
+            }
+            
+            // 配置照片输出
+            if let connection = photoOutput.connection(with: .video) {
+                if connection.isVideoOrientationSupported {
+                    connection.videoOrientation = .portrait
+                }
+            }
+            
+            // 更新高分辨率设置
+            photoOutput.isHighResolutionCaptureEnabled = true
+            
+            session.commitConfiguration()
+            
+            print("📸 [Photo Session] 会话配置完成")
+            print("📸 [Photo Session] - 会话预设: \(session.sessionPreset.rawValue)")
+            print("📸 [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
+        }
+    }
+    
     @objc public init(position: CameraPosition = .back, detection: CameraDetection = .none) {
         super.init()
         
@@ -103,6 +166,13 @@ extension SCSession.FlashMode {
         }
         
         self.session.sessionPreset = .high
+        
+        // 配置照片输出
+        photoOutput.isHighResolutionCaptureEnabled = true
+        print("📸 [Photo Session] 初始化照片输出:")
+        print("📸 [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
+        print("📸 [Photo Session] - 图像稳定: \(photoOutput.isStillImageStabilizationSupported)")
+        
         self.session.addOutput(self.photoOutput)
         configureInputs()
     }
@@ -118,31 +188,62 @@ extension SCSession.FlashMode {
         self.captureCallback = callback
         self.errorCallback = error
 
+        // 创建照片设置
         let settings = AVCapturePhotoSettings()
-        settings.flashMode = self.flashMode.captureFlashMode
         
-        // 确保使用当前的曝光设置
-        if let device = videoInput?.device {
-            settings.isAutoStillImageStabilizationEnabled = false  // 禁用自动图像稳定
-            if device.exposureMode == .custom {
-                print("📸 [Capture] 使用自定义曝光设置")
-                print("📸 [Capture] 当前快门速度：\(CMTimeGetSeconds(device.exposureDuration))秒")
-                print("📸 [Capture] 当前 ISO：\(device.iso)")
-                settings.isAutoStillImageStabilizationEnabled = false
-            } else {
-                print("📸 [Capture] 使用自动曝光设置")
-            }
-        }
-
-        if let connection = self.photoOutput.connection(with: .video) {
-            if self.resolution.width > 0, self.resolution.height > 0 {
-                connection.videoOrientation = .portrait
-            } else {
-                connection.videoOrientation = UIDevice.current.orientation.videoOrientation
-            }
+        // 从SCCameraSettingsManager获取相机设置
+        let cameraSettings = SCCameraSettingsManager.shared.getCameraSettings()
+        
+        // 设置闪光灯模式
+        settings.flashMode = AVCaptureDevice.FlashMode(rawValue: cameraSettings.flashState.rawValue) ?? .auto
+        
+        // 设置图像稳定
+        settings.isAutoStillImageStabilizationEnabled = photoOutput.isStillImageStabilizationSupported
+        
+        // 设置高分辨率拍摄
+        settings.isHighResolutionPhotoEnabled = true
+        
+        // 获取目标分辨率
+        let targetSize: CGSize
+        if resolution.width > 0 && resolution.height > 0 {
+            targetSize = resolution
+            print("📸 [Capture] 使用设置的分辨率: \(targetSize.width) x \(targetSize.height)")
+        } else if let device = videoInput?.device {
+            // 使用设备支持的最大分辨率
+            let maxResolution = device.activeFormat.highResolutionStillImageDimensions
+            targetSize = CGSize(width: CGFloat(maxResolution.width), height: CGFloat(maxResolution.height))
+            print("📸 [Capture] 使用设备最大分辨率: \(targetSize.width) x \(targetSize.height)")
+        } else {
+            // 使用默认分辨率
+            targetSize = CGSize(width: 4032, height: 3024)
+            print("📸 [Capture] 使用默认分辨率: \(targetSize.width) x \(targetSize.height)")
         }
         
-        self.photoOutput.capturePhoto(with: settings, delegate: self)
+        // 设置预览格式
+        if let previewPixelType = settings.availablePreviewPhotoPixelFormatTypes.first {
+            let format: [String: Any] = [
+                kCVPixelBufferPixelFormatTypeKey as String: previewPixelType,
+                kCVPixelBufferWidthKey as String: Int(targetSize.width),
+                kCVPixelBufferHeightKey as String: Int(targetSize.height)
+            ]
+            settings.previewPhotoFormat = format
+            print("📸 [Capture] 设置照片格式: \(format)")
+        }
+        
+        // 设置照片方向
+        if let connection = photoOutput.connection(with: .video) {
+            connection.videoOrientation = .portrait
+            print("📸 [Capture] 设置照片方向: portrait")
+        }
+        
+        // 打印最终设置
+        print("📸 [Capture] 最终照片设置:")
+        print("📸 [Capture] - 目标尺寸: \(targetSize.width) x \(targetSize.height)")
+        print("📸 [Capture] - 高分辨率: \(settings.isHighResolutionPhotoEnabled)")
+        print("📸 [Capture] - 图像稳定: \(settings.isAutoStillImageStabilizationEnabled)")
+        
+        // 捕获照片
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
     
     @objc public func togglePosition() {
@@ -165,31 +266,6 @@ extension SCSession.FlashMode {
             
             if let delegate = self.delegate {
                 delegate.didChangeValue(session: self, value: self.zoom, key: "zoom")
-            }
-        }
-    }
-    
-    @objc public var resolution = CGSize.zero {
-        didSet {
-            guard let deviceInput = self.captureDeviceInput else {
-                return
-            }
-            
-            do {
-                try deviceInput.device.lockForConfiguration()
-                
-                if
-                    self.resolution.width > 0, self.resolution.height > 0,
-                    let format = SCSession.deviceInputFormat(input: deviceInput, width: Int(self.resolution.width), height: Int(self.resolution.height))
-                {
-                    deviceInput.device.activeFormat = format
-                } else {
-                    self.session.sessionPreset = .high
-                }
-                
-                deviceInput.device.unlockForConfiguration()
-            } catch {
-                //
             }
         }
     }
@@ -282,22 +358,30 @@ extension SCSession.FlashMode {
     
     @available(iOS 11.0, *)
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
-        defer {
-            self.captureCallback = { (_, _) in }
-            self.errorCallback = { (_) in }
-        }
-
+        print("📸 [Photo Session] ===== 照片处理完成 =====")
+        
         if let error = error {
+            print("❌ [Photo Session] 处理照片时出错: \(error.localizedDescription)")
             self.errorCallback(error)
             return
         }
-
-        guard let data = photo.fileDataRepresentation() else {
+        
+        guard let imageData = photo.fileDataRepresentation() else {
+            print("❌ [Photo Session] 无法获取图片数据")
             self.errorCallback(SCError.error("Cannot get photo file data representation"))
             return
         }
-
-        self.processPhotoData(data: data, resolvedSettings: photo.resolvedSettings)
+        
+        print("📸 [Photo Session] 照片信息:")
+        print("📸 [Photo Session] - 数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
+        
+        // 获取照片分辨率
+        if let cgImage = UIImage(data: imageData)?.cgImage {
+            print("📸 [Photo Session] - 实际分辨率: \(cgImage.width) x \(cgImage.height)")
+        }
+        
+        // 处理照片数据，传递原始的 resolvedSettings
+        self.processPhotoData(imageData, photo.resolvedSettings)
     }
     
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photoSampleBuffer: CMSampleBuffer?, previewPhoto previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {
@@ -319,24 +403,72 @@ extension SCSession.FlashMode {
             return
         }
 
-        self.processPhotoData(data: data, resolvedSettings: resolvedSettings)
+        self.processPhotoData(data, resolvedSettings)
     }
     
-    private func processPhotoData(data: Data, resolvedSettings: AVCaptureResolvedPhotoSettings) {
+    func processPhotoData(_ data: Data, _ resolvedSettings: AVCaptureResolvedPhotoSettings) {
+        print("📸 [Photo Session] ===== 处理照片数据 =====")
+        print("📸 [Photo Session] - 数据大小: \(Double(data.count) / 1024.0 / 1024.0) MB")
+        
         guard let image = UIImage(data: data) else {
-            self.errorCallback(SCError.error("Cannot get photo"))
+            print("❌ [Photo Session] 无法从数据创建图像")
+            self.errorCallback(SCError.error("Cannot create image from data"))
             return
         }
-
-        if
-            self.resolution.width > 0, self.resolution.height > 0,
-            let transformedImage = SCUtils.cropAndScale(image, width: Int(self.resolution.width), height: Int(self.resolution.height), orientation: UIDevice.current.orientation, mirrored: self.cameraPosition == .front)
-        {
-            self.captureCallback(transformedImage, resolvedSettings)
-            return
+        
+        print("📸 [Photo Session] 原始图片信息:")
+        print("📸 [Photo Session] - 尺寸: \(image.size.width) x \(image.size.height)")
+        print("📸 [Photo Session] - 方向: \(image.imageOrientation.rawValue)")
+        
+        // 异步处理图像
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // 获取设备方向
+            let deviceOrientation = UIDevice.current.orientation
+            print("📸 [Photo Process] 设备方向: \(deviceOrientation.rawValue)")
+            
+            // 根据设备方向和相机位置确定旋转角度
+            let rotationAngle: CGFloat = {
+                switch deviceOrientation {
+                case .portrait:
+                    return self.cameraPosition == .front ? .pi / 2 : .pi / 2
+                case .portraitUpsideDown:
+                    return self.cameraPosition == .front ? -.pi / 2 : -.pi / 2
+                case .landscapeLeft:
+                    return self.cameraPosition == .front ? .pi : 0
+                case .landscapeRight:
+                    return self.cameraPosition == .front ? 0 : .pi
+                default:
+                    return self.cameraPosition == .front ? .pi / 2 : .pi / 2
+                }
+            }()
+            
+            // 旋转图片
+            let rotatedImage = image.SCRotate(by: rotationAngle)
+            print("📸 [Photo Process] 旋转后尺寸: \(rotatedImage.size.width) x \(rotatedImage.size.height)")
+            print("📸 [Photo Process] 旋转后方向: \(rotatedImage.imageOrientation.rawValue)")
+            
+            // 如果是前置相机，需要水平翻转
+            let finalImage: UIImage
+            if self.cameraPosition == .front {
+                UIGraphicsBeginImageContextWithOptions(rotatedImage.size, false, rotatedImage.scale)
+                let context = UIGraphicsGetCurrentContext()!
+                context.translateBy(x: rotatedImage.size.width, y: 0)
+                context.scaleBy(x: -1, y: 1)
+                rotatedImage.draw(in: CGRect(origin: .zero, size: rotatedImage.size))
+                finalImage = UIGraphicsGetImageFromCurrentImageContext() ?? rotatedImage
+                UIGraphicsEndImageContext()
+                print("📸 [Photo Process] 前置相机图片已水平翻转")
+            } else {
+                finalImage = rotatedImage
+            }
+            
+            DispatchQueue.main.async {
+                self.captureCallback(finalImage, resolvedSettings)
+                print("📸 [Photo Session] ===== 照片处理完成 =====")
+            }
         }
-
-        self.captureCallback(image, resolvedSettings)
     }
     
     public func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
@@ -433,13 +565,7 @@ extension SCSession.FlashMode {
             lockFocus()
         }
     }
-    
-    // MARK: - Camera Setup
-    private func setupCamera() {
-        setupSession()
-        loadFocusSettings()
-    }
-    
+
     // MARK: - Session Setup
     private func setupSession() {
         session.beginConfiguration()
@@ -476,14 +602,28 @@ extension SCSession.FlashMode {
     
     // MARK: - Session Control
     func startSession() {
-        if !session.isRunning {
+        // 确保在后台线程调用
+        if Thread.isMainThread {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.session.startRunning()
+                self?.startSession()
             }
+            return
+        }
+        
+        if !session.isRunning {
+            session.startRunning()
         }
     }
     
     func stopSession() {
+        // 确保在后台线程调用
+        if Thread.isMainThread {
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.stopSession()
+            }
+            return
+        }
+        
         if session.isRunning {
             session.stopRunning()
         }
@@ -770,7 +910,7 @@ extension SCSession.FlashMode {
                 device.unlockForConfiguration()
                 return true
             } else {
-                print("📸 [Shutter Speed] 设备不支持自定义曝光模式")
+                print("⚠️ [Shutter Speed] 设备不支持自定义曝光模式")
                 device.unlockForConfiguration()
                 completion?(false)
                 return false
@@ -781,4 +921,70 @@ extension SCSession.FlashMode {
             return false
         }
     }
+
+//    public func capturePhoto() {
+//        print("📸 [Photo Session] ===== 开始拍照 =====")
+//        
+//        // 获取当前设备方向
+//        let deviceOrientation = UIDevice.current.orientation
+//        print("📸 [Photo Session] 拍摄信息:")
+//        print("📸 [Photo Session] - 设备方向: \(deviceOrientation.rawValue)")
+//        print("📸 [Photo Session] - 是否前置摄像头: \(self.cameraPosition == .front)")
+//        
+//        // 创建照片设置
+//        let settings = AVCapturePhotoSettings()
+//        
+//        // 确保使用高质量照片输出
+//        settings.isHighResolutionPhotoEnabled = photoOutput.isHighResolutionCaptureEnabled
+//        
+//        // 设置照片分辨率和格式
+//        if let previewPixelType = settings.availablePreviewPhotoPixelFormatTypes.first {
+//            // 获取目标分辨率
+//            let targetSize: CGSize
+//            if resolution.width > 0 && resolution.height > 0 {
+//                targetSize = resolution
+//                print("📸 [Capture] 使用设置的分辨率: \(targetSize.width) x \(targetSize.height)")
+//            } else if let device = videoInput?.device {
+//                // 使用设备支持的最大分辨率
+//                let maxResolution = device.activeFormat.highResolutionStillImageDimensions
+//                targetSize = CGSize(width: CGFloat(maxResolution.width), height: CGFloat(maxResolution.height))
+//                print("📸 [Capture] 使用设备最大分辨率: \(targetSize.width) x \(targetSize.height)")
+//            } else {
+//                // 使用默认 4:3 分辨率
+//                targetSize = CGSize(width: 4032, height: 3024)
+//                print("📸 [Capture] 使用默认分辨率: \(targetSize.width) x \(targetSize.height)")
+//            }
+//            
+//            // 设置预览格式
+//            let format: [String: Any] = [
+//                kCVPixelBufferPixelFormatTypeKey as String: previewPixelType,
+//                kCVPixelBufferWidthKey as String: Int(targetSize.width),
+//                kCVPixelBufferHeightKey as String: Int(targetSize.height)
+//            ]
+//            settings.previewPhotoFormat = format
+//            print("📸 [Capture] 设置照片格式: \(format)")
+//        }
+//        
+//        // 根据设备能力设置图像稳定
+//        settings.isAutoStillImageStabilizationEnabled = photoOutput.isStillImageStabilizationSupported
+//        
+//        // 设置闪光灯
+//        settings.flashMode = self.flashMode.captureFlashMode
+//        
+//        // 设置照片方向
+//        if let connection = self.photoOutput.connection(with: .video) {
+//            connection.videoOrientation = deviceOrientation.videoOrientation
+//            print("📸 [Capture] 设置照片方向: \(connection.videoOrientation.rawValue)")
+//        }
+//        
+//        // 打印最终设置
+//        print("📸 [Capture] 最终照片设置:")
+//        print("📸 [Capture] - 预览格式: \(settings.previewPhotoFormat ?? [:])")
+//        print("📸 [Capture] - 高分辨率: \(settings.isHighResolutionPhotoEnabled)")
+//        print("📸 [Capture] - 图像稳定: \(settings.isAutoStillImageStabilizationEnabled)")
+//        
+//        // 开始拍照
+//        self.photoOutput.capturePhoto(with: settings, delegate: self)
+//    }
+
 }

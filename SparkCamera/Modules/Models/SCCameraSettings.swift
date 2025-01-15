@@ -41,6 +41,9 @@ class SCCameraSettings: Object {
     // 对焦锁定
     @Persisted var isFocusLocked: Bool = false
     
+    // 自动保存照片
+    @Persisted var isAutoSaveEnabled: Bool = false
+    
     // 上次更新时间
     @Persisted var lastUpdated: Date = Date()
     
@@ -57,6 +60,7 @@ class SCCameraSettings: Object {
         settings.timerMode = 0
         settings.focusMode = 1  // 连续对焦
         settings.isFocusLocked = false
+        settings.isAutoSaveEnabled = false  // 默认关闭自动保存
         settings.lastUpdated = Date()
         return settings
     }

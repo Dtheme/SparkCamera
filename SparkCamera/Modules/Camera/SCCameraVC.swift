@@ -15,8 +15,8 @@ import Photos
 class SCCameraVC: UIViewController {
     
     // MARK: - Properties
-    private var photoSession: SCPhotoSession!
-    private var previewView: SCPreviewView!
+    internal var photoSession: SCPhotoSession!
+    internal var previewView: SCPreviewView!
     private var cameraManager: SCCameraManager!
     private lazy var lensSelectorView = SCLensSelectorView()
     private let motionManager = CMMotionManager()
@@ -47,14 +47,15 @@ class SCCameraVC: UIViewController {
         return label
     }()
     
-    // 添加网格相关属性
-    private var gridView: SCGridView?
-    private var isGridVisible = false
-    private lazy var gridButton: UIButton = {
+    // 添加自动保存按钮
+    private lazy var autoSaveButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "grid"), for: .normal)
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        button.setImage(UIImage(systemName: "square.and.arrow.down", withConfiguration: config), for: .normal)
         button.tintColor = .white
-        button.addTarget(self, action: #selector(toggleGrid), for: .touchUpInside)
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        button.layer.cornerRadius = 22
+        button.addTarget(self, action: #selector(toggleAutoSave), for: .touchUpInside)
         return button
     }()
     
@@ -67,7 +68,7 @@ class SCCameraVC: UIViewController {
         return button
     }()
     
-    private lazy var captureButton: UIButton = {
+    internal lazy var captureButton: UIButton = {
         let button = UIButton(type: .system)
         button.backgroundColor = .white
         button.layer.cornerRadius = 35
@@ -76,7 +77,7 @@ class SCCameraVC: UIViewController {
         return button
     }()
     
-    private lazy var switchCameraButton: UIButton = {
+    internal lazy var switchCameraButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "camera.rotate"), for: .normal)
         button.tintColor = .white
@@ -93,15 +94,7 @@ class SCCameraVC: UIViewController {
         return view
     }()
     
-    private lazy var zoomIndicatorView: UIView = {
-        let view = UIView()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.6)
-        view.layer.cornerRadius = 15
-        view.isHidden = true
-        return view
-    }()
-    
-    private lazy var zoomLabel: UILabel = {
+    internal lazy var zoomLabel: UILabel = {
         let label = UILabel()
         label.textColor = .white
         label.font = .systemFont(ofSize: 16, weight: .bold)
@@ -110,7 +103,15 @@ class SCCameraVC: UIViewController {
         return label
     }()
     
-    private lazy var livePhotoButton: UIButton = {
+    internal lazy var zoomIndicatorView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        view.layer.cornerRadius = 15
+        view.isHidden = true
+        return view
+    }()
+    
+    internal lazy var livePhotoButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "livephoto"), for: .normal)
         button.tintColor = .white
@@ -118,7 +119,7 @@ class SCCameraVC: UIViewController {
         return button
     }()
     
-    private lazy var toolBar: SCCameraToolBar = {
+    internal lazy var toolBar: SCCameraToolBar = {
         let toolBar = SCCameraToolBar()
         toolBar.delegate = self
         return toolBar
@@ -130,6 +131,14 @@ class SCCameraVC: UIViewController {
         button.setImage(UIImage(systemName: "camera.focus"), for: .normal)
         button.tintColor = .white
         button.addTarget(self, action: #selector(focusModeButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    internal lazy var gridButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "grid"), for: .normal)
+        button.tintColor = .white
+        button.addTarget(self, action: #selector(toggleGrid), for: .touchUpInside)
         return button
     }()
     
@@ -177,7 +186,26 @@ class SCCameraVC: UIViewController {
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        photoSession?.stopSession()
+        
+        // 停止倒计时
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        
+        // 停止水平指示器
+        motionManager.stopDeviceMotionUpdates()
+        
+        // 在主线程中同步停止相机会话
+//        if let session = photoSession {
+//            session.stopSession()
+//            
+//            // 清理预览视图
+//            previewView?.session = nil
+//            
+//            // 清理相机会话
+//            photoSession?.delegate = nil
+//            photoSession = nil
+//            cameraManager = nil
+//        }
     }
     
     private func setupHorizontalIndicator() {
@@ -317,249 +345,158 @@ class SCCameraVC: UIViewController {
     private func setupCamera() {
         print("⏱️ [Camera Setup] Starting camera setup")
         
-        // 1. 初始化相机会话
-        photoSession = SCPhotoSession()
-        photoSession.delegate = self
-        
-        // 2. 初始化相机管理器
-        cameraManager = SCCameraManager(session: photoSession, photoSession: photoSession)
-        
-        // 3. 配置预览视图
-        previewView.session = photoSession
-        previewView.autorotate = true
-        
-        // 4. 设置当前设备到 SCCameraSettingsManager
-        if let device = AVCaptureDevice.default(for: .video) {
-            SCCameraSettingsManager.shared.setCurrentDevice(device)
-        }
-        
-        // 5. 设置镜头选择器
-        setupLensSelector()
-        
-        // 6. 检查并设置闪光灯初始状态
-        setupFlashState()
-        
-        // 7. 启动相机会话
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // 确保在主线程进行初始化
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.photoSession.startSession()
             
-            // 确保在主线程更新 UI
-            DispatchQueue.main.async {
-                self.hideLoading()
+            // 1. 初始化相机会话
+            self.photoSession = SCPhotoSession()
+            self.photoSession.delegate = self
+            
+            // 2. 初始化相机管理器
+            self.cameraManager = SCCameraManager(session: self.photoSession, photoSession: self.photoSession)
+            
+            // 3. 配置预览视图
+            self.previewView.session = self.photoSession
+            self.previewView.autorotate = true
+            
+            // 4. 设置当前设备到 SCCameraSettingsManager
+            if let device = AVCaptureDevice.default(for: .video) {
+                SCCameraSettingsManager.shared.setCurrentDevice(device)
+            }
+            
+            // 5. 设置镜头选择器
+            self.setupLensSelector()
+            
+            // 6. 检查并设置闪光灯初始状态
+            self.setupFlashState()
+            
+            // 7. 在后台线程启动相机会话
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                guard let self = self else { return }
+                self.photoSession?.startSession()
+                
+                // 8. 在主线程更新 UI
+                DispatchQueue.main.async {
+                    self.hideLoading()
+                }
             }
         }
     }
     
     private func setupUI() {
-        // 1. 添加预览视图
+        // 1. 初始化基础组件
+        photoSession = SCPhotoSession()
+        photoSession?.delegate = self
+        
+        previewView = SCPreviewView()
+        previewView.session = photoSession
         view.addSubview(previewView)
         
-        // 2. 添加关闭按钮
+        // 2. 设置预览比例和分辨率
+        let ratioState = SCRatioState(rawValue: SCCameraSettingsManager.shared.ratioMode) ?? .ratio4_3
+        updateAspectRatio(ratioState)
+        
+        // 3. 添加 UI 控件
         view.addSubview(closeButton)
-
-
-        // 3. 添加工具栏
         view.addSubview(toolBar)
         toolBar.delegate = self
-        print("📸 [ToolBar] 设置代理: \(String(describing: toolBar.delegate))")
-
-        // 从数据库中查询设置
-        // 获取保存的闪光灯状态，如果没有保存过，默认为自动模式
-        let savedFlashMode = SCCameraSettingsManager.shared.flashMode
-        let flashState = SCFlashState(rawValue: savedFlashMode) ?? .auto
         
-        // 如果是第一次使用（没有保存过状态），保存默认的自动模式
-        if SCCameraSettingsManager.shared.flashMode == 0 {
-            SCCameraSettingsManager.shared.flashMode = SCFlashState.auto.rawValue
-        }
+        // 4. 初始化工具栏项目
+        setupToolBarItems()
         
-        // 获取保存的比例设置，如果没有保存过，默认为 4:3
-        let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
-        let ratioState = SCRatioState(rawValue: savedRatioMode) ?? .ratio4_3
-        
-        // 如果是第一次使用，保存默认的 4:3 比例
-        if SCCameraSettingsManager.shared.ratioMode == 0 {
-            SCCameraSettingsManager.shared.ratioMode = SCRatioState.ratio4_3.rawValue
-            print("📸 [Ratio] 首次使用，设置默认比例为 4:3")
-        }
-
-        // 获取保存的定时器设置，如果没有保存过，默认为关闭状态
-        let savedTimerMode = SCCameraSettingsManager.shared.timerMode
-        let timerState = SCTimerState(rawValue: savedTimerMode) ?? .off
-        
-        // 如果是第一次使用，保存默认的关闭状态
-        if SCCameraSettingsManager.shared.timerMode == 0 {
-            SCCameraSettingsManager.shared.timerMode = SCTimerState.off.rawValue
-            print("📸 [Timer] 首次使用，设置默认定时器状态为关闭")
-        }
-
-        // 获取保存的白平衡设置，如果没有保存过，默认为自动
-        let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
-        let whiteBalanceState = SCWhiteBalanceState(rawValue: savedWhiteBalanceMode) ?? .auto
-        
-        // 如果是第一次使用，保存默认的自动白平衡
-        if SCCameraSettingsManager.shared.whiteBalanceMode == 0 {
-            SCCameraSettingsManager.shared.whiteBalanceMode = SCWhiteBalanceState.auto.rawValue
-            print("📸 [WhiteBalance] 首次使用，设置默认白平衡为自动")
-        }
-
-        // 获取保存的曝光设置，如果没有保存过，默认为0
-        let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
-        let exposureStates: [SCExposureState] = [.negative2, .negative1, .zero, .positive1, .positive2]
-        let exposureState = exposureStates.first { $0.value == savedExposureValue } ?? .zero
-        
-        // 如果是第一次使用，保存默认的曝光值
-        if SCCameraSettingsManager.shared.exposureValue == 0 {
-            SCCameraSettingsManager.shared.exposureValue = SCExposureState.zero.value
-            print("📸 [Exposure] 首次使用，设置默认曝光值为0")
-        }
-
-        // 获取保存的ISO设置，如果没有保存过，默认为自动
-        let savedISOValue = SCCameraSettingsManager.shared.isoValue
-        let isoStates: [SCISOState] = [.auto, .iso100, .iso200, .iso400, .iso800]
-        let isoState = isoStates.first { $0.value == savedISOValue } ?? .auto
-        
-        // 如果是第一次使用，保存默认的ISO值
-        if SCCameraSettingsManager.shared.isoValue == 0 {
-            SCCameraSettingsManager.shared.isoValue = SCISOState.auto.value
-            print("📸 [ISO] 首次使用，设置默认ISO为自动")
-        }
-
-        // 初始化闪光灯工具项
-        let flashItem = SCToolItem(type: .flash)
-        flashItem.setState(flashState)  // 设置状态，这会自动更新图标
-        flashItem.isSelected = false    // 确保初始状态未选中
-        
-        // 初始化比例工具项
-        let ratioItem = SCToolItem(type: .ratio)
-        ratioItem.setState(ratioState)  // 设置状态，这会自动更新图标
-        ratioItem.isSelected = false    // 确保初始状态未选中
-        print("📸 [Ratio] 初始化比例状态: \(ratioState.title)")
-        
-        // 初始化白平衡工具项
-        let whiteBalanceItem = SCToolItem(type: .whiteBalance)
-        whiteBalanceItem.setState(whiteBalanceState)
-        whiteBalanceItem.isSelected = false
-        print("📸 [WhiteBalance] 初始化白平衡状态: \(whiteBalanceState.title)")
-        
-        // 初始化曝光工具项
-        let exposureItem = SCToolItem(type: .exposure)
-        exposureItem.setState(exposureState)
-        exposureItem.isSelected = false
-        print("📸 [Exposure] 初始化曝光状态: \(exposureState.title)")
-        
-        // 初始化ISO工具项
-        let isoItem = SCToolItem(type: .iso)
-        isoItem.setState(isoState)
-        isoItem.isSelected = false
-        print("📸 [ISO] 初始化ISO状态: \(isoState.title)")
-        
-        // 初始化定时器工具项
-        let timerItem = SCToolItem(type: .timer)
-        timerItem.setState(timerState)  // 设置状态
-        timerItem.isSelected = false    // 确保初始状态未选中
-        print("📸 [Timer] 初始化定时器状态: \(timerState.title)")
-
-        // 获取保存的快门速度设置
-        let savedShutterSpeedValue = SCCameraSettingsManager.shared.shutterSpeedValue
-        print("📸 [ShutterSpeed] 数据库中保存的快门速度值: \(savedShutterSpeedValue)")
-        let shutterSpeedStates: [SCShutterSpeedState] = [.auto, .speed1_1000, .speed1_500, .speed1_250, .speed1_125, .speed1_60, .speed1_30]
-        let shutterSpeedState = shutterSpeedStates.first(where: { $0.value == savedShutterSpeedValue }) ?? .auto
-        
-        // 如果是第一次使用，保存默认的快门速度值
-        if SCCameraSettingsManager.shared.shutterSpeedValue == 0 {
-            SCCameraSettingsManager.shared.shutterSpeedValue = SCShutterSpeedState.auto.value
-            print("📸 [ShutterSpeed] 首次使用，设置默认快门速度为自动")
-        }
-
-        // 初始化快门速度工具项
-        let shutterSpeedItem = SCToolItem(type: .shutterSpeed)
-        shutterSpeedItem.setState(shutterSpeedState)
-        shutterSpeedItem.isSelected = false
-        print("📸 [ShutterSpeed] 初始化快门速度状态: \(shutterSpeedState.title)")
-        print("📸 [ShutterSpeed] 快门速度值: \(shutterSpeedState.value)")
-        print("📸 [ShutterSpeed] 当前实际快门速度状态: \(shutterSpeedState)")
-
-        // 初始化工具栏项目
-        let toolItems: [SCToolItem] = [
-            flashItem,          // 闪光灯
-            ratioItem,          // 比例
-            whiteBalanceItem,   // 白平衡
-            exposureItem,       // 曝光
-            isoItem,            // ISO
-            shutterSpeedItem,   // 快门速度
-            timerItem           // 上次选的延时摄影
-        ]
-        toolBar.setItems(toolItems)
-        
-        // 4. 添加切换相机按钮
+        // 5. 添加其他控件
         view.addSubview(switchCameraButton)
-        
-        // 5. 添加实况照片按钮
         view.addSubview(livePhotoButton)
-        
-        // 6. 添加拍照按钮
         view.addSubview(captureButton)
-        
-        // 7. 添加变焦指示器和标签
+        view.addSubview(gridButton)
         view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
-        
-        // 8. 添加对焦框 - 确保添加到预览视图上
         previewView.addSubview(focusView)
-        
-        // 9. 添加镜头选择器
         view.addSubview(lensSelectorView)
-        
-        // 10. 添加水平指示器 - 确保添加到预览视图上
         previewView.addSubview(horizontalIndicator)
         
-        // 设置初始状态
+        // 6. 设置初始状态
         zoomIndicatorView.isHidden = true
         focusView.isHidden = true
         horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
         
-        // 设置初始预览比例
-        switch ratioState {
-        case .ratio4_3:
-            updatePreviewRatio(4.0 / 3.0)
-        case .ratio1_1:
-            updatePreviewRatio(1.0)
-        case .ratio16_9:
-            updatePreviewRatio(16.0 / 9.0)
-        }
-        
-        // 11. 添加网格按钮
-        view.addSubview(gridButton)
-
+        // 7. 设置其他 UI
         setupFocusUI()
+        view.addSubview(autoSaveButton)
+        updateAutoSaveButtonState()
+        
+        // 8. 更新网格按钮状态
+        gridButton.tintColor = previewView.showGrid ? SCConstants.themeColor : .white
     }
     
-    private func updatePreviewRatio(_ ratio: CGFloat) {
+    // 将工具栏项目设置移到单独的方法
+    private func setupToolBarItems() {
+        // 获取保存的设置状态
+        let flashState = SCFlashState(rawValue: SCCameraSettingsManager.shared.flashMode) ?? .auto
+        let ratioState = SCRatioState(rawValue: SCCameraSettingsManager.shared.ratioMode) ?? .ratio4_3
+        let whiteBalanceState = SCWhiteBalanceState(rawValue: SCCameraSettingsManager.shared.whiteBalanceMode) ?? .auto
+        
+        // 获取保存的曝光值
+        let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
+        let exposureStates: [SCExposureState] = [.negative2, .negative1, .zero, .positive1, .positive2]
+        let exposureState = exposureStates.first { $0.value == savedExposureValue } ?? .zero
+        
+        // 获取保存的 ISO 值
+        let savedISOValue = SCCameraSettingsManager.shared.isoValue
+        let isoStates: [SCISOState] = [.auto, .iso100, .iso200, .iso400, .iso800]
+        let isoState = isoStates.first { $0.value == savedISOValue } ?? .auto
+        
+        let timerState = SCTimerState(rawValue: SCCameraSettingsManager.shared.timerMode) ?? .off
+        let shutterSpeedState = SCShutterSpeedState(rawValue: SCCameraSettingsManager.shared.shutterSpeedValue) ?? .auto
+        
+        // 初始化工具项
+        let toolItems = [
+            createToolItem(type: SCToolType.flash, state: flashState),
+            createToolItem(type: SCToolType.ratio, state: ratioState),
+            createToolItem(type: SCToolType.whiteBalance, state: whiteBalanceState),
+            createToolItem(type: SCToolType.exposure, state: exposureState),
+            createToolItem(type: SCToolType.iso, state: isoState),
+            createToolItem(type: SCToolType.shutterSpeed, state: shutterSpeedState),
+            createToolItem(type: SCToolType.timer, state: timerState)
+        ]
+        
+        toolBar.setItems(toolItems)
+    }
+    
+    private func createToolItem<T: SCToolState>(type: SCToolType, state: T) -> SCToolItem {
+        let item = SCToolItem(type: type)
+        item.setState(state)
+        item.isSelected = false
+        return item
+    }
+    
+    internal func updatePreviewRatio(_ ratio: CGFloat) {
         // 先移除预览视图的所有约束
         previewView.snp.removeConstraints()
         
         // 重新设置预览视图约束
-        previewView.snp.remakeConstraints() { make in
+        previewView.snp.remakeConstraints { make in
             make.width.equalTo(UIScreen.main.bounds.width)
             make.centerX.equalToSuperview()
-            make.height.equalTo(previewView.snp.width).multipliedBy(ratio)
             
             // 根据比例调整位置
             if ratio == 16.0 / 9.0 {
                 // 16:9 模式下垂直居中
                 make.centerY.equalToSuperview()
+                make.height.equalTo(previewView.snp.width).multipliedBy(ratio).priority(.high)
             } else {
                 // 其他模式保持原来的布局
                 let screenHeight = UIScreen.main.bounds.height
-                let safeAreaTop = CGFloat(0.0)
+                let safeAreaTop = view.safeAreaInsets.top
                 let toolBarHeight: CGFloat = 80
                 let bottomSpace: CGFloat = 100
                 let availableHeight = screenHeight - safeAreaTop - toolBarHeight - bottomSpace
                 let previewHeight = UIScreen.main.bounds.width * ratio
                 let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+                
                 make.top.equalToSuperview().offset(verticalOffset)
+                make.height.equalTo(previewHeight).priority(.high)
             }
         }
         
@@ -572,8 +509,24 @@ class SCCameraVC: UIViewController {
             return .ratio4_3
         }()
         
+        // 更新相机会话的输出尺寸
+        if let session = photoSession {
+            let screenWidth = UIScreen.main.bounds.width * UIScreen.main.scale
+            let screenHeight = screenWidth * ratio
+            session.resolution = CGSize(width: screenWidth, height: screenHeight)
+            print("📸 [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
+        }
+        
         // 更新镜头选择器位置
         updateLensSelectorPosition(for: ratioState)
+        
+        // 更新网格视图
+        if previewView.showGrid {
+            previewView.showGrid = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                self.previewView.showGrid = true
+            }
+        }
         
         // 使用动画更新布局
         UIView.animate(withDuration: 0.3) {
@@ -582,6 +535,11 @@ class SCCameraVC: UIViewController {
     }
     
     private func updateLensSelectorPosition(for ratioState: SCRatioState) {
+        // 确保 lensSelectorView 已经被添加到父视图
+        if lensSelectorView.superview == nil {
+            view.addSubview(lensSelectorView)
+        }
+        
         // 移除现有约束
         lensSelectorView.snp.removeConstraints()
         
@@ -595,12 +553,15 @@ class SCCameraVC: UIViewController {
             switch ratioState {
             case .ratio16_9:
                 // 16:9模式下，距离工具栏顶部-20pt
-                make.bottom.equalTo(toolBar.snp.top).offset(-20)
+                make.bottom.equalTo(toolBar.snp.top).offset(-20).priority(.high)
             default:
                 // 1:1和4:3模式下，距离预览视图底部-20pt
-                make.bottom.equalTo(previewView.snp.bottom).offset(-20)
+                make.bottom.equalTo(previewView.snp.bottom).offset(-20).priority(.high)
             }
         }
+        
+        // 立即更新布局
+        view.layoutIfNeeded()
     }
     
     private func setupConstraints() {
@@ -624,6 +585,13 @@ class SCCameraVC: UIViewController {
             make.bottom.equalTo(captureButton.snp.top).offset(-20)
             make.width.equalTo(UIScreen.main.bounds.width)
             make.height.equalTo(80)
+        }
+        
+        // 添加网格按钮约束
+        gridButton.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
+            make.right.equalTo(livePhotoButton.snp.left).offset(-20)
+            make.width.height.equalTo(44)
         }
         
         // 4. 预览视图
@@ -704,10 +672,11 @@ class SCCameraVC: UIViewController {
             make.height.equalTo(4)
         }
         
-        // 添加网格按钮约束
-        gridButton.snp.makeConstraints { make in
-            make.centerY.equalTo(lensSelectorView)
-            make.leading.equalTo(view.safeAreaLayoutGuide).offset(16)
+        // 自动保存按钮约束
+        autoSaveButton.snp.makeConstraints { make in
+            make.centerY.equalTo(captureButton)
+            make.left.equalTo(captureButton.snp.right).offset(20)
+            make.width.height.equalTo(44)
         }
     }
     
@@ -820,6 +789,14 @@ class SCCameraVC: UIViewController {
     }
     
     private func capturePhotoWithFlash(_ flashMode: AVCaptureDevice.FlashMode) {
+        // 检查相机会话状态
+        guard let session = photoSession, session.session.isRunning else {
+            print("⚠️ [Camera] 相机会话未运行")
+            let error = NSError(domain: "com.sparkcamera", code: -1, userInfo: [NSLocalizedDescriptionKey: "相机未准备就绪"])
+            showError(error)
+            return
+        }
+        
         // 拍照并处理结果
         let sessionFlashMode: SCSession.FlashMode
         switch flashMode {
@@ -833,8 +810,8 @@ class SCCameraVC: UIViewController {
             sessionFlashMode = .auto
         }
         
-        photoSession.flashMode = sessionFlashMode
-        photoSession.capture({ [weak self] image, _ in
+        session.flashMode = sessionFlashMode
+        session.capture({ [weak self] image, resolvedSettings in
             guard let self = self else { return }
             
             // 如果是定时拍照，直接保存原图到相册
@@ -928,7 +905,31 @@ class SCCameraVC: UIViewController {
     
     // MARK: - Helpers
     private func handleCapturedImage(_ image: UIImage) {
-        let photoPreviewVC = SCPhotoPreviewVC(image: image)
+        // 打印原始图片信息
+        print("📸 [Original Image] 尺寸: \(image.size.width) x \(image.size.height)")
+        print("📸 [Original Image] 方向: \(image.imageOrientation.rawValue)")
+        print("📸 [Original Image] 比例: \(image.scale)")
+        
+        // 获取当前比例设置
+        let ratioState: SCRatioState = {
+            if let ratioItem = toolBar.getItem(for: .ratio),
+               let state = ratioItem.state as? SCRatioState {
+                return state
+            }
+            return .ratio4_3  // 默认 4:3
+        }()
+        
+        // 计算图片的宽高比
+        let aspectRatio = ratioState.aspectRatio
+        print("📸 [Camera Settings] 当前比例模式: \(ratioState.title) 目标比例: \(ratioState.title) ")
+
+        // 如果开启了自动保存，先保存照片
+        if SCCameraSettingsManager.shared.isAutoSaveEnabled {
+            print("📸 [Auto Save] 自动保存已开启，准备保存原始图片")
+            UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        }
+        
+        let photoPreviewVC = SCPhotoPreviewVC(image: image, aspectRatio: aspectRatio)
         photoPreviewVC.modalPresentationStyle = .fullScreen
         
         // 使用自定义转场动画
@@ -997,7 +998,7 @@ class SCCameraVC: UIViewController {
         SwiftMessages.show(view: view)
     }
     
-    private func showFocusAnimation(at point: CGPoint) {
+    internal func showFocusAnimation(at point: CGPoint) {
         // 确保对焦框在预览视图内
         let focusViewSize = focusView.bounds.size
         let minX = focusViewSize.width / 2
@@ -1119,7 +1120,7 @@ class SCCameraVC: UIViewController {
         // 如果是第一次使用（没有保存过状态），保存默认的自动模式
         if SCCameraSettingsManager.shared.flashMode == 0 {
             SCCameraSettingsManager.shared.flashMode = SCFlashState.auto.rawValue
-            print("📸 [Flash] 首次使用，设置默认闪光灯状态为自动")
+            print(" [Flash] 首次使用，设置默认闪光灯状态为自动")
         }
         
         // 设置闪光灯状态
@@ -1144,7 +1145,7 @@ class SCCameraVC: UIViewController {
     }
     
     // 添加闪光灯状态变化提示方法
-    private func showFlashModeChanged(_ state: SCFlashState) {
+    internal func showFlashModeChanged(_ state: SCFlashState) {
         let view = MessageView.viewFromNib(layout: .statusLine)
         view.configureTheme(.success)
         
@@ -1163,7 +1164,7 @@ class SCCameraVC: UIViewController {
     }
     
     // 添加比例状态变化提示方法
-    private func showRatioModeChanged(_ state: SCRatioState) {
+    internal func showRatioModeChanged(_ state: SCRatioState) {
         let view = MessageView.viewFromNib(layout: .statusLine)
         view.configureTheme(.success)
         view.configureContent(title: "", body: "预览比例：\(state.title)")
@@ -1392,7 +1393,7 @@ class SCCameraVC: UIViewController {
         showSuccess(message)
     }
     
-    private func handleFocusStateChange(_ state: SCFocusState) {
+    internal func handleFocusStateChange(_ state: SCFocusState) {
         let focusBoxView = SCFocusBoxView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
         focusBoxView.animate(for: state)
         
@@ -1410,491 +1411,94 @@ class SCCameraVC: UIViewController {
         }
     }
     
-    // 添加网格切换方法
     @objc private func toggleGrid() {
-        isGridVisible.toggle()
+        previewView.showGrid.toggle()
         
-        if isGridVisible {
-            // 创建并显示网格
-            let gridView = SCGridView(frame: previewView.bounds)
-            gridView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            previewView.addSubview(gridView)
-            self.gridView = gridView
-            
-            // 更新按钮状态
-            gridButton.tintColor = SCConstants.themeColor
-        } else {
-            // 移除网格
-            gridView?.removeFromSuperview()
-            gridView = nil
-            
-            // 更新按钮状态
-            gridButton.tintColor = .white
-        }
+        // 更新按钮颜色
+        gridButton.tintColor = previewView.showGrid ? SCConstants.themeColor : .white
         
-        // 添加触觉反馈
+        // 触觉反馈
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
         
-        // 显示状态更新提示
+        // 显示提示
+        SwiftMessages.showSuccessMessage(previewView.showGrid ? "网格已开启" : "网格已关闭")
+    }
+    
+    @objc internal func hideZoomIndicator() {
+        UIView.animate(withDuration: 0.3) {
+            self.zoomIndicatorView.alpha = 0
+        } completion: { _ in
+            self.zoomIndicatorView.isHidden = true
+            self.zoomIndicatorView.alpha = 1
+        }
+    }
+    
+    // 添加自动保存相关方法
+    private func updateAutoSaveButtonState() {
+        let isAutoSaveEnabled = SCCameraSettingsManager.shared.isAutoSaveEnabled
+        let imageName = isAutoSaveEnabled ? "square.and.arrow.down.fill" : "square.and.arrow.down"
+        let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
+        autoSaveButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
+        autoSaveButton.tintColor = isAutoSaveEnabled ? SCConstants.themeColor : .white
+    }
+    
+    @objc private func toggleAutoSave() {
+        // 切换自动保存状态
+        let newState = !SCCameraSettingsManager.shared.isAutoSaveEnabled
+        SCCameraSettingsManager.shared.isAutoSaveEnabled = newState
+        
+        // 更新按钮状态
+        updateAutoSaveButtonState()
+        
+        // 触觉反馈
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // 显示提示
+        let message = newState ? "已开启自动保存" : "已关闭自动保存"
         let view = MessageView.viewFromNib(layout: .statusLine)
-        view.configureTheme(.success)
-        view.configureContent(title: "", body: isGridVisible ? "网格已开启" : "网格已关闭")
+        view.configureTheme(newState ? .success : .info)
+        view.configureContent(title: "", body: message)
         SwiftMessages.show(view: view)
     }
-}
+    
+    func updateAspectRatio(_ state: SCRatioState) {
+        // 更新UI约束
+        updatePreviewRatio(state.aspectRatio)
 
-// MARK: - SCSessionDelegate
-extension SCCameraVC: SCSessionDelegate {
-    func didChangeValue(session: SCSession, value: Any, key: String) {
-        switch key {
-        case "zoom":
-            if let zoomValue = value as? Double {
-                // 更新变焦指示器
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    
-                    // 更新文字
-                    self.zoomLabel.text = String(format: "%.1fx", zoomValue)
-                    
-                    // 确保 zoomLabel 在 zoomIndicatorView 内部
-                    self.zoomLabel.frame = self.zoomIndicatorView.bounds
-                    
-                    // 显示变焦指示器
-                    if self.zoomIndicatorView.isHidden {
-                        self.zoomIndicatorView.alpha = 0
-                        self.zoomIndicatorView.isHidden = false
-                        
-                        UIView.animate(withDuration: 0.2) {
-                            self.zoomIndicatorView.alpha = 1
-                            self.zoomLabel.alpha = 1
-                        }
-                    }
-                    
-                    // 延迟隐藏变焦指示器
-                    NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(self.hideZoomIndicator), object: nil)
-                    self.perform(#selector(self.hideZoomIndicator), with: nil, afterDelay: 1.5)
-                }
-            }
-            
-        case "focusState":
-            if let focusState = value as? SCFocusState {
-                DispatchQueue.main.async { [weak self] in
-                    self?.handleFocusStateChange(focusState)
-                }
-            }
-            
-        default:
-            break
+        // 获取当前屏幕宽度和新的比例
+        let screenWidth = UIScreen.main.bounds.width * UIScreen.main.scale
+        let screenHeight = screenWidth * state.aspectRatio
+
+        // 更新session的resolution
+        if let session = photoSession {
+            session.resolution = CGSize(width: screenWidth, height: screenHeight)
+            print("📸 [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
         }
     }
     
-    @objc private func hideZoomIndicator() {
-        UIView.animate(withDuration: 0.2) { [weak self] in
-            guard let self = self else { return }
-            self.zoomIndicatorView.alpha = 0
-            self.zoomLabel.alpha = 0
-        } completion: { [weak self] _ in
-            guard let self = self else { return }
-            self.zoomIndicatorView.isHidden = true
-        }
-    }
-}
-
-// MARK: - SCCameraToolBarDelegate
-extension SCCameraVC: SCCameraToolBarDelegate {
-    func toolBar(_ toolBar: SCCameraToolBar, didSelect item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 空实现，所有选择逻辑都在 didSelect:for: 方法中处理
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didExpand item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 打印展开的工具项信息
-        print("📸📸 [ToolBar] 展开工具项: \(item.type)")
-        print("📸 [ToolBar] 当前状态: \(String(describing: item.state))")
-        print("📸 [ToolBar] 是否选中: \(item.isSelected)")
+    // MARK: - Deinitialization
+    deinit {
+        print("📸 [Camera] SCCameraVC 正在释放...")
         
-        // 根据工具项类型处理特定逻辑
-        switch item.type {
-        case .ratio:
-            // 获取保存的比例设置
-            let savedRatioMode = SCCameraSettingsManager.shared.ratioMode
-            print("📸 [Ratio] 数据库中保存的比例模式: \(savedRatioMode)")
-            if let ratioState = SCRatioState(rawValue: savedRatioMode) {
-                item.setState(ratioState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [Ratio] 选中保存的状态: \(ratioState.title)")
-                print("📸 [Ratio] 比例值: \(ratioState.aspectRatio)")
-                print("📸 [Ratio] 当前实际比例状态: \(ratioState)")
-            }
-
-        case .flash:
-            // 获取保存的闪光灯设置
-            let savedFlashMode = SCCameraSettingsManager.shared.flashMode
-            print("📸 [Flash] 数据库中保存的闪光灯模式: \(savedFlashMode)")
-            if let flashState = SCFlashState(rawValue: savedFlashMode) {
-                item.setState(flashState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [Flash] 选中保存的状态: \(flashState.title)")
-                print("📸 [Flash] 闪光灯模式: \(flashState.avFlashMode.rawValue)")
-                print("📸 [Flash] 当前实际闪光灯状态: \(flashState)")
-            }
-
-        case .whiteBalance:
-            // 获取保存的白平衡设置
-            let savedWhiteBalanceMode = SCCameraSettingsManager.shared.whiteBalanceMode
-            print("📸 [WhiteBalance] 数据库中保存的白平衡模式: \(savedWhiteBalanceMode)")
-            if let whiteBalanceState = SCWhiteBalanceState(rawValue: savedWhiteBalanceMode) {
-                item.setState(whiteBalanceState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [WhiteBalance] 选中保存的状态: \(whiteBalanceState.title)")
-                print("📸 [WhiteBalance] 色温值: \(whiteBalanceState.temperature)")
-                print("📸 [WhiteBalance] 当前实际白平衡状态: \(whiteBalanceState)")
-            }
-
-        case .exposure:
-            // 获取保存的曝光值
-            let savedExposureValue = SCCameraSettingsManager.shared.exposureValue
-            print("📸 [Exposure] 数据库中保存的曝光值: \(savedExposureValue)")
-            let exposureStates: [SCExposureState] = [.negative2, .negative1, .zero, .positive1, .positive2]
-            if let exposureState = exposureStates.first(where: { $0.value == savedExposureValue }) {
-                item.setState(exposureState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [Exposure] 选中保存的状态: \(exposureState.title)")
-                print("📸 [Exposure] 曝光值: \(exposureState.value)")
-                print("📸 [Exposure] 当前实际曝光状态: \(exposureState)")
-            }
-
-        case .iso:
-            // 获取保存的 ISO 值
-            let savedISOValue = SCCameraSettingsManager.shared.isoValue
-            print("📸 [ISO] 数据库中保存的 ISO 值: \(savedISOValue)")
-            let isoStates: [SCISOState] = [.auto, .iso100, .iso200, .iso400, .iso800]
-            if let isoState = isoStates.first(where: { $0.value == savedISOValue }) {
-                item.setState(isoState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [ISO] 选中保存的状态: \(isoState.title)")
-                print("📸 [ISO] ISO 值: \(isoState.value)")
-                print("📸 [ISO] 当前实际ISO状态: \(isoState)")
-            }
-
-        case .timer:
-            // 获取保存的定时器设置
-            let savedTimerMode = SCCameraSettingsManager.shared.timerMode
-            print("📸 [Timer] 数据库中保存的定时器模式: \(savedTimerMode)")
-            if let timerState = SCTimerState(rawValue: savedTimerMode) {
-                item.setState(timerState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [Timer] 选中保存的状态: \(timerState.title)")
-                print("📸 [Timer] 定时秒数: \(timerState.seconds)")
-                print("📸 [Timer] 当前实际定时器状态: \(timerState)")
-            }
-
-        case .livePhoto:
-            print("📸 [LivePhoto] 功能未实现，使用默认关闭状态")
-            let defaultState = SCLivePhotoState.off
-            item.setState(defaultState)
-            item.isSelected = true
-            toolBar.updateItem(item)
-            print("📸 [LivePhoto] 使用默认状态: \(defaultState.title)")
-            print("📸 [LivePhoto] 当前实际实况照片状态: \(defaultState)")
-        case .shutterSpeed:
-            // 获取保存的快门速度设置
-            let savedShutterSpeedValue = SCCameraSettingsManager.shared.shutterSpeedValue
-            print("📸 [ShutterSpeed] 数据库中保存的快门速度值: \(savedShutterSpeedValue)")
-            let shutterSpeedStates: [SCShutterSpeedState] = [.auto, .speed1_1000, .speed1_500, .speed1_250, .speed1_125, .speed1_60, .speed1_30]
-            if let shutterSpeedState = shutterSpeedStates.first(where: { $0.value == savedShutterSpeedValue }) {
-                item.setState(shutterSpeedState)
-                item.isSelected = true
-                toolBar.updateItem(item)
-                print("📸 [ShutterSpeed] 选中保存的状态: \(shutterSpeedState.title)")
-                print("📸 [ShutterSpeed] 快门速度值: \(shutterSpeedState.value)")
-                print("📸 [ShutterSpeed] 当前实际快门速度状态: \(shutterSpeedState)")
-            }
-
-        }
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didCollapse item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 处理工具项收起
-        UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseOut], animations: {
-            // 显示拍照按钮和其他控制按钮
-            self.captureButton.transform = .identity
-            self.switchCameraButton.transform = .identity
-            self.livePhotoButton.transform = .identity
-            
-            self.captureButton.alpha = 1
-            self.switchCameraButton.alpha = 1
-            self.livePhotoButton.alpha = 1
-        })
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, willAnimate item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 处理工具项动画开始
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didFinishAnimate item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        print("工具栏动画完成：\(item.type)")
+        // 停止倒计时
+        countdownTimer?.invalidate()
+        countdownTimer = nil
         
-        // 根据工具类型和选项类型处理不同的逻辑
-        switch (item.type, optionType) {
-        case (.exposure, .scale):
-            // 从 scale 选项类型获取曝光值
-            if let value = item.getValue(for: SCCameraToolOptionsViewType.scale) as? Float {
-                print("📸 [Exposure] 工具栏收起，应用曝光值：\(value)")
-                // 更新相机曝光
-                if photoSession.setExposure(value) {
-                    // 保存到数据库
-                    SCCameraSettingsManager.shared.exposureValue = value
-                    // 显示状态更新提示
-                    let view = MessageView.viewFromNib(layout: .statusLine)
-                    view.configureTheme(.success)
-                    view.configureContent(title: "", body: "曝光：\(value)")
-                    SwiftMessages.show(view: view)
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        case (.timer, .normal):
-            // 从 normal 选项类型获取定时器状态
-            if let timerState = item.getValue(for: SCCameraToolOptionsViewType.normal) as? SCTimerState {
-                print("📸 [Timer] 工具栏收起，定时器状态：\(timerState.seconds)秒")
-            }
-        default:
-            break
-        }
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didSelect option: String, for item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        if item.type == .flash {
-            if let flashState = item.state as? SCFlashState {
-                print("📸 [Flash] 选择闪光灯状态：\(flashState.title)")
-                // 更新闪光灯状态
-                if photoSession.setFlashMode(flashState.avFlashMode) {
-                    // 保存到数据库
-                    SCCameraSettingsManager.shared.flashMode = flashState.rawValue
-                    // 显示状态更新提示
-                    showFlashModeChanged(flashState)
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        } else if item.type == .ratio {
-            if let ratioState = item.state as? SCRatioState {
-                print("📸 [Ratio] 选择比例状态：\(ratioState.title)")
-                // 更新预览比例
-                switch ratioState {
-                case .ratio4_3:
-                    updatePreviewRatio(4.0 / 3.0)
-                case .ratio1_1:
-                    updatePreviewRatio(1.0)
-                case .ratio16_9:
-                    updatePreviewRatio(16.0 / 9.0)
-                }
-                // 保存到数据库
-                SCCameraSettingsManager.shared.ratioMode = ratioState.rawValue
-                // 显示状态更新提示
-                showRatioModeChanged(ratioState)
-                // 添加触觉反馈
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-            }
-        } else if item.type == .timer {
-            if let timerState = item.state as? SCTimerState {
-                print("📸 [Timer] 选择定时器状态：\(timerState.seconds)秒")
-                // 保存到数据库
-                SCCameraSettingsManager.shared.timerMode = timerState.rawValue
-                // 显示状态更新提示
-                let view = MessageView.viewFromNib(layout: .statusLine)
-                view.configureTheme(.success)
-                view.configureContent(title: "", body: timerState == .off ? "定时器已关闭" : "定时器：\(timerState.seconds)秒")
-                SwiftMessages.show(view: view)
-                // 添加触觉反馈
-                let generator = UIImpactFeedbackGenerator(style: .light)
-                generator.impactOccurred()
-            }
-        } else if item.type == .whiteBalance {
-            if let whiteBalanceState = item.state as? SCWhiteBalanceState {
-                print("📸 [WhiteBalance] 选择白平衡状态：\(whiteBalanceState.title)")
-                // 更新相机白平衡
-                if photoSession.setWhiteBalanceMode(whiteBalanceState) {
-                    // 保存到数据库
-                    SCCameraSettingsManager.shared.whiteBalanceMode = whiteBalanceState.rawValue
-                    // 显示状态更新提示
-                    let view = MessageView.viewFromNib(layout: .statusLine)
-                    view.configureTheme(.success)
-                    view.configureContent(title: "", body: "白平衡：\(whiteBalanceState.title)")
-                    SwiftMessages.show(view: view)
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        } else if item.type == .exposure {
-            if let exposureState = item.state as? SCExposureState {
-                print("📸 [Exposure] 选择曝光状态：\(exposureState.title)")
-                // 更新相机曝光
-                if photoSession.setExposure(exposureState.value) {
-                    // 保存到数据库
-                    SCCameraSettingsManager.shared.exposureValue = exposureState.value
-                    // 显示状态更新提示
-                    let view = MessageView.viewFromNib(layout: .statusLine)
-                    view.configureTheme(.success)
-                    view.configureContent(title: "", body: "曝光：\(exposureState.title)")
-                    SwiftMessages.show(view: view)
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        } else if item.type == .iso {
-            if let isoState = item.state as? SCISOState {
-                print("📸 [ISO] 选择ISO状态：\(isoState.title)")
-                // 更新相机ISO
-                if photoSession.setISO(isoState.value) {
-                    // 保存到数据库
-                    SCCameraSettingsManager.shared.isoValue = isoState.value
-                    // 显示状态更新提示
-                    let view = MessageView.viewFromNib(layout: .statusLine)
-                    view.configureTheme(.success)
-                    view.configureContent(title: "", body: "ISO：\(isoState.title)")
-                    SwiftMessages.show(view: view)
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                }
-            }
-        } else if item.type == .shutterSpeed {
-            if let shutterSpeedState = item.state as? SCShutterSpeedState {
-                print("📸 [ShutterSpeed] 选择快门速度状态：\(shutterSpeedState.title)")
-                // 更新相机快门速度
-                photoSession.setShutterSpeed(shutterSpeedState.value) { success in
-                    if success {
-                        // 保存到数据库
-                        SCCameraSettingsManager.shared.shutterSpeedValue = shutterSpeedState.value
-                        
-                        // 显示状态更新提示
-                        DispatchQueue.main.async {
-                            let view = MessageView.viewFromNib(layout: .statusLine)
-                            view.configureTheme(.success)
-                            view.configureContent(title: "", body: shutterSpeedState == .auto ? "自动快门速度" : "快门速度：1/\(Int(1/shutterSpeedState.value))秒")
-                            SwiftMessages.show(view: view)
-                            
-                            // 添加触觉反馈
-                            let generator = UIImpactFeedbackGenerator(style: .light)
-                            generator.impactOccurred()
-                        }
-                    } else {
-                        // 设置失败时显示错误提示
-                        DispatchQueue.main.async {
-                            SwiftMessages.showErrorMessage("设置快门速度失败")
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didToggleState item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 处理状态切换
-        switch item.type {
-        case .flash:
-            if let flashState = item.state as? SCFlashState {
-                if photoSession.setFlashMode(flashState.avFlashMode) {
-                    // 保存闪光灯状态
-                    SCCameraSettingsManager.shared.flashMode = flashState.rawValue
-                    // 添加触觉反馈
-                    let generator = UIImpactFeedbackGenerator(style: .light)
-                    generator.impactOccurred()
-                    // 显示状态更新提示
-                    showFlashModeChanged(flashState)
-                }
-            }
-        case .livePhoto:
-            // 实况照片功能待实现
-            SwiftMessages.showInfoMessage("实况照片功能待开发")
-        case .ratio, .whiteBalance, .exposure, .iso, .timer:
-            break
-        case .shutterSpeed:
-            if let shutterSpeedState = item.state as? SCShutterSpeedState {
-                let nextState = shutterSpeedState.nextState()
-                // 更新工具项状态
-                item.setState(nextState)
-                toolBar.updateItem(item)
-                
-                // 设置快门速度
-                photoSession.setShutterSpeed(nextState.value) { success in
-                    if success {
-                        // 保存快门速度状态
-                        SCCameraSettingsManager.shared.shutterSpeedValue = nextState.value
-                        
-                        // 添加触觉反馈
-                        let generator = UIImpactFeedbackGenerator(style: .light)
-                        generator.impactOccurred()
-                        
-                        // 显示状态更新提示
-                        let message = nextState.value == 0 ? "自动快门速度" : "快门速度: 1/\(Int(1/nextState.value))秒"
-                        DispatchQueue.main.async {
-                            SwiftMessages.showSuccessMessage(message)
-                        }
-                    } else {
-                        // 设置失败时显示错误提示
-                        DispatchQueue.main.async {
-                            SwiftMessages.showErrorMessage("设置快门速度失败")
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    func toolBar(_ toolBar: SCCameraToolBar, didChangeSlider value: Float, for item: SCToolItem, optionType: SCCameraToolOptionsViewType) {
-        // 目前只处理曝光值的调整
-        if item.type == .exposure {
-            // 获取设备支持的曝光值范围
-            let range = SCCameraSettingsManager.shared.exposureRange
-            // 确保值在设备支持的范围内
-            let clampedValue = min(range.max, max(range.min, value))
-            
-            print("📸 [Exposure] 准备更新曝光值：\(value)")
-            print("📸 [Exposure] 设备支持范围：[\(range.min), \(range.max)]")
-            print("📸 [Exposure] 调整后的值：\(clampedValue)")
-            
-            if photoSession.setExposure(clampedValue) {
-                print("📸 [Exposure] 成功更新曝光值：\(clampedValue)")
-                // 保存到数据库
-                SCCameraSettingsManager.shared.exposureValue = clampedValue
-            }
-        }
-    }
-}
-
-// MARK: - SCCameraToolOptionsViewDelegate
-extension SCCameraVC: SCCameraToolOptionsViewDelegate {
-    func optionsView(_ optionsView: SCCameraToolOptionsView, didChangeSliderValue value: Float, for type: SCToolType) {
-        // 处理选项选择
-        if let item = toolBar.getItem(for: type) {
-            item.setValue(value, for: .scale)
-//            toolBar.updateItem(item)
-//            toolBar.delegate?.toolBar(toolBar, didSelect: option.title, for: item, optionType: .normal)
-        }
-    }
-    
-    func optionsView(_ optionsView: SCCameraToolOptionsView, didSelect option: SCToolOption, for type: SCToolType) {
-        // 处理选项选择
-        if let item = toolBar.getItem(for: type) {
-            item.setState(option.state)
-            toolBar.updateItem(item)
-            toolBar.delegate?.toolBar(toolBar, didSelect: option.title, for: item, optionType: .normal)
-        }
+        // 停止水平指示器
+        motionManager.stopDeviceMotionUpdates()
+        
+        // 清理预览视图
+        previewView?.session = nil
+        previewView = nil
+        
+        // 清理相机会话
+        photoSession?.stopSession()
+        photoSession = nil
+        cameraManager = nil
+        
+        print("📸 [Camera] SCCameraVC 已释放")
     }
 }
 
