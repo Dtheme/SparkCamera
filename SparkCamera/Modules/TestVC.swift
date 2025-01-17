@@ -7,8 +7,50 @@
 
 import UIKit
 import SnapKit
+import GPUImage
 
 class TestVC: UIViewController {
+
+    // MARK: - Properties
+    private var picture: GPUImagePicture?
+    private var currentFilter: GPUImageFilter?
+    private var renderQueue = DispatchQueue(label: "com.sparkcamera.gpuimage.render")
+    private var isFilterApplied = false
+
+    // 滤镜链
+    private lazy var brightnessFilter: GPUImageBrightnessFilter = {
+        let filter = GPUImageBrightnessFilter()
+        filter.brightness = -0.1
+        return filter
+    }()
+
+    private lazy var contrastFilter: GPUImageContrastFilter = {
+        let filter = GPUImageContrastFilter()
+        filter.contrast = 1.2
+        return filter
+    }()
+
+    private lazy var saturationFilter: GPUImageSaturationFilter = {
+        let filter = GPUImageSaturationFilter()
+        filter.saturation = 0.85
+        return filter
+    }()
+
+    private lazy var highlightShadowFilter: GPUImageHighlightShadowFilter = {
+        let filter = GPUImageHighlightShadowFilter()
+        filter.highlights = 0.8
+        filter.shadows = 0.2
+        return filter
+    }()
+
+    private lazy var colorFilter: GPUImageRGBFilter = {
+        let filter = GPUImageRGBFilter()
+        // 调整 RGB 通道以获得富士胶片的效果
+        filter.red = 1.0
+        filter.green = 1.1
+        filter.blue = 0.9
+        return filter
+    }()
 
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -21,69 +63,28 @@ class TestVC: UIViewController {
 
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "相机实验室"
+        label.text = "富士胶片经典镀铬"
         label.textColor = .black
         label.font = .systemFont(ofSize: 24, weight: .bold)
         label.textAlignment = .center
         return label
     }()
 
-    private lazy var valueLabel: UILabel = {
-        let label = UILabel()
-        label.text = "当前值：0.0"
-        label.textColor = .black
-        label.font = .systemFont(ofSize: 18)
-        label.textAlignment = .center
-        return label
+    private lazy var imageView: GPUImageView = {
+        let view = GPUImageView()
+        view.backgroundColor = .black
+        view.contentMode = .scaleAspectFit
+        view.fillMode = kGPUImageFillModePreserveAspectRatio
+        return view
     }()
 
-    private lazy var scaleSlider: SCScaleSlider = {
-        let config = SCScaleSliderConfig(minValue: -2.0,
-                                         maxValue: 2.0,
-                                         step: 0.1,
-                                         defaultValue: 1.0)
-        let slider = SCScaleSlider(config: config)
-        slider.backgroundColor = UIColor.orange.withAlphaComponent(0.1)
-
-        var customStyle = SCScaleSliderStyle.Style.default.style
-        customStyle.scaleWidth = 5
-        slider.style = customStyle
-
-        return slider
-    }()
-
-    private lazy var styleStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 10
-        stackView.distribution = .fillEqually
-        return stackView
-    }()
-
-    private lazy var defaultStyleButton: UIButton = {
+    private lazy var filterButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("默认", for: .normal)
-        button.backgroundColor = .systemGray6
+        button.setTitle("应用滤镜", for: .normal)
+        button.backgroundColor = .systemBlue
+        button.setTitleColor(.white, for: .normal)
         button.layer.cornerRadius = 8
-        button.addTarget(self, action: #selector(defaultStyleTapped), for: .touchUpInside)
-        return button
-    }()
-
-    private lazy var darkStyleButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("暗色", for: .normal)
-        button.backgroundColor = .systemGray6
-        button.layer.cornerRadius = 8
-        button.addTarget(self, action: #selector(darkStyleTapped), for: .touchUpInside)
-        return button
-    }()
-
-    private lazy var verticalStyleButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("竖条", for: .normal)
-        button.backgroundColor = .systemGray6
-        button.layer.cornerRadius = 8
-        button.addTarget(self, action: #selector(verticalStyleTapped), for: .touchUpInside)
+        button.addTarget(self, action: #selector(filterButtonTapped), for: .touchUpInside)
         return button
     }()
 
@@ -92,7 +93,11 @@ class TestVC: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
-        setupActions()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        loadImage()
     }
 
     // MARK: - Setup
@@ -101,13 +106,8 @@ class TestVC: UIViewController {
 
         view.addSubview(closeButton)
         view.addSubview(titleLabel)
-        view.addSubview(valueLabel)
-        view.addSubview(scaleSlider)
-        view.addSubview(styleStackView)
-
-        styleStackView.addArrangedSubview(defaultStyleButton)
-        styleStackView.addArrangedSubview(darkStyleButton)
-        styleStackView.addArrangedSubview(verticalStyleButton)
+        view.addSubview(imageView)
+        view.addSubview(filterButton)
     }
 
     private func setupConstraints() {
@@ -122,29 +122,35 @@ class TestVC: UIViewController {
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
         }
 
-        valueLabel.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
+        imageView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
             make.top.equalTo(titleLabel.snp.bottom).offset(40)
+            make.height.equalTo(imageView.snp.width)
         }
 
-        scaleSlider.snp.makeConstraints { make in
-            make.left.equalToSuperview().offset(30)
-            make.right.equalToSuperview().offset(-30)
-            make.top.equalTo(valueLabel.snp.bottom).offset(40)
-            make.height.equalTo(100)
-        }
-
-        styleStackView.snp.makeConstraints { make in
+        filterButton.snp.makeConstraints { make in
             make.left.equalToSuperview().offset(20)
             make.right.equalToSuperview().offset(-20)
-            make.top.equalTo(scaleSlider.snp.bottom).offset(40)
+            make.top.equalTo(imageView.snp.bottom).offset(40)
             make.height.equalTo(44)
         }
     }
 
-    private func setupActions() {
-        scaleSlider.valueChangedHandler = { [weak self] value in
-            self?.valueLabel.text = String(format: "当前值：%.1f", value)
+    private func loadImage() {
+        // 加载示例图片
+        guard let image = UIImage(named: "test_image") ?? UIImage(systemName: "photo") else { return }
+
+        renderQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // 创建 GPUImage 图片对象
+            self.picture = GPUImagePicture(image: image)
+
+            DispatchQueue.main.async {
+                // 直接显示原图
+                self.picture?.addTarget(self.imageView)
+                self.picture?.processImage()
+            }
         }
     }
 
@@ -153,31 +159,42 @@ class TestVC: UIViewController {
         dismiss(animated: true)
     }
 
-    @objc private func defaultStyleTapped() {
-        //        scaleSlider.style = .Style.default.style
-        var customStyle = SCScaleSliderStyle.Style.default.style
-        customStyle.scaleWidth = 8
-        scaleSlider.style = customStyle
-        updateButtonStates(selectedButton: defaultStyleButton)
-    }
+    @objc private func filterButtonTapped() {
+        renderQueue.async { [weak self] in
+            guard let self = self else { return }
 
-    @objc private func darkStyleTapped() {
-        scaleSlider.style = .Style.dark.style
-        updateButtonStates(selectedButton: darkStyleButton)
-    }
+            // 移除之前的目标
+            self.picture?.removeAllTargets()
+            self.brightnessFilter.removeAllTargets()
+            self.contrastFilter.removeAllTargets()
+            self.saturationFilter.removeAllTargets()
+            self.highlightShadowFilter.removeAllTargets()
+            self.colorFilter.removeAllTargets()
 
-    @objc private func verticalStyleTapped() {
-        //        scaleSlider.style = .Style.vertical.style
-        var customStyle = SCScaleSliderStyle.Style.vertical.style
-        customStyle.scaleWidth = 10
-        scaleSlider.style = customStyle
-        updateButtonStates(selectedButton: verticalStyleButton)
-    }
+            if !self.isFilterApplied {
+                // 设置滤镜链
+                self.picture?.addTarget(self.brightnessFilter)
+                self.brightnessFilter.addTarget(self.contrastFilter)
+                self.contrastFilter.addTarget(self.saturationFilter)
+                self.saturationFilter.addTarget(self.highlightShadowFilter)
+                self.highlightShadowFilter.addTarget(self.colorFilter)
+                self.colorFilter.addTarget(self.imageView)
 
-    private func updateButtonStates(selectedButton: UIButton) {
-        [defaultStyleButton, darkStyleButton, verticalStyleButton].forEach { button in
-            button.backgroundColor = button == selectedButton ? .systemBlue : .systemGray6
-            button.setTitleColor(button == selectedButton ? .white : .systemBlue, for: .normal)
+                DispatchQueue.main.async {
+                    self.filterButton.setTitle("还原图片", for: .normal)
+                }
+            } else {
+                // 还原原图
+                self.picture?.addTarget(self.imageView)
+
+                DispatchQueue.main.async {
+                    self.filterButton.setTitle("应用滤镜", for: .normal)
+                }
+            }
+
+            // 处理图片
+            self.picture?.processImage()
+            self.isFilterApplied.toggle()
         }
     }
 }

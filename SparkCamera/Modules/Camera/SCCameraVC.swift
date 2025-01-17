@@ -951,15 +951,8 @@ class SCCameraVC: UIViewController {
             SwiftMessages.show(view: view)
         } else {
             print("✅ [Photo Save] 照片保存成功")
-            // 显示成功提示
-            let view = MessageView.viewFromNib(layout: .statusLine)
-            view.configureTheme(.success)
-            view.configureContent(title: "保存成功", body: "照片已保存到相册")
-            SwiftMessages.show(view: view)
-            
-            // 添加触觉反馈
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
+            // 发送通知，通知预览界面更新状态
+            NotificationCenter.default.post(name: NSNotification.Name("PhotoSavedToAlbum"), object: nil)
         }
     }
     

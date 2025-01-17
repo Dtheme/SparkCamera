@@ -27,6 +27,9 @@ import UIKit
     /// 照片方向
     public let orientation: UIImage.Orientation
     
+    /// 是否已保存到相册
+    public var isSavedToAlbum: Bool = false
+    
     // MARK: - Initialization
     
     /// 使用UIImage初始化
@@ -61,7 +64,8 @@ import UIKit
             "isLandscape": isLandscape,
             "width": width,
             "height": height,
-            "orientation": orientation.rawValue
+            "orientation": orientation.rawValue,
+            "isSavedToAlbum": isSavedToAlbum
         ]
     }
     
@@ -76,7 +80,9 @@ import UIKit
             return nil
         }
         
-        return SCPhotoInfo(width: width, height: height, orientation: orientation)
+        let info = SCPhotoInfo(width: width, height: height, orientation: orientation)
+        info.isSavedToAlbum = dict["isSavedToAlbum"] as? Bool ?? false
+        return info
     }
     
     // MARK: - Debug Description
@@ -88,6 +94,7 @@ import UIKit
         - 宽高比: \(aspectRatio)
         - 是否横向: \(isLandscape)
         - 方向: \(orientation.rawValue)
+        - 已保存到相册: \(isSavedToAlbum)
         """
     }
 }

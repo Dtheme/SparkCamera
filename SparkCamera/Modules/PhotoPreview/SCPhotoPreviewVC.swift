@@ -41,6 +41,7 @@ import SnapKit
         // 确保释放资源
         zoomView.image = nil
         downsampledImage = nil
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - View Lifecycle
@@ -54,6 +55,12 @@ import SnapKit
         
         // 立即开始处理图片
         processImageInBackground()
+        
+        // 添加通知监听，用于自动保存成功后更新状态
+        NotificationCenter.default.addObserver(self,
+            selector: #selector(handlePhotoSaved),
+            name: NSNotification.Name("PhotoSavedToAlbum"),
+            object: nil)
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -395,28 +402,23 @@ import SnapKit
     
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
         if let error = error {
-            // 显示错误信息
+            print("⚠️ [Photo Save] 保存照片失败: \(error.localizedDescription)")
+            // 显示错误提示
             let view = MessageView.viewFromNib(layout: .statusLine)
             view.configureTheme(.error)
             view.configureContent(title: "保存失败", body: error.localizedDescription)
             SwiftMessages.show(view: view)
         } else {
-            // 显示成功信息
+            print("✅ [Photo Save] 照片保存成功")
+            // 更新保存状态
+            photoInfo.isSavedToAlbum = true
+            // 发送通知
+            self.dismiss(animated: true)
+            // 显示成功提示
             let view = MessageView.viewFromNib(layout: .statusLine)
             view.configureTheme(.success)
-            view.configureContent(title: "已保存", body: "照片已保存到相册")
+            view.configureContent(title: "保存成功", body: "照片已保存到相册")
             SwiftMessages.show(view: view)
-            
-            // 触觉反馈
-            let feedbackGenerator = UINotificationFeedbackGenerator()
-            feedbackGenerator.notificationOccurred(.success)
-            
-            // 延迟关闭页面
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.animateDismissal {
-                    self.dismiss(animated: false)
-                }
-            }
         }
     }
     
@@ -526,6 +528,14 @@ import SnapKit
                 self.hideProgressView()
             }
         }
+    }
+    
+    // MARK: - Notification Handlers
+    @objc private func handlePhotoSaved() {
+        // 更新保存状态
+        photoInfo.isSavedToAlbum = true
+        // 更新信息视图
+        infoView?.updateSaveState(isSaved: true)
     }
 
 }

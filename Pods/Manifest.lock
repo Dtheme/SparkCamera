@@ -1,4 +1,5 @@
 PODS:
+  - GPUImage (0.1.7)
   - Realm (10.45.3):
     - Realm/Headers (= 10.45.3)
   - Realm/Headers (10.45.3)
@@ -16,6 +17,7 @@ PODS:
   - SwiftMessages/App (10.0.1)
 
 DEPENDENCIES:
+  - GPUImage
   - RealmSwift (~> 10.45.0)
   - RxCocoa (~> 6.0)
   - RxSwift (~> 6.0)
@@ -24,6 +26,7 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - GPUImage
     - Realm
     - RealmSwift
     - RxCocoa
@@ -33,6 +36,7 @@ SPEC REPOS:
     - SwiftMessages
 
 SPEC CHECKSUMS:
+  GPUImage: 733a5f0fab92df9de1c37ba9df520a833ccb406d
   Realm: b277b843c7505c1e30e3a70322a24a09283e62bb
   RealmSwift: f6690053e81733801e6619eb5b39993ab76f7050
   RxCocoa: 2d33c1e1e5d66492052ad46b11024ae287572880
@@ -41,6 +45,6 @@ SPEC CHECKSUMS:
   SnapKit: d612e99e678a2d3b95bf60b0705ed0a35c03484a
   SwiftMessages: 759b4a0bf5c3a116a0d7e8a34b098ba83c458625
 
-PODFILE CHECKSUM: 7e1742db5ba6e58d79fc84902c32a3d44545f47a
+PODFILE CHECKSUM: fab8e37d91edc62b42a34f7ecd0ad16403ada114
 
 COCOAPODS: 1.16.2
