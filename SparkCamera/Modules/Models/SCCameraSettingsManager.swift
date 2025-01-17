@@ -33,21 +33,38 @@ class SCCameraSettingsManager {
     }
     
     private init() {
+        print("📸 [Settings] 开始初始化设置管理器")
+        
+        // 获取文档目录
+        guard let documentsURL = try? FileManager.default.url(for: .documentDirectory, 
+                                                            in: .userDomainMask, 
+                                                            appropriateFor: nil, 
+                                                            create: true) else {
+            fatalError("❌ [Settings] 无法获取文档目录")
+        }
+        
+        let realmURL = documentsURL.appendingPathComponent("SparkCamera.realm")
+        print("📸 [Settings] Realm 文件路径: \(realmURL.path)")
+        
         // 配置 Realm
         let config = Realm.Configuration(
-            fileURL: try! FileManager.default
-                .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
-                .appendingPathComponent("SparkCamera.realm"),
+            fileURL: realmURL,
             schemaVersion: Self.currentSchemaVersion,
             migrationBlock: { migration, oldSchemaVersion in
                 // 数据库迁移逻辑
-                migration.enumerateObjects(ofType: SCCameraSettings.className()) { oldObject, newObject in
-                    // 检查并设置新增属性的默认值
-                    if oldObject != nil && !oldObject!.objectSchema.properties.contains(where: { $0.name == "isAutoSaveEnabled" }) {
-                        newObject!["isAutoSaveEnabled"] = false
+                if oldSchemaVersion < Self.currentSchemaVersion {
+                    migration.enumerateObjects(ofType: SCCameraSettings.className()) { oldObject, newObject in
+                        // 检查并设置新增属性的默认值
+                        if oldObject != nil && !oldObject!.objectSchema.properties.contains(where: { $0.name == "isAutoSaveEnabled" }) {
+                            newObject!["isAutoSaveEnabled"] = false
+                        }
                     }
-                    // 这里可以添加其他新属性的迁移逻辑
                 }
+            },
+            shouldCompactOnLaunch: { totalBytes, usedBytes in
+                // 如果数据库文件大于 100MB 且至少 50% 是可以压缩的
+                let oneHundredMB = 100 * 1024 * 1024
+                return (totalBytes > oneHundredMB) && (Double(usedBytes) / Double(totalBytes)) < 0.5
             }
         )
         
@@ -60,25 +77,32 @@ class SCCameraSettingsManager {
         // 初始化 Realm
         do {
             realm = try Realm()
-            print("📸 [Settings] Realm 文件路径: \(realm.configuration.fileURL?.path ?? "未知")")
-        } catch {
-            print("⚠️ [Settings] Realm 初始化失败: \(error)")
-            // 如果初始化失败，尝试删除现有的 Realm 文件并重新创建
-            if let fileURL = config.fileURL {
-                try? FileManager.default.removeItem(at: fileURL)
-                print("📸 [Settings] 已删除旧的 Realm 文件，准备重新创建")
-            }
+            print("📸 [Settings] Realm 初始化成功")
+        } catch let error as NSError {
+            print("⚠️ [Settings] Realm 初始化失败: \(error.localizedDescription)")
+            print("⚠️ [Settings] 错误代码: \(error.code)")
+            print("⚠️ [Settings] 错误域: \(error.domain)")
             
+            // 尝试删除现有的 Realm 文件
             do {
+                try FileManager.default.removeItem(at: realmURL)
+                print("📸 [Settings] 已删除旧的 Realm 文件")
+                
+                // 重新创建 Realm
                 realm = try Realm()
                 print("📸 [Settings] Realm 重新创建成功")
             } catch {
-                fatalError("❌ [Settings] Realm 重新创建失败: \(error)")
+                print("❌ [Settings] 无法删除或重新创建 Realm: \(error)")
+                // 使用内存数据库作为后备方案
+                let memoryConfig = Realm.Configuration(inMemoryIdentifier: "SparkCameraTemp")
+                realm = try! Realm(configuration: memoryConfig)
+                print("📸 [Settings] 已切换到内存数据库")
             }
         }
         
         // 加载或创建默认设置
         loadSettings()
+        print("📸 [Settings] 设置管理器初始化完成")
     }
     
     // MARK: - 公共方法

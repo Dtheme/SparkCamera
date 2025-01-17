@@ -173,8 +173,8 @@ extension SCSession.FlashMode {
         startDeviceOrientationNotifier()
         
         // 配置相机位置和检测
-        self.cameraPosition = position
-        self.cameraDetection = detection
+            self.cameraPosition = position
+            self.cameraDetection = detection
         
         // 配置输入设备并设置初始分辨率
         configureInputs()
@@ -549,7 +549,7 @@ extension SCSession.FlashMode {
                     return .ratio3x4
                 } else if abs(previewRatio - 0.5625) < 0.01 {
                     return .ratio9x16
-                } else {
+        } else {
                     // 默认使用 1:1
                     return .ratio1x1
                 }
@@ -619,10 +619,10 @@ extension SCSession.FlashMode {
                     let xOffset = (effectiveWidth - targetWidth) / 2
                     if isRotated {
                         rect = CGRect(x: 0, y: xOffset, width: imageWidth, height: targetWidth)
-                    } else {
+            } else {
                         rect = CGRect(x: xOffset, y: 0, width: targetWidth, height: imageHeight)
                     }
-                } else {
+                    } else {
                     // 图片太高，从上下裁剪
                     let targetHeight = effectiveWidth / targetAspectRatio
                     let yOffset = (effectiveHeight - targetHeight) / 2

@@ -128,13 +128,13 @@ class SCCameraVC: UIViewController {
     }()
     
     // MARK: - Focus UI
-    private lazy var focusModeButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "camera.focus"), for: .normal)
-        button.tintColor = .white
-        button.addTarget(self, action: #selector(focusModeButtonTapped), for: .touchUpInside)
-        return button
-    }()
+//    private lazy var focusModeButton: UIButton = {
+//        let button = UIButton(type: .system)
+//        button.setImage(UIImage(systemName: "camera.focus"), for: .normal)
+//        button.tintColor = .white
+//        button.addTarget(self, action: #selector(focusModeButtonTapped), for: .touchUpInside)
+//        return button
+//    }()
     
     internal lazy var gridButton: UIButton = {
         let button = UIButton(type: .system)
@@ -431,8 +431,6 @@ class SCCameraVC: UIViewController {
         focusView.isHidden = true
         horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
         
-        // 7. 设置其他 UI
-        setupFocusUI()
         view.addSubview(autoSaveButton)
         updateAutoSaveButtonState()
         
@@ -582,35 +580,14 @@ class SCCameraVC: UIViewController {
             make.width.height.equalTo(44)
         }
         
-        // 2. 自动保存按钮
-        autoSaveButton.snp.makeConstraints { make in
-            make.centerY.equalTo(closeButton)
-            make.trailing.equalToSuperview().offset(-20)
-            make.width.height.equalTo(44)
-        }
-        
-        // 3. 对焦模式按钮
-        focusModeButton.snp.makeConstraints { make in
-            make.centerY.equalTo(closeButton)
-            make.trailing.equalTo(autoSaveButton.snp.leading).offset(-16)
-            make.width.height.equalTo(44)
-        }
-        
-        // 4. 网格按钮
-        gridButton.snp.makeConstraints { make in
-            make.centerY.equalTo(closeButton)
-            make.trailing.equalTo(focusModeButton.snp.leading).offset(-16)
-            make.width.height.equalTo(44)
-        }
-        
-        // 5. 拍照按钮
+        // 2. 拍照按钮
         captureButton.snp.makeConstraints { make in
+            make.bottom.equalTo(view.safeAreaLayoutGuide).offset(-30)
             make.centerX.equalToSuperview()
-            make.bottom.equalTo(view.safeAreaLayoutGuide.snp.bottom).offset(-20)
             make.width.height.equalTo(70)
         }
         
-        // 6. 工具栏
+        // 3. 工具栏
         toolBar.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.bottom.equalTo(captureButton.snp.top).offset(-20)
@@ -618,21 +595,73 @@ class SCCameraVC: UIViewController {
             make.height.equalTo(80)
         }
         
-        // 7. 切换相机按钮
+        // 添加网格按钮约束
+        gridButton.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
+            make.right.equalTo(livePhotoButton.snp.left).offset(-20)
+            make.width.height.equalTo(44)
+        }
+        
+        // 4. 预览视图
+        let screenWidth = UIScreen.main.bounds.width
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop = view.safeAreaInsets.top
+        let toolBarHeight: CGFloat = 80
+        let bottomSpace: CGFloat = 100  // 拍照按钮和底部安全区域的空间
+        let availableHeight = screenHeight - safeAreaTop - toolBarHeight - bottomSpace
+        
+        // 获取当前比例状态
+        let ratioState: SCRatioState = {
+            if let ratioItem = toolBar.getItem(for: .ratio),
+               let state = ratioItem.state as? SCRatioState {
+                return state
+            }
+            return .ratio4_3  // 默认 4:3
+        }()
+        
+        // 计算预览高度
+        let previewHeight: CGFloat = {
+            let heightByRatio = screenWidth * ratioState.aspectRatio
+            return min(heightByRatio, availableHeight)
+        }()
+
+        // 根据不同的比例状态设置不同的布局
+        switch ratioState {
+        case .ratio16_9:
+            // 16:9 模式下垂直居中
+            let verticalCenter = (screenHeight - previewHeight) / 2
+            previewView.snp.makeConstraints { make in
+                make.width.equalTo(screenWidth)
+                make.height.equalTo(previewHeight)
+                make.centerX.equalToSuperview()
+                make.centerY.equalToSuperview()
+            }
+        default:
+            // 其他模式保持原来的布局
+            let verticalOffset = (availableHeight - previewHeight) / 2 + safeAreaTop
+            previewView.snp.makeConstraints { make in
+                make.width.equalTo(screenWidth)
+                make.height.equalTo(previewHeight)
+                make.centerX.equalToSuperview()
+                make.top.equalToSuperview().offset(verticalOffset)
+            }
+        }
+        
+        // 5. 切换相机按钮
         switchCameraButton.snp.makeConstraints { make in
             make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
             make.centerY.equalTo(captureButton)
             make.width.height.equalTo(44)
         }
         
-        // 8. 实况照片按钮
+        // 6. 实况照片按钮
         livePhotoButton.snp.makeConstraints { make in
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.right.equalTo(view.safeAreaLayoutGuide).offset(-20)
             make.width.height.equalTo(44)
         }
         
-        // 9. 变焦指示器
+        // 7. 变焦指示器
         zoomIndicatorView.snp.makeConstraints { make in
             make.centerX.equalToSuperview()
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
@@ -644,11 +673,18 @@ class SCCameraVC: UIViewController {
             make.edges.equalTo(zoomIndicatorView)
         }
         
-        // 10. 水平指示器
+        // 8. 水平指示器
         horizontalIndicator.snp.makeConstraints { make in
             make.center.equalTo(previewView)
             make.width.equalTo(200)
             make.height.equalTo(4)
+        }
+        
+        // 自动保存按钮约束
+        autoSaveButton.snp.makeConstraints { make in
+            make.centerY.equalTo(captureButton)
+            make.left.equalTo(captureButton.snp.right).offset(20)
+            make.width.height.equalTo(44)
         }
     }
     
@@ -1292,69 +1328,69 @@ class SCCameraVC: UIViewController {
     }
     
     // MARK: - Focus UI
-    private func setupFocusUI() {
-        view.addSubview(focusModeButton)
-        
-        focusModeButton.snp.makeConstraints { make in
-            make.right.equalTo(view.safeAreaLayoutGuide).offset(-16)
-            make.centerY.equalTo(captureButton)
-        }
-        
-        updateFocusModeButton()
-    }
+//    private func setupFocusUI() {
+//        view.addSubview(focusModeButton)
+//        
+//        focusModeButton.snp.makeConstraints { make in
+//            make.right.equalTo(view.safeAreaLayoutGuide).offset(-16)
+//            make.centerY.equalTo(captureButton)
+//        }
+//        
+//        updateFocusModeButton()
+//    }
     
-    private func updateFocusModeButton() {
-        guard let session = photoSession else { return }
-        
-        let imageName: String
-        switch session.focusMode {
-        case .auto:
-            imageName = "camera.focus"
-        case .continuous:
-            imageName = "camera.focus.auto"
-        case .locked:
-            imageName = "camera.focus.locked"
-        case .manual:
-            imageName = "camera.focus.manual"
-        }
-        
-        focusModeButton.setImage(UIImage(systemName: imageName), for: .normal)
-    }
+//    private func updateFocusModeButton() {
+//        guard let session = photoSession else { return }
+//        
+//        let imageName: String
+//        switch session.focusMode {
+//        case .auto:
+//            imageName = "camera.focus"
+//        case .continuous:
+//            imageName = "camera.focus.auto"
+//        case .locked:
+//            imageName = "camera.focus.locked"
+//        case .manual:
+//            imageName = "camera.focus.manual"
+//        }
+//        
+//        focusModeButton.setImage(UIImage(systemName: imageName), for: .normal)
+//    }
     
-    @objc private func focusModeButtonTapped() {
-        guard let session = photoSession else { return }
-        
-        // 循环切换对焦模式
-        let nextMode: SCFocusMode
-        switch session.focusMode {
-        case .auto:
-            nextMode = .continuous
-        case .continuous:
-            nextMode = .locked
-        case .locked:
-            nextMode = .auto
-        case .manual:
-            nextMode = .auto
-        }
-        
-        session.setFocusMode(nextMode)
-        updateFocusModeButton()
-        
-        // 显示提示
-        let message: String
-        switch nextMode {
-        case .auto:
-            message = "单次自动对焦"
-        case .continuous:
-            message = "连续自动对焦"
-        case .locked:
-            message = "对焦已锁定"
-        case .manual:
-            message = "手动对焦"
-        }
-        
-        showSuccess(message)
-    }
+//    @objc private func focusModeButtonTapped() {
+//        guard let session = photoSession else { return }
+//        
+//        // 循环切换对焦模式
+//        let nextMode: SCFocusMode
+//        switch session.focusMode {
+//        case .auto:
+//            nextMode = .continuous
+//        case .continuous:
+//            nextMode = .locked
+//        case .locked:
+//            nextMode = .auto
+//        case .manual:
+//            nextMode = .auto
+//        }
+//        
+//        session.setFocusMode(nextMode)
+//        updateFocusModeButton()
+//        
+//        // 显示提示
+//        let message: String
+//        switch nextMode {
+//        case .auto:
+//            message = "单次自动对焦"
+//        case .continuous:
+//            message = "连续自动对焦"
+//        case .locked:
+//            message = "对焦已锁定"
+//        case .manual:
+//            message = "手动对焦"
+//        }
+//        
+//        showSuccess(message)
+//    }
     
     internal func handleFocusStateChange(_ state: SCFocusState) {
         let focusBoxView = SCFocusBoxView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
