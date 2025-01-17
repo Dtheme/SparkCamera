@@ -16,6 +16,7 @@ class TestVC: UIViewController {
     private var currentFilter: GPUImageFilter?
     private var renderQueue = DispatchQueue(label: "com.sparkcamera.gpuimage.render")
     private var isFilterApplied = false
+    private var isProcessing = false
 
     // 滤镜链
     private lazy var brightnessFilter: GPUImageBrightnessFilter = {
@@ -45,7 +46,6 @@ class TestVC: UIViewController {
 
     private lazy var colorFilter: GPUImageRGBFilter = {
         let filter = GPUImageRGBFilter()
-        // 调整 RGB 通道以获得富士胶片的效果
         filter.red = 1.0
         filter.green = 1.1
         filter.blue = 0.9
@@ -75,6 +75,7 @@ class TestVC: UIViewController {
         view.backgroundColor = .black
         view.contentMode = .scaleAspectFit
         view.fillMode = kGPUImageFillModePreserveAspectRatio
+        view.sizeToFit()
         return view
     }()
 
@@ -95,9 +96,12 @@ class TestVC: UIViewController {
         setupConstraints()
     }
 
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        loadImage()
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 确保只在第一次布局时加载图片
+        if picture == nil {
+            loadImage()
+        }
     }
 
     // MARK: - Setup
@@ -122,10 +126,14 @@ class TestVC: UIViewController {
             make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
         }
 
+        // 使用固定尺寸而不是动态计算
+        let screenWidth = UIScreen.main.bounds.width
+        let imageHeight = screenWidth * 4/3 // 使用4:3比例
+
         imageView.snp.makeConstraints { make in
             make.left.right.equalToSuperview()
             make.top.equalTo(titleLabel.snp.bottom).offset(40)
-            make.height.equalTo(imageView.snp.width)
+            make.height.equalTo(imageHeight)
         }
 
         filterButton.snp.makeConstraints { make in
@@ -137,7 +145,6 @@ class TestVC: UIViewController {
     }
 
     private func loadImage() {
-        // 加载示例图片
         guard let image = UIImage(named: "test_image") ?? UIImage(systemName: "photo") else { return }
 
         renderQueue.async { [weak self] in
@@ -160,6 +167,11 @@ class TestVC: UIViewController {
     }
 
     @objc private func filterButtonTapped() {
+        // 防止重复处理
+        guard !isProcessing else { return }
+        isProcessing = true
+        filterButton.isEnabled = false
+
         renderQueue.async { [weak self] in
             guard let self = self else { return }
 
@@ -195,6 +207,22 @@ class TestVC: UIViewController {
             // 处理图片
             self.picture?.processImage()
             self.isFilterApplied.toggle()
+
+            DispatchQueue.main.async {
+                self.isProcessing = false
+                self.filterButton.isEnabled = true
+            }
         }
+    }
+
+    // MARK: - Memory Management
+    deinit {
+        // 清理资源
+        picture?.removeAllTargets()
+        brightnessFilter.removeAllTargets()
+        contrastFilter.removeAllTargets()
+        saturationFilter.removeAllTargets()
+        highlightShadowFilter.removeAllTargets()
+        colorFilter.removeAllTargets()
     }
 }

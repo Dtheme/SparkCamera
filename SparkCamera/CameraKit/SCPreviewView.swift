@@ -20,7 +20,8 @@ import AVFoundation
             
             if let previewLayer = previewLayer {
                 previewLayer.videoGravity = .resizeAspectFill
-                previewLayer.frame = self.bounds
+                layer.insertSublayer(previewLayer, at: 0)
+                previewLayer.frame = bounds
             }
         }
     }
@@ -31,7 +32,7 @@ import AVFoundation
             
             if let session = session {
                 if previewLayer == nil {
-                    setupPreviewLayer()
+                    previewLayer = AVCaptureVideoPreviewLayer()
                 }
                 
                 previewLayer?.session = session.session
@@ -43,22 +44,7 @@ import AVFoundation
                     session.start()
                 }
                 
-                // 初始化时设置 maxZoomFactor
-                if let lensName = session.currentLens?.name {
-                    switch lensName {
-                    case "0.5x":
-                        self.maxZoomFactor = 2.0
-                        print("0.5x lens maxZoomFactor set to \(self.maxZoomFactor)")
-                    case "1x":
-                        self.maxZoomFactor = 2.96
-                        print("1x lens maxZoomFactor set to \(self.maxZoomFactor)")
-                    case "3x":
-                        self.maxZoomFactor = 15.0
-                        print("3x lens maxZoomFactor set to \(self.maxZoomFactor)")
-                    default:
-                        self.maxZoomFactor = 2.96
-                    }
-                }
+                updateMaxZoomFactor(for: session.currentLens?.name)
             }
         }
     }
@@ -69,6 +55,7 @@ import AVFoundation
             
             if let gridView = self.gridView {
                 self.addSubview(gridView)
+                gridView.frame = bounds
             }
         }
     }
@@ -80,7 +67,7 @@ import AVFoundation
             }
             
             if self.showGrid {
-                self.gridView = SCGridView(frame: self.bounds)
+                self.gridView = SCGridView(frame: bounds)
             } else {
                 self.gridView = nil
             }
@@ -94,55 +81,78 @@ import AVFoundation
             }
         }
     }
-
     
     internal let focusBox = SCFocusBoxView()
-
+    
+    // MARK: - Initialization
     @objc public override init(frame: CGRect) {
         super.init(frame: frame)
-        self.setupView()
+        setupView()
     }
     
     @objc public required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
-        self.setupView()
+        setupView()
     }
     
     private func setupView() {
-        // 添加对焦框
         self.addSubview(focusBox)
         self.bringSubviewToFront(focusBox)
     }
     
-    // MARK: - Setup
-    private func setupPreviewLayer() {
-        previewLayer = AVCaptureVideoPreviewLayer()
-        previewLayer?.videoGravity = .resizeAspectFill
-        
-        if let previewLayer = previewLayer {
-            layer.insertSublayer(previewLayer, at: 0)
-            previewLayer.frame = bounds
-        }
-    }
-    
+    // MARK: - Layout
     @objc public override func layoutSubviews() {
         super.layoutSubviews()
-        previewLayer?.frame = bounds
-
-        print("Preview layer setup completed: \(String(describing: self.previewLayer?.bounds))")
-        print("Preview view setup completed: \(self.frame)")
+        
+        let currentBounds = bounds
+        
+        // 更新 previewLayer
+        if previewLayer?.frame != currentBounds {
+            previewLayer?.frame = currentBounds
+            
+            // 只在调试模式下打印一次布局信息
+            #if DEBUG
+            if ProcessInfo.processInfo.environment["LAYOUT_DEBUG"] != nil {
+                print("Preview layer setup completed: \(String(describing: currentBounds))")
+                print("Preview view setup completed: \(frame)")
+            }
+            #endif
+        }
+        
+        // 更新 gridView
+        if let gridView = gridView, gridView.frame != currentBounds {
+            gridView.frame = currentBounds
+        }
+        
+        // 确保 focusBox 始终在最上层
+        bringSubviewToFront(focusBox)
     }
     
-    // MARK: - Configuration
-    public func setSession(_ session: AVCaptureSession) {
-        previewLayer?.session = session
+    // MARK: - Private Methods
+    private func updateMaxZoomFactor(for lensName: String?) {
+        guard let lensName = lensName else { return }
         
-        if previewLayer?.superlayer == nil {
-            if let previewLayer = previewLayer {
-                layer.addSublayer(previewLayer)
-                previewLayer.frame = bounds
-            }
+        switch lensName {
+        case "0.5x":
+            self.maxZoomFactor = 2.0
+        case "1x":
+            self.maxZoomFactor = 2.96
+        case "3x":
+            self.maxZoomFactor = 15.0
+        default:
+            self.maxZoomFactor = 2.96
         }
+        
+        #if DEBUG
+        print("📸 [Zoom] \(lensName) lens maxZoomFactor set to \(self.maxZoomFactor)")
+        #endif
+    }
+    
+    // MARK: - Public Methods
+    public func setSession(_ session: AVCaptureSession) {
+        // 创建新的预览层
+        let newPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
+        self.previewLayer = newPreviewLayer
     }
 }
 
