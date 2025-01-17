@@ -5,16 +5,15 @@
 //  Created by dzw on 2024/1/14.
 //
 
-
 import UIKit
 import SwiftMessages
 import SnapKit
 
-class SCPhotoPreviewVC: UIViewController {
+@objc class SCPhotoPreviewVC: UIViewController {
     
     // MARK: - Properties
     private let image: UIImage
-    private let aspectRatio: CGFloat
+    private let photoInfo: SCPhotoInfo
     private var scrollView: UIScrollView!
     private var imageView: UIImageView!
     private var blurEffectView: UIVisualEffectView!
@@ -24,9 +23,9 @@ class SCPhotoPreviewVC: UIViewController {
     private var progressView: UIProgressView!
     
     // MARK: - Initialization
-    init(image: UIImage, aspectRatio: CGFloat) {
+    init(image: UIImage, photoInfo: SCPhotoInfo) {
         self.image = image
-        self.aspectRatio = aspectRatio
+        self.photoInfo = photoInfo
         super.init(nibName: nil, bundle: nil)
     }
     
@@ -100,20 +99,31 @@ class SCPhotoPreviewVC: UIViewController {
         // 获取屏幕尺寸
         let screenSize = UIScreen.main.bounds.size
         
+        print("📸 [Preview] 图片信息:")
+        print(photoInfo.description)
+        
         // 计算图片在屏幕上的显示尺寸
         var displayWidth: CGFloat
         var displayHeight: CGFloat
         
-        // 使用传入的 aspectRatio 计算显示尺寸
-        if aspectRatio > screenSize.height / screenSize.width {
-            // 图片比例比屏幕更高，以屏幕高度为基准
-            displayHeight = screenSize.height
-            displayWidth = displayHeight / aspectRatio
-        } else {
+        // 计算屏幕和图片的宽高比
+        let screenRatio = screenSize.width / screenSize.height
+        let imageRatio = photoInfo.width / photoInfo.height
+        
+        // 根据图片方向和屏幕方向来决定显示尺寸
+        if imageRatio > screenRatio {
             // 图片比例比屏幕更宽，以屏幕宽度为基准
             displayWidth = screenSize.width
-            displayHeight = displayWidth * aspectRatio
+            displayHeight = screenSize.width * (photoInfo.height / photoInfo.width)
+        } else {
+            // 图片比例比屏幕更高，以屏幕高度为基准
+            displayHeight = screenSize.height
+            displayWidth = screenSize.height * (photoInfo.width / photoInfo.height)
         }
+        
+        print("📸 [Preview] 显示尺寸:")
+        print("📸 [Preview] - 宽度: \(displayWidth)")
+        print("📸 [Preview] - 高度: \(displayHeight)")
         
         // 使用 SnapKit 设置约束
         imageView.snp.makeConstraints { make in
@@ -173,7 +183,20 @@ class SCPhotoPreviewVC: UIViewController {
         resolutionLabel.font = .systemFont(ofSize: 12)
         
         let ratioLabel = UILabel()
-        ratioLabel.text = String(format: "%.2f:1", aspectRatio)
+        // 根据宽高比显示标准比例格式
+        let ratio = photoInfo.aspectRatio
+        let ratioText: String
+        if abs(ratio - 1.0) < 0.01 {
+            ratioText = "1:1"
+        } else if abs(ratio - 4.0/3.0) < 0.01 {
+            ratioText = "4:3"
+        } else if abs(ratio - 16.0/9.0) < 0.01 {
+            ratioText = "16:9"
+        } else {
+            ratioText = String(format: "%.2f:1", ratio)
+        }
+        
+        ratioLabel.text = ratioText
         ratioLabel.textColor = .white
         ratioLabel.font = .systemFont(ofSize: 12)
         
@@ -238,7 +261,7 @@ class SCPhotoPreviewVC: UIViewController {
         let imageView = UIImageView(image: image)
         imageView.tintColor = .white
         imageView.contentMode = .scaleAspectFit
-        
+
         // 配置标题
         let label = UILabel()
         label.text = title

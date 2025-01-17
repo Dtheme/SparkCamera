@@ -43,6 +43,7 @@
 		7822C4342D3611CB00849682 /* SCCameraVC+SessionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7822C4312D3611CB00849682 /* SCCameraVC+SessionDelegate.swift */; };
 		7822C4352D3611CB00849682 /* SCCameraVC+ToolBarDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7822C4322D3611CB00849682 /* SCCameraVC+ToolBarDelegate.swift */; };
 		7822C4382D379F5800849682 /* UIImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7822C4362D379F5800849682 /* UIImage+Extension.swift */; };
+		782A6DBA2D39FA7F00B710C5 /* SCPhotoInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 782A6DB92D39FA7F00B710C5 /* SCPhotoInfo.swift */; };
 		783345CE2D2BC01700CD3D67 /* SCScaleSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */; };
 		78463F542D2F7C2000D7FA4C /* SCConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78463F532D2F7C2000D7FA4C /* SCConstants.swift */; };
 		7868A9192D1412D700CBB2FB /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7868A90B2D1412D700CBB2FB /* AppDelegate.swift */; };
@@ -92,6 +93,7 @@
 		7822C4312D3611CB00849682 /* SCCameraVC+SessionDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "SCCameraVC+SessionDelegate.swift"; sourceTree = "<group>"; };
 		7822C4322D3611CB00849682 /* SCCameraVC+ToolBarDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "SCCameraVC+ToolBarDelegate.swift"; sourceTree = "<group>"; };
 		7822C4362D379F5800849682 /* UIImage+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIImage+Extension.swift"; sourceTree = "<group>"; };
+		782A6DB92D39FA7F00B710C5 /* SCPhotoInfo.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCPhotoInfo.swift; sourceTree = "<group>"; };
 		783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCScaleSlider.swift; sourceTree = "<group>"; };
 		78463F532D2F7C2000D7FA4C /* SCConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SCConstants.swift; path = SparkCamera/Utilities/SCConstants.swift; sourceTree = SOURCE_ROOT; };
 		7868A8B92D140E8F00CBB2FB /* SparkCamera.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -206,6 +208,7 @@
 		780DDCFE2D26876D000CA610 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				782A6DB92D39FA7F00B710C5 /* SCPhotoInfo.swift */,
 				780DDCFB2D26876D000CA610 /* Tools */,
 				780DDCFC2D26876D000CA610 /* SCCameraSettings.swift */,
 				780DDCFD2D26876D000CA610 /* SCCameraSettingsManager.swift */,
@@ -456,6 +459,7 @@
 				780DDD152D26876D000CA610 /* SCCameraToolBar.swift in Sources */,
 				780DDD192D26876D000CA610 /* TestVC.swift in Sources */,
 				780DDD0E2D26876D000CA610 /* SCToolItem.swift in Sources */,
+				782A6DBA2D39FA7F00B710C5 /* SCPhotoInfo.swift in Sources */,
 				780DDCD12D268365000CA610 /* SCCameraManager.swift in Sources */,
 				780DDD0F2D26876D000CA610 /* SCToolOption.swift in Sources */,
 				780DDD112D26876D000CA610 /* SCToolType.swift in Sources */,

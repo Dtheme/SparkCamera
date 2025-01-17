@@ -160,6 +160,15 @@ class SCCameraToolBar: UIView {
                     if cell == selectedCell {
                         // 设置选中cell的初始位置，考虑 contentOffset
                         cell.frame = CGRect(x: cell.frame.origin.x,
+                                          y: 0,
+                                          width: cellWidth,
+                                          height: cellHeight)
+                        cell.isHidden = false
+                        cell.alpha = 1
+                    } else {
+                        cell.isHidden = true
+                        cell.alpha = 0
+                    }
                 }
             }
         }) { _ in
@@ -234,15 +243,27 @@ class SCCameraToolBar: UIView {
             self.superview?.layoutIfNeeded()
             self.blurView.layer.cornerRadius = 12
             
+            // 恢复 collectionView 的滚动位置
+            self.collectionView.setContentOffset(self.originalContentOffset, animated: false)
+            
             // 恢复所有 cell 的位置
             for (indexPath, originalFrame) in self.originalCellFrames {
-                        cell.isHidden = false
-                        cell.alpha = 1
-                    } else {
-                        cell.frame = originalFrame
-                        cell.isHidden = true
-                        cell.alpha = 0
-                    }
+                // 获取 cell 或创建新的 cell 如果不可见
+                let cell = self.collectionView.cellForItem(at: indexPath) ?? {
+                    let cell = self.collectionView.dequeueReusableCell(withReuseIdentifier: SCCameraToolCell.reuseIdentifier, for: indexPath)
+                    cell.frame = originalFrame
+                    return cell
+                }()
+                
+                cell.frame = originalFrame
+                if let activeItem = self.activeItem, 
+                   let index = self.items.firstIndex(where: { $0.type == activeItem.type }),
+                   indexPath.item == index {
+                    cell.isHidden = false
+                    cell.alpha = 1
+                } else {
+                    cell.isHidden = true
+                    cell.alpha = 0
                 }
             }
         }) { _ in
@@ -254,26 +275,6 @@ class SCCameraToolBar: UIView {
                          delay: 0,
                          options: [.curveEaseOut],
                          animations: {
-                // 显示所有 cells
-                for (indexPath, originalFrame) in self.originalCellFrames {
-                    if let cell = self.collectionView.cellForItem(at: indexPath) {
-                        cell.frame = originalFrame
-                        cell.isHidden = false
-                        UIView.animate(withDuration: 0.2,
-                                     delay: 0,
-                                     options: [.curveEaseOut],
-                                     animations: {
-                                cell.alpha = 1
-                            }, completion: { _ in
-                                completedCells += 1
-                                // 当所有 cell 动画都完成时
-                                if completedCells == totalCells {
-                                    // 清理状态
-                                    self.originalLayoutAttributes.removeAll()
-                                    self.originalCellFrames.removeAll()
-                                    self.isCollapsed = false
-                                    self.isAnimating = false
-                                    
             // 显示所有 cells
             for (indexPath, originalFrame) in self.originalCellFrames {
                 // 获取 cell 或创建新的 cell 如果不可见
