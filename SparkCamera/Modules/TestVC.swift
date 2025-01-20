@@ -63,7 +63,7 @@ class TestVC: UIViewController {
 
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "富士胶片经典镀铬"
+        label.text = "富士镀铬胶片效果"
         label.textColor = .black
         label.font = .systemFont(ofSize: 24, weight: .bold)
         label.textAlignment = .center

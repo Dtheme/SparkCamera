@@ -14,37 +14,50 @@ import AVFoundation
     public var currentZoomFactor: CGFloat = 1.0
     public var maxZoomFactor: CGFloat = 15.0
     
+    private let sessionQueue = DispatchQueue(label: "com.sparkcamera.session")
+    
     @objc public var previewLayer: AVCaptureVideoPreviewLayer? {
         didSet {
-            oldValue?.removeFromSuperlayer()
-            
-            if let previewLayer = previewLayer {
-                previewLayer.videoGravity = .resizeAspectFill
-                layer.insertSublayer(previewLayer, at: 0)
-                previewLayer.frame = bounds
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                oldValue?.removeFromSuperlayer()
+                
+                if let previewLayer = self.previewLayer {
+                    previewLayer.videoGravity = .resizeAspectFill
+                    self.layer.insertSublayer(previewLayer, at: 0)
+                    previewLayer.frame = self.bounds
+                }
             }
         }
     }
     
     @objc public var session: SCSession? {
         didSet {
-            oldValue?.stop()
-            
-            if let session = session {
-                if previewLayer == nil {
-                    previewLayer = AVCaptureVideoPreviewLayer()
+            sessionQueue.async { [weak self] in
+                guard let self = self else { return }
+                oldValue?.stop()
+                
+                if let session = session {
+                    DispatchQueue.main.async {
+                        if self.previewLayer == nil {
+                            let newLayer = AVCaptureVideoPreviewLayer()
+                            newLayer.session = session.session
+                            self.previewLayer = newLayer
+                        } else {
+                            self.previewLayer?.session = session.session
+                        }
+                        
+                        session.previewLayer = self.previewLayer
+                        session.overlayView = self
+                    }
+                    
+                    self.updateMaxZoomFactor(for: session.currentLens?.name)
+                    
+                    // 确保在主线程启动会话
+                    DispatchQueue.main.async {
+                        session.start()
+                    }
                 }
-                
-                previewLayer?.session = session.session
-                session.previewLayer = self.previewLayer
-                session.overlayView = self
-                
-                // 确保在主线程启动会话
-                DispatchQueue.main.async {
-                    session.start()
-                }
-                
-                updateMaxZoomFactor(for: session.currentLens?.name)
             }
         }
     }
@@ -150,9 +163,13 @@ import AVFoundation
     
     // MARK: - Public Methods
     public func setSession(_ session: AVCaptureSession) {
-        // 创建新的预览层
-        let newPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
-        self.previewLayer = newPreviewLayer
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            DispatchQueue.main.async {
+                let newPreviewLayer = AVCaptureVideoPreviewLayer(session: session)
+                self.previewLayer = newPreviewLayer
+            }
+        }
     }
 }
 
