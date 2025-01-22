@@ -23,6 +23,7 @@
 		7817491F2D1D2DE800521F2D /* ProFont-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */; };
 		781749202D1D2DE800521F2D /* ProFont-regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */; };
 		7822C4382D379F5800849682 /* UIImage+Extension.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7822C4362D379F5800849682 /* UIImage+Extension.swift */; };
+		7822E14A2D40942E006186D1 /* SCFilterView+Save.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7822E1492D40942E006186D1 /* SCFilterView+Save.swift */; };
 		7828B6DC2D3E2EB3007233AB /* SCActionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7828B6D92D3E2EB3007233AB /* SCActionSheet.swift */; };
 		7828B6DD2D3E2EB3007233AB /* SCAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7828B6DA2D3E2EB3007233AB /* SCAlert.swift */; };
 		7828B6E02D3E44FD007233AB /* SCFilterTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7828B6DE2D3E44FC007233AB /* SCFilterTemplate.swift */; };
@@ -81,6 +82,7 @@
 		7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-Bold.ttf"; sourceTree = "<group>"; };
 		7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "ProFont-regular.ttf"; sourceTree = "<group>"; };
 		7822C4362D379F5800849682 /* UIImage+Extension.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIImage+Extension.swift"; sourceTree = "<group>"; };
+		7822E1492D40942E006186D1 /* SCFilterView+Save.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "SCFilterView+Save.swift"; sourceTree = "<group>"; };
 		7828B6D92D3E2EB3007233AB /* SCActionSheet.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCActionSheet.swift; sourceTree = "<group>"; };
 		7828B6DA2D3E2EB3007233AB /* SCAlert.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCAlert.swift; sourceTree = "<group>"; };
 		7828B6DE2D3E44FC007233AB /* SCFilterTemplate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = SCFilterTemplate.swift; sourceTree = "<group>"; };
@@ -268,6 +270,7 @@
 			isa = PBXGroup;
 			children = (
 				78796CBA2D3F7875008C9278 /* SCFilterView.swift */,
+				7822E1492D40942E006186D1 /* SCFilterView+Save.swift */,
 				7828B6E12D3E4550007233AB /* SCFilterOptionView.swift */,
 				782A6DD02D3A2DCB00B710C5 /* SCPhotoInfoView.swift */,
 				782A6DD12D3A2DCB00B710C5 /* SCPhotoPreviewToolbar.swift */,
@@ -537,6 +540,7 @@
 				780DDCD12D268365000CA610 /* SCCameraManager.swift in Sources */,
 				782A6DF02D3A2DCB00B710C5 /* SCCameraToolBarDelegate.swift in Sources */,
 				782A6DF42D3A2DCB00B710C5 /* SCLoadingView.swift in Sources */,
+				7822E14A2D40942E006186D1 /* SCFilterView+Save.swift in Sources */,
 				782A6DEB2D3A2DCB00B710C5 /* SCCameraSettingsManager.swift in Sources */,
 				780DDCD32D268365000CA610 /* SCFocusBoxView.swift in Sources */,
 				782A6DEC2D3A2DCB00B710C5 /* SCPhotoInfo.swift in Sources */,

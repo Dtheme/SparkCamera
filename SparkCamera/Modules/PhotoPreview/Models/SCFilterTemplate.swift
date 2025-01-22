@@ -24,7 +24,7 @@ struct SCFilterTemplate {
         case retroBlue         // 复古蓝调
         case softFocus         // 软焦
         case japaneseStyle     // 日系清新
-        case comic             // 版画效果
+        case polarizing        // 偏振滤镜
     }
     
     /// 滤镜参数
@@ -175,19 +175,21 @@ struct SCFilterTemplate {
             blue: 1.05            // 增加蓝色，冷色调
         )
         
-        static let comic = FilterParameters(
-            brightness: 0.1,
-            contrast: 2.0,
-            saturation: 0.5,
-            exposure: -0.1,
-            highlights: 0.6,
-            shadows: 0.4,
-            grain: 0.2,
-            sharpness: 1.5,
-            edgeStrength: 1.0,
-            red: 1.0,
-            green: 1.0,
-            blue: 1.0
+        static let polarizing = FilterParameters(
+            brightness: -0.05,      // 轻微降低亮度，避免过曝
+            contrast: 1.5,          // 显著增加对比度，增强纹理细节
+            saturation: 1.3,        // 增加饱和度，使颜色更鲜艳
+            exposure: -0.1,         // 轻微降低曝光，减少反光
+            highlights: 0.3,        // 降低高光，减少眩光
+            shadows: 0.6,           // 提升阴影细节
+            grain: 0.0,            // 不需要颗粒感
+            sharpness: 1.5,        // 增加锐度，增强细节
+            blur: 0.0,             // 不需要模糊
+            glow: 0.0,             // 不需要光晕
+            edgeStrength: 0.3,     // 增加边缘强度，增强纹理
+            red: 0.9,              // 降低红色，避免偏色
+            green: 1.1,            // 增加绿色，增强自然色
+            blue: 1.4              // 显著增加蓝色，增强天空色彩
         )
     }
     
@@ -254,15 +256,17 @@ struct SCFilterTemplate {
             parameters: FilterParameters.japaneseStyle
         ),
         SCFilterTemplate(
-            name: "版画效果",
+            name: "偏振滤镜",
             thumbnail: nil,
-            type: .comic,
-            parameters: FilterParameters.comic
+            type: .polarizing,
+            parameters: FilterParameters.polarizing
         )
     ]
     
     // MARK: - 应用滤镜
-    func applyFilter(to picture: GPUImagePicture, output: GPUImageView) {
+    func applyFilter(to picture: GPUImagePicture, output: GPUImageInput) {
+        print("[FilterTemplate] 开始应用滤镜: \(name)")
+        
         // 创建滤镜链
         let brightnessFilter = GPUImageBrightnessFilter()         // 亮度
         let contrastFilter = GPUImageContrastFilter()             // 对比度
@@ -273,7 +277,6 @@ struct SCFilterTemplate {
         let gaussianBlurFilter = GPUImageGaussianBlurFilter()     // 高斯模糊
         let colorFilter = GPUImageRGBFilter()                     // RGB颜色
         let grayscaleFilter = GPUImageGrayscaleFilter()           // 灰度滤镜
-        let edgeDetectionFilter = GPUImageSobelEdgeDetectionFilter() // 边缘检测
         
         // 设置参数
         brightnessFilter.brightness = parameters.brightness
@@ -287,14 +290,26 @@ struct SCFilterTemplate {
         colorFilter.red = parameters.red
         colorFilter.green = parameters.green
         colorFilter.blue = parameters.blue
-        edgeDetectionFilter.edgeStrength = parameters.edgeStrength
+        
+        print("[FilterTemplate] 滤镜参数:")
+        print("- 亮度: \(parameters.brightness)")
+        print("- 对比度: \(parameters.contrast)")
+        print("- 饱和度: \(parameters.saturation)")
+        print("- 曝光: \(parameters.exposure)")
+        print("- 高光: \(parameters.highlights)")
+        print("- 阴影: \(parameters.shadows)")
+        print("- 锐化: \(parameters.sharpness)")
+        print("- 模糊: \(parameters.blur)")
+        print("- RGB: (\(parameters.red), \(parameters.green), \(parameters.blue))")
         
         // 如果是原图，直接输出
         if type == .original {
+            print("[FilterTemplate] 原图模式，直接输出")
             picture.addTarget(output)
-            picture.processImage()
             return
         }
+        
+        print("[FilterTemplate] 开始构建滤镜链，类型: \(type)")
         
         // 连接滤镜链
         if type == .blackAndWhite {
@@ -312,20 +327,14 @@ struct SCFilterTemplate {
             } else {
                 sharpenFilter.addTarget(output)
             }
-        } else if type == .comic {
-            // 版画效果特殊处理
-            picture.addTarget(edgeDetectionFilter)
-            edgeDetectionFilter.addTarget(contrastFilter)
-            contrastFilter.addTarget(saturationFilter)
-            saturationFilter.addTarget(sharpenFilter)
-            sharpenFilter.addTarget(highlightShadowFilter)
-            
-            if parameters.blur > 0 {
-                highlightShadowFilter.addTarget(gaussianBlurFilter)
-                gaussianBlurFilter.addTarget(output)
-            } else {
-                highlightShadowFilter.addTarget(output)
-            }
+        } else if type == .polarizing {
+            // 偏振滤镜特殊处理
+            picture.addTarget(highlightShadowFilter)
+            highlightShadowFilter.addTarget(saturationFilter)
+            saturationFilter.addTarget(contrastFilter)
+            contrastFilter.addTarget(sharpenFilter)
+            sharpenFilter.addTarget(colorFilter)
+            colorFilter.addTarget(output)
         } else {
             // 其他滤镜正常处理
             picture.addTarget(brightnessFilter)
@@ -345,7 +354,6 @@ struct SCFilterTemplate {
             colorFilter.addTarget(output)
         }
         
-        // 处理图像
-        picture.processImage()
+        print("[FilterTemplate] 滤镜链构建完成")
     }
 } 

@@ -489,33 +489,48 @@ import GPUImage
     
     private func saveImageToAlbum() {
         // 显示进度条
-        showProgressView()
-        progressView.progress = 0
+        progressView.isHidden = false
+        progressView.setProgress(0.3, animated: true)
         
-        // 触觉反馈
-        let feedback = UIImpactFeedbackGenerator(style: .medium)
-        feedback.prepare()
-        
-        // 模拟保存进度
-        var progress: Float = 0
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
-            }
+        // 保存图片
+        filterView.saveToAlbum { [weak self] success, error in
+            guard let self = self else { return }
             
-            progress += 0.1
-            self.progressView.progress = min(progress, 1.0)
-            
-            if progress >= 1.0 {
-                timer.invalidate()
-                feedback.impactOccurred()
-                
-                // 保存图片
-                UIImageWriteToSavedPhotosAlbum(self.image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
-                
-                // 隐藏进度条
-                self.hideProgressView()
+            DispatchQueue.main.async {
+                if success {
+                    // 更新进度
+                    self.progressView.setProgress(1.0, animated: true)
+                    
+                    // 显示成功提示
+                    let view = MessageView.viewFromNib(layout: .statusLine)
+                    view.configureTheme(.success)
+                    view.configureContent(title: "保存成功", body: "图片已保存到相册")
+                    SwiftMessages.show(view: view)
+                    
+                    // 刷新 FilterView
+                    if let image = self.filterView.currentImage {
+                        self.filterView.setImage(image)
+                    }
+                    
+                    // 延迟隐藏进度条
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        self.progressView.isHidden = true
+                        self.progressView.setProgress(0.0, animated: false)
+                    }
+                } else {
+                    // 隐藏进度条
+                    self.progressView.isHidden = true
+                    self.progressView.setProgress(0.0, animated: false)
+                    
+                    // 显示错误提示
+                    let view = MessageView.viewFromNib(layout: .statusLine)
+                    view.configureTheme(.error)
+                    view.configureContent(
+                        title: "保存失败",
+                        body: error?.localizedDescription ?? "未知错误"
+                    )
+                    SwiftMessages.show(view: view)
+                }
             }
         }
     }
@@ -658,7 +673,6 @@ extension SCPhotoPreviewVC: SCPhotoPreviewToolbarDelegate {
             isEditingMode = false
             updateUIForEditingMode(false)
         } else {
-            // 原有的保存逻辑
             // 显示进度条
             showProgressView()
             progressView.progress = 0
@@ -667,26 +681,31 @@ extension SCPhotoPreviewVC: SCPhotoPreviewToolbarDelegate {
             let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
             feedbackGenerator.prepare()
             
-            // 模拟保存进度
-            var progress: Float = 0
-            Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-                guard let self = self else {
-                    timer.invalidate()
-                    return
-                }
+            // 保存图片
+            filterView.saveToAlbum { [weak self] success, error in
+                guard let self = self else { return }
                 
-                progress += 0.1
-                self.progressView.progress = min(progress, 1.0)
+                // 隐藏进度条
+                self.hideProgressView()
                 
-                if progress >= 1.0 {
-                    timer.invalidate()
+                if success {
+                    // 触觉反馈
                     feedbackGenerator.impactOccurred()
                     
-                    // 保存照片到相册
-                    UIImageWriteToSavedPhotosAlbum(self.image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
+                    // 更新保存状态
+                    self.photoInfo.isSavedToAlbum = true
                     
-                    // 隐藏进度条
-                    self.hideProgressView()
+                    // 关闭预览界面
+                    self.dismiss(animated: true)
+                } else {
+                    // 显示错误信息
+                    let view = MessageView.viewFromNib(layout: .statusLine)
+                    view.configureTheme(.error)
+                    view.configureContent(
+                        title: "保存失败",
+                        body: error?.localizedDescription ?? "未知错误"
+                    )
+                    SwiftMessages.show(view: view)
                 }
             }
         }

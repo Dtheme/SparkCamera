@@ -49,78 +49,68 @@ class SCFilterView: UIView {
         return image
     }
     
-    // 获取处理后的图片
-    func captureFilteredImage() -> UIImage? {
-        guard let picture = currentPicture,
-              let image = originalImage else { return nil }
-        
-        // 如果没有滤镜模板，直接输出原图
-        if filterTemplate == nil {
-            return originalImage
-        }
-        
-        // 创建一个临时的 GPUImageView 用于捕获
-        let outputView = GPUImageView()
-        outputView.frame = CGRect(origin: .zero, size: image.size)
-        outputView.fillMode = kGPUImageFillModePreserveAspectRatio
-        
-        // 创建新的图片对象，避免影响当前显示
-        let pictureOutput = GPUImagePicture(image: image)!
-        
-        // 应用当前的滤镜模板
-        if let template = filterTemplate {
-            template.applyFilter(to: pictureOutput, output: outputView)
-        } else {
-            pictureOutput.addTarget(outputView)
-        }
-        
-        // 处理图片
-        pictureOutput.processImage()
-        
-        // 从 outputView 中获取处理后的图片
-        let scale = UIScreen.main.scale
-        let size = image.size
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
-        
-        if let context = UIGraphicsGetCurrentContext() {
-            outputView.layer.render(in: context)
-        }
-        
-        let processedImage = UIGraphicsGetImageFromCurrentImageContext()
-        UIGraphicsEndImageContext()
-        
-        // 清理资源
-        pictureOutput.removeAllTargets()
-        
-        return processedImage
-    }
+    // MARK: - Public Methods
     
-    // 生成处理后的图片数据
-    func generateFilteredImageData(completion: @escaping (UIImage?) -> Void) {
-        guard let image = originalImage else {
+    /// 获取处理后的图片（异步）
+    func getFilteredImage(completion: @escaping (UIImage?) -> Void) {
+        guard let picture = currentPicture,
+              let image = originalImage else {
+            print("[FilterView] 获取图片失败: currentPicture 或 originalImage 为空")
             completion(nil)
             return
         }
+        
+        print("[FilterView] 开始处理图片:")
+        print("- 原始图片尺寸: \(image.size)")
+        print("- 是否有滤镜模板: \(filterTemplate != nil)")
         
         // 如果没有滤镜模板，直接返回原图
         if filterTemplate == nil {
-            completion(originalImage)
+            print("[FilterView] 无滤镜模板，返回原图")
+            completion(image)
             return
         }
         
-        // 从当前显示的 gpuImageView 中获取图像
-        let scale = UIScreen.main.scale
-        let size = gpuImageView.bounds.size
-        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        // 创建新的图片对象和输出目标
+        let pictureOutput = GPUImagePicture(image: image)!
+        let outputFilter = GPUImageFilter()
         
-        if let context = UIGraphicsGetCurrentContext() {
-            gpuImageView.layer.render(in: context)
-            let processedImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
-            completion(processedImage)
+        // 配置输出
+        outputFilter.useNextFrameForImageCapture()
+        
+        // 应用滤镜模板
+        if let template = filterTemplate {
+            print("[FilterView] 应用滤镜模板: \(template.name)")
+            template.applyFilter(to: pictureOutput, output: outputFilter)
         } else {
-            UIGraphicsEndImageContext()
-            completion(nil)
+            print("[FilterView] 无滤镜模板，直接连接输出")
+            pictureOutput.addTarget(outputFilter)
+        }
+        
+        // 处理图像并在完成后获取结果
+        pictureOutput.processImage { [weak self] in
+            guard self != nil else { return }
+            
+            // 获取处理后的图像
+            if let processedImage = outputFilter.imageFromCurrentFramebuffer() {
+                print("[FilterView] 成功获取处理后的图片:")
+                print("- 处理后图片尺寸: \(processedImage.size)")
+                print("- 处理后图片scale: \(processedImage.scale)")
+                print("- 处理后图片orientation: \(processedImage.imageOrientation.rawValue)")
+                
+                // 清理资源
+                pictureOutput.removeAllTargets()
+                outputFilter.removeAllTargets()
+                
+                DispatchQueue.main.async {
+                    completion(processedImage)
+                }
+            } else {
+                print("[FilterView] 获取处理后的图片失败")
+                DispatchQueue.main.async {
+                    completion(nil)
+                }
+            }
         }
     }
     
@@ -205,22 +195,21 @@ class SCFilterView: UIView {
     private func applyFilter() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self,
-                  let currentPicture = self.currentPicture else { return }
+                  let picture = self.currentPicture else { return }
             
             // 清理现有的渲染内容
-            currentPicture.removeAllTargets()
+            picture.removeAllTargets()
             
-            // 配置 GPUImageView
-            self.gpuImageView.fillMode = kGPUImageFillModePreserveAspectRatio
-            
-            if let filterTemplate = self.filterTemplate {
-                // 如果有滤镜模板，应用滤镜效果
-                filterTemplate.applyFilter(to: currentPicture, output: self.gpuImageView)
+            // 应用新的滤镜
+            if let template = self.filterTemplate {
+                template.applyFilter(to: picture, output: self.gpuImageView)
             } else {
-                // 如果没有滤镜模板，直接显示原图
-                currentPicture.addTarget(self.gpuImageView)
-                currentPicture.processImage()
+                // 如果没有滤镜，直接显示原图
+                picture.addTarget(self.gpuImageView)
             }
+            
+            // 处理图像
+            picture.processImage()
         }
     }
     

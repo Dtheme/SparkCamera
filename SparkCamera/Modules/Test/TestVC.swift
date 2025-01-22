@@ -56,30 +56,33 @@ class TestVC: UIViewController {
         // filterOptionView.updateTemplates(SCFilterTemplate.templates)
     }
     
-    @objc private func saveImageToAlbum() {
-        // 检查相册权限
-        PHPhotoLibrary.requestAuthorization { [weak self] status in
-            guard let self = self else { return }
+    private func saveImageToAlbum() {
+        // 生成滤镜图片
+        filterView.getFilteredImage { [weak self] image in
+            guard let self = self,
+                  let image = image else {
+                self?.showAlert(title: "错误", message: "无法生成滤镜图片")
+                return
+            }
             
-            if status == .authorized {
-                // 在主线程中获取滤镜后的图片
-                DispatchQueue.main.async {
-                    print("开始生成滤镜图片")
-                    self.filterView.generateFilteredImageData { image in
-                        if let image = image {
-                            print("成功生成滤镜图片，尺寸：\(image.size)")
-                            // 保存图片到相册
-                            UIImageWriteToSavedPhotosAlbum(image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
-                        } else {
-                            print("生成滤镜图片失败")
-                            self.showAlert(title: "保存失败", message: "无法生成滤镜图片")
+            // 保存到相册
+            PHPhotoLibrary.requestAuthorization { status in
+                if status == .authorized {
+                    PHPhotoLibrary.shared().performChanges({
+                        PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    }, completionHandler: { success, error in
+                        DispatchQueue.main.async {
+                            if success {
+                                self.showAlert(title: "成功", message: "图片已保存到相册")
+                            } else {
+                                self.showAlert(title: "错误", message: error?.localizedDescription ?? "保存失败")
+                            }
                         }
+                    })
+                } else {
+                    DispatchQueue.main.async {
+                        self.showAlert(title: "错误", message: "没有相册访问权限")
                     }
-                }
-            } else {
-                print("没有相册访问权限")
-                DispatchQueue.main.async {
-                    self.showAlert(title: "无法访问相册", message: "请在设置中允许访问相册")
                 }
             }
         }
