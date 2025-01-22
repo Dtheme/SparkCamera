@@ -23,6 +23,12 @@ class SCPhotoPreviewToolbar: UIView {
     private var editButton: UIButton!
     private var confirmButton: UIButton!
     
+    private var isEditingMode: Bool = false {
+        didSet {
+            updateButtonsForEditingMode()
+        }
+    }
+    
     // MARK: - Initialization
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -116,6 +122,96 @@ class SCPhotoPreviewToolbar: UIView {
         button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
         
         return button
+    }
+    
+    // MARK: - Public Methods
+    func setEditingMode(_ editing: Bool) {
+        isEditingMode = editing
+    }
+    
+    private func updateButtonsForEditingMode() {
+        // 移除所有按钮的子视图
+        [cancelButton, editButton, confirmButton].forEach { button in
+            button?.subviews.forEach { $0.removeFromSuperview() }
+        }
+        
+        if isEditingMode {
+            // 编辑模式下的按钮状态
+            let cancelStack = createButtonStackView(title: "取消", icon: nil)
+            let editStack = createButtonStackView(title: "编辑", icon: nil)
+            let confirmStack = createButtonStackView(title: "保存", icon: nil)
+            
+            cancelButton.addSubview(cancelStack)
+            editButton.addSubview(editStack)
+            confirmButton.addSubview(confirmStack)
+            
+            cancelStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+            editStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+            confirmStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+        } else {
+            // 恢复原始状态
+            let cancelStack = createButtonStackView(
+                title: "取消",
+                icon: UIImage(systemName: "xmark")?.withRenderingMode(.alwaysTemplate)
+            )
+            let editStack = createButtonStackView(
+                title: "编辑",
+                icon: UIImage(systemName: "slider.horizontal.3")?.withRenderingMode(.alwaysTemplate)
+            )
+            let confirmStack = createButtonStackView(
+                title: "完成",
+                icon: UIImage(systemName: "checkmark")?.withRenderingMode(.alwaysTemplate)
+            )
+            
+            cancelButton.addSubview(cancelStack)
+            editButton.addSubview(editStack)
+            confirmButton.addSubview(confirmStack)
+            
+            cancelStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+            editStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+            confirmStack.snp.makeConstraints { make in
+                make.center.equalToSuperview()
+            }
+        }
+    }
+    
+    private func createButtonStackView(title: String, icon: UIImage?) -> UIStackView {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.alignment = .center
+        stackView.spacing = 4
+        stackView.isUserInteractionEnabled = false
+        
+        if let icon = icon {
+            let imageView = UIImageView(image: icon)
+            imageView.tintColor = .white
+            imageView.contentMode = .scaleAspectFit
+            imageView.isUserInteractionEnabled = false
+            stackView.addArrangedSubview(imageView)
+            
+            imageView.snp.makeConstraints { make in
+                make.width.height.equalTo(24)
+            }
+        }
+        
+        let label = UILabel()
+        label.text = title
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 13)
+        label.isUserInteractionEnabled = false
+        stackView.addArrangedSubview(label)
+        
+        return stackView
     }
     
     // MARK: - Actions

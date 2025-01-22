@@ -10,6 +10,7 @@
 
 import UIKit
 import SnapKit
+import GPUImage
 
 protocol SCPhotoZoomViewDelegate: AnyObject {
     func zoomViewDidTap(_ zoomView: SCPhotoZoomView)
@@ -19,50 +20,115 @@ protocol SCPhotoZoomViewDelegate: AnyObject {
     func zoomViewDidEndPan(_ zoomView: SCPhotoZoomView, shouldDismiss: Bool)
 }
 
-class SCPhotoZoomView: UIView {
+class SCPhotoZoomView: UIScrollView {
     
     // MARK: - Properties
-    private let scrollView: UIScrollView = {
-        let scrollView = UIScrollView()
-        scrollView.minimumZoomScale = 1.0
-        scrollView.maximumZoomScale = 3.0
-        scrollView.showsHorizontalScrollIndicator = false
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.contentInsetAdjustmentBehavior = .never
-        scrollView.decelerationRate = .fast
-        scrollView.bouncesZoom = true
-        return scrollView
-    }()
+    weak var zoomDelegate: SCPhotoZoomViewDelegate?
+    var gpuImageView: GPUImageView!
+    private var lastZoomState: (scale: CGFloat, offset: CGPoint)?
+    private var initialContentOffset: CGPoint = .zero
+    private var panStartPoint: CGPoint = .zero
+    private var isAnimating = false
+    private var currentPicture: GPUImagePicture?
     
-    private let imageView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.backgroundColor = .clear
-        imageView.contentMode = .scaleAspectFit
-        imageView.clipsToBounds = true
-        imageView.isUserInteractionEnabled = true
-        return imageView
-    }()
-    
-    private var lastZoomScale: CGFloat = 1.0
-    private var panGesture: UIPanGestureRecognizer!
-    private var initialTouchPoint: CGPoint = .zero
-    private var initialImageCenter: CGPoint = .zero
-    private var initialImageTransform: CGAffineTransform = .identity
-    
-    weak var delegate: SCPhotoZoomViewDelegate?
+    var filterTemplate: SCFilterTemplate? {
+        didSet {
+            // 当 filterTemplate 改变时，重新应用滤镜
+            if let image = image {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
+                    // 清理现有的渲染内容
+                    self.currentPicture?.removeAllTargets()
+                    
+                    // 根据图片方向创建正确的图片
+                    let correctedImage: UIImage
+                    if image.imageOrientation != .up {
+                        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+                        image.draw(in: CGRect(origin: .zero, size: image.size))
+                        correctedImage = UIGraphicsGetImageFromCurrentImageContext() ?? image
+                        UIGraphicsEndImageContext()
+                    } else {
+                        correctedImage = image
+                    }
+                    
+                    // 创建新的 GPUImagePicture
+                    let picture = GPUImagePicture(image: correctedImage)
+                    self.currentPicture = picture
+                    
+                    guard let currentPicture = self.currentPicture else { return }
+                    
+                    // 配置 GPUImageView
+                    self.gpuImageView.fillMode = kGPUImageFillModePreserveAspectRatio
+                    self.gpuImageView.backgroundColor = .clear
+                    
+                    if let filterTemplate = self.filterTemplate {
+                        // 应用新的滤镜
+                        filterTemplate.applyFilter(to: currentPicture, output: self.gpuImageView)
+                    } else {
+                        // 如果滤镜被清除，显示原图
+                        currentPicture.addTarget(self.gpuImageView)
+                        currentPicture.processImage()
+                    }
+                }
+            }
+        }
+    }
     
     var image: UIImage? {
         didSet {
-            imageView.image = image
-            if let _ = image {
-                resetZoom(animated: false)
-                updateImageViewLayout()
+            if let image = image {
+                // 在主线程中设置 GPUImageView 的属性
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
+                    // 清理现有的渲染内容
+                    self.currentPicture?.removeAllTargets()
+                    
+                    // 根据图片方向创建正确的图片
+                    let correctedImage: UIImage
+                    if image.imageOrientation != .up {
+                        UIGraphicsBeginImageContextWithOptions(image.size, false, image.scale)
+                        image.draw(in: CGRect(origin: .zero, size: image.size))
+                        correctedImage = UIGraphicsGetImageFromCurrentImageContext() ?? image
+                        UIGraphicsEndImageContext()
+                    } else {
+                        correctedImage = image
+                    }
+                    
+                    // 创建新的 GPUImagePicture
+                    let picture = GPUImagePicture(image: correctedImage)
+                    self.currentPicture = picture
+                    
+                    guard let currentPicture = self.currentPicture else { return }
+                    
+                    // 配置 GPUImageView
+                    self.gpuImageView.fillMode = kGPUImageFillModePreserveAspectRatio
+                    self.gpuImageView.backgroundColor = .clear
+                    
+                    if let filterTemplate = self.filterTemplate {
+                        // 如果有滤镜模板，应用滤镜效果
+                        filterTemplate.applyFilter(to: currentPicture, output: self.gpuImageView)
+                    } else {
+                        // 如果没有滤镜模板，直接显示原图
+                        currentPicture.addTarget(self.gpuImageView)
+                        currentPicture.processImage()
+                    }
+                    
+                    // 更新布局
+                    self.updateImageViewFrame()
+                    self.centerImage()
+                }
+            } else {
+                // 清理现有的渲染内容
+                currentPicture?.removeAllTargets()
+                currentPicture = nil
             }
         }
     }
     
     var isZoomed: Bool {
-        return scrollView.zoomScale > scrollView.minimumZoomScale
+        return zoomScale > minimumZoomScale + 0.01
     }
     
     // MARK: - Initialization
@@ -76,222 +142,233 @@ class SCPhotoZoomView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
-    // MARK: - Setup
+    // MARK: - UI Setup
     private func setupUI() {
-        addSubview(scrollView)
-        scrollView.delegate = self
+        // 配置滚动视图
+        super.delegate = self
+        showsHorizontalScrollIndicator = false
+        showsVerticalScrollIndicator = false
+        decelerationRate = .fast
+        contentInsetAdjustmentBehavior = .never
+        alwaysBounceVertical = true
+        alwaysBounceHorizontal = true
+        backgroundColor = .black
         
-        scrollView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-        
-        scrollView.addSubview(imageView)
+        // 设置 GPUImageView
+        gpuImageView = GPUImageView()
+        gpuImageView.backgroundColor = .clear
+        gpuImageView.fillMode = kGPUImageFillModePreserveAspectRatio
+        addSubview(gpuImageView)
     }
     
+    // MARK: - Gestures
     private func setupGestures() {
-        let singleTap = UITapGestureRecognizer(target: self, action: #selector(handleSingleTap))
-        addGestureRecognizer(singleTap)
+        // 单击手势
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        addGestureRecognizer(tapGesture)
         
-        let doubleTap = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
-        doubleTap.numberOfTapsRequired = 2
-        addGestureRecognizer(doubleTap)
+        // 双击手势
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleDoubleTap))
+        doubleTapGesture.numberOfTapsRequired = 2
+        addGestureRecognizer(doubleTapGesture)
         
-        let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
-        addGestureRecognizer(longPress)
+        // 设置手势优先级
+        tapGesture.require(toFail: doubleTapGesture)
         
-        panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture))
+        // 长按手势
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
+        longPressGesture.minimumPressDuration = 0.5
+        addGestureRecognizer(longPressGesture)
+        
+        // 平移手势
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
+        panGesture.delegate = self
         addGestureRecognizer(panGesture)
-        
-        singleTap.require(toFail: doubleTap)
     }
     
     // MARK: - Layout
-    private func updateImageViewLayout() {
-        guard let image = imageView.image else { return }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if !isAnimating {
+            updateImageViewFrame()
+        }
+    }
+    
+    private func updateImageViewFrame() {
+        guard let image = image else { return }
         
-        let viewSize = bounds.size
         let imageSize = image.size
+        let viewSize = bounds.size
         
-        let scaleWidth = viewSize.width / imageSize.width
-        let scaleHeight = viewSize.height / imageSize.height
-        let minScale = min(scaleWidth, scaleHeight)
+        // 计算适合视图的图片大小
+        let widthRatio = viewSize.width / imageSize.width
+        let heightRatio = viewSize.height / imageSize.height
+        let minScale = min(widthRatio, heightRatio)
         
-        scrollView.minimumZoomScale = minScale
-        scrollView.maximumZoomScale = max(minScale * 3.0, 1.0)
+        // 设置滚动视图的缩放范围
+        minimumZoomScale = minScale
+        maximumZoomScale = max(1.0, minScale) * 3.0
         
-        let width = imageSize.width * minScale
-        let height = imageSize.height * minScale
+        // 如果还没有设置过缩放比例，设置为最小缩放比例
+        if zoomScale == 0 || zoomScale < minimumZoomScale {
+            zoomScale = minScale
+        }
         
-        imageView.frame = CGRect(
-            x: (viewSize.width - width) / 2,
-            y: (viewSize.height - height) / 2,
-            width: width,
-            height: height
-        )
+        // 计算实际显示尺寸
+        let scaledWidth = imageSize.width * zoomScale
+        let scaledHeight = imageSize.height * zoomScale
         
-        scrollView.contentSize = viewSize
-        scrollView.zoomScale = minScale
+        // 直接设置 frame，不使用约束
+        gpuImageView.frame = CGRect(x: 0, y: 0, width: scaledWidth, height: scaledHeight)
+        contentSize = CGSize(width: scaledWidth, height: scaledHeight)
+        
+        // 居中图片
         centerImage()
     }
     
     private func centerImage() {
-        let boundsSize = scrollView.bounds.size
-        var frameToCenter = imageView.frame
+        guard let image = image else { return }
         
-        if frameToCenter.size.height < boundsSize.height {
-            frameToCenter.origin.y = (boundsSize.height - frameToCenter.size.height) / 2
-        } else {
-            frameToCenter.origin.y = 0
+        let imageSize = image.size
+        let scaledSize = CGSize(
+            width: imageSize.width * zoomScale,
+            height: imageSize.height * zoomScale
+        )
+        
+        // 计算内容边距
+        let verticalInset = max(0, (bounds.height - scaledSize.height) / 2)
+        let horizontalInset = max(0, (bounds.width - scaledSize.width) / 2)
+        
+        // 设置内容边距
+        contentInset = UIEdgeInsets(
+            top: verticalInset,
+            left: horizontalInset,
+            bottom: verticalInset,
+            right: horizontalInset
+        )
+        
+        // 如果是最小缩放比例，重置偏移量
+        if abs(zoomScale - minimumZoomScale) < 0.01 {
+            contentOffset = .zero
         }
-        
-        if frameToCenter.size.width < boundsSize.width {
-            frameToCenter.origin.x = (boundsSize.width - frameToCenter.size.width) / 2
-        } else {
-            frameToCenter.origin.x = 0
-        }
-        
-        imageView.frame = frameToCenter
     }
     
-    // MARK: - Gestures
-    @objc private func handleSingleTap(_ gesture: UITapGestureRecognizer) {
-        delegate?.zoomViewDidTap(self)
+    // MARK: - Gesture Handlers
+    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
+        zoomDelegate?.zoomViewDidTap(self)
     }
     
     @objc private func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
-        if scrollView.zoomScale > scrollView.minimumZoomScale {
-            // 缩小到原始大小
-            UIView.animate(withDuration: 0.25) {
-                self.scrollView.zoomScale = self.scrollView.minimumZoomScale
-            }
+        zoomDelegate?.zoomViewDidDoubleTap(self)
+        
+        if isZoomed {
+            // 保存当前状态
+            lastZoomState = (zoomScale, contentOffset)
+            // 缩小到最小比例
+            setZoomScale(minimumZoomScale, animated: true)
         } else {
-            // 放大到指定位置
-            let location = gesture.location(in: imageView)
-            let zoomRect = zoomRectForScale(scale: scrollView.maximumZoomScale * 0.7, center: location)
-            scrollView.zoom(to: zoomRect, animated: true)
+            if let lastState = lastZoomState {
+                // 恢复上次的缩放状态
+                isAnimating = true
+                UIView.animate(withDuration: 0.3, animations: {
+                    self.setZoomScale(lastState.scale, animated: false)
+                    self.setContentOffset(lastState.offset, animated: false)
+                }) { _ in
+                    self.isAnimating = false
+                }
+            } else {
+                // 放大到点击位置
+                let location = gesture.location(in: gpuImageView)
+                let zoomRect = calculateZoomRect(for: location)
+                zoom(to: zoomRect, animated: true)
+            }
         }
-        
-        delegate?.zoomViewDidDoubleTap(self)
-    }
-    
-    private func zoomRectForScale(scale: CGFloat, center: CGPoint) -> CGRect {
-        var zoomRect = CGRect.zero
-        let bounds = scrollView.bounds
-        
-        zoomRect.size.width = bounds.size.width / scale
-        zoomRect.size.height = bounds.size.height / scale
-        
-        zoomRect.origin.x = center.x - (zoomRect.size.width / 2)
-        zoomRect.origin.y = center.y - (zoomRect.size.height / 2)
-        
-        return zoomRect
     }
     
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
         if gesture.state == .began {
-            delegate?.zoomViewDidLongPress(self)
+            zoomDelegate?.zoomViewDidLongPress(self)
         }
     }
     
-    // 添加平移手势处理方法
-    @objc private func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
-        guard !isZoomed else { return }  // 如果图片已放大，不处理拖拽
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        guard !isZoomed else { return }
         
         let translation = gesture.translation(in: self)
         let velocity = gesture.velocity(in: self)
         
         switch gesture.state {
         case .began:
-            // 记录初始状态
-            initialImageCenter = imageView.center
-            initialImageTransform = imageView.transform
+            panStartPoint = contentOffset
+            initialContentOffset = contentOffset
             
         case .changed:
-            // 计算垂直和水平移动距离
-            let verticalDelta = translation.y
-            let horizontalDelta = translation.x
-            
-            // 计算缩放比例（随着下拉逐渐缩小）
-            let scale = max(0.5, 1 - abs(verticalDelta) / 1000)
-            
-            // 应用变换
-            var transform = initialImageTransform
-            transform = transform.scaledBy(x: scale, y: scale)
-            imageView.transform = transform
-            
-            // 更新位置（水平方向有阻尼效果）
-            imageView.center = CGPoint(
-                x: initialImageCenter.x + horizontalDelta * 0.7,
-                y: initialImageCenter.y + verticalDelta
-            )
-            
-            // 计算并通知代理进度
-            let progress = min(1.0, abs(verticalDelta) / bounds.height)
-            delegate?.zoomView(self, didPanWithProgress: progress)
+            let progress = abs(translation.y / bounds.height)
+            zoomDelegate?.zoomView(self, didPanWithProgress: progress)
             
         case .ended, .cancelled:
-            let shouldDismiss = abs(translation.y) > bounds.height * 0.25 || abs(velocity.y) > 800
-            
-            if shouldDismiss {
-                // 使用当前速度计算动画时间
-                let velocity = max(abs(velocity.y), 800)
-                let duration = 0.25 * (bounds.height / velocity)
-                
-                // 添加消失动画
-                UIView.animate(withDuration: duration, delay: 0, options: [.curveEaseOut], animations: {
-                    // 继续向移动方向移动并缩小
-                    let direction = translation.y > 0 ? 1.0 : -1.0
-                    self.imageView.center = CGPoint(
-                        x: self.initialImageCenter.x,
-                        y: self.initialImageCenter.y + direction * self.bounds.height
-                    )
-                    self.imageView.transform = self.imageView.transform.scaledBy(x: 0.5, y: 0.5)
-                }) { _ in
-                    self.delegate?.zoomViewDidEndPan(self, shouldDismiss: true)
-                }
-            } else {
-                // 恢复到原始状态
-                UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.2, options: .curveEaseOut, animations: {
-                    self.imageView.center = self.initialImageCenter
-                    self.imageView.transform = self.initialImageTransform
-                }) { _ in
-                    self.delegate?.zoomViewDidEndPan(self, shouldDismiss: false)
-                }
-            }
+            let shouldDismiss = abs(translation.y) > bounds.height * 0.3 || abs(velocity.y) > 500
+            zoomDelegate?.zoomViewDidEndPan(self, shouldDismiss: shouldDismiss)
             
         default:
             break
         }
     }
     
+    private func calculateZoomRect(for point: CGPoint) -> CGRect {
+        let maxZoomScale = maximumZoomScale
+        let currentScale = zoomScale
+        let zoomFactor = maxZoomScale / currentScale
+        
+        let width = bounds.size.width / zoomFactor
+        let height = bounds.size.height / zoomFactor
+        let x = point.x - (width / 2)
+        let y = point.y - (height / 2)
+        
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+    
     // MARK: - Public Methods
-    func resetZoom(animated: Bool = true) {
-        if animated {
-            UIView.animate(withDuration: 0.3) {
-                self.scrollView.zoomScale = self.scrollView.minimumZoomScale
-            }
-        } else {
-            scrollView.zoomScale = scrollView.minimumZoomScale
+    func resetZoom() {
+        isAnimating = true
+        UIView.animate(withDuration: 0.3, animations: {
+            self.setZoomScale(self.minimumZoomScale, animated: false)
+            self.contentOffset = .zero
+        }) { _ in
+            self.isAnimating = false
+            self.lastZoomState = nil
         }
     }
     
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        updateImageViewLayout()
+    // MARK: - UIScrollViewDelegate
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return gpuImageView
     }
 }
 
 // MARK: - UIScrollViewDelegate
 extension SCPhotoZoomView: UIScrollViewDelegate {
-    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
-        return imageView
-    }
-    
     func scrollViewDidZoom(_ scrollView: UIScrollView) {
-        centerImage()
+        if !isAnimating {
+            centerImage()
+        }
     }
     
     func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
-        lastZoomScale = scale
+        if abs(scale - minimumZoomScale) < 0.01 {
+            lastZoomState = nil
+        }
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate
+extension SCPhotoZoomView: UIGestureRecognizerDelegate {
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let panGesture = gestureRecognizer as? UIPanGestureRecognizer {
+            let velocity = panGesture.velocity(in: self)
+            // 只允许垂直方向的平移手势
+            return abs(velocity.y) > abs(velocity.x)
+        }
+        return true
     }
 }

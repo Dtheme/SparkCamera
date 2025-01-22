@@ -8,23 +8,29 @@
 import UIKit
 import SwiftMessages
 import SnapKit
+import GPUImage
 
 @objc class SCPhotoPreviewVC: UIViewController {
     
     // MARK: - Properties
     private let image: UIImage
     private let photoInfo: SCPhotoInfo
-    private var zoomView: SCPhotoZoomView!
+    private var filterView: SCFilterView!
     private var blurEffectView: UIVisualEffectView!
     private var toolbar: SCPhotoPreviewToolbar!
     private var infoView: SCPhotoInfoView!
+    private var filterOptionView: SCFilterOptionView!
+    private var closeButton: UIButton!
     private var isStatusBarHidden = false
     private var progressView: UIProgressView!
-    private var progressBackgroundView: UIVisualEffectView?  // 添加背景视图引用
+    private var progressBackgroundView: UIVisualEffectView?
     
     // 添加内存管理相关属性
     private var isViewVisible = false
     private var downsampledImage: UIImage?
+    
+    // MARK: - Editing Mode
+    private var isEditingMode: Bool = false
     
     // MARK: - Initialization
     init(image: UIImage, photoInfo: SCPhotoInfo) {
@@ -39,7 +45,6 @@ import SnapKit
     
     deinit {
         // 确保释放资源
-        zoomView.image = nil
         downsampledImage = nil
         NotificationCenter.default.removeObserver(self)
     }
@@ -75,7 +80,6 @@ import SnapKit
         // 释放内存
         if !isBeingDismissed {
             downsampledImage = nil
-            zoomView.image = nil
         }
     }
     
@@ -86,10 +90,12 @@ import SnapKit
     // MARK: - UI Setup
     private func setupUI() {
         setupBackground()
-        setupZoomView()
+        setupFilterView()
         setupToolbar()
         setupInfoView()
+        setupFilterOptionView()
         setupProgressView()
+        setupCloseButton()
     }
     
     private func setupBackground() {
@@ -102,14 +108,30 @@ import SnapKit
         }
     }
     
-    private func setupZoomView() {
-        zoomView = SCPhotoZoomView()
-        zoomView.delegate = self
-        zoomView.image = image
-        view.addSubview(zoomView)
+    private func setupFilterView() {
+        filterView = SCFilterView()
+        filterView.delegate = self
+        view.addSubview(filterView)
         
-        zoomView.snp.makeConstraints { make in
+        filterView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
+        }
+        
+        // 设置图片
+        filterView.setImage(image)
+    }
+    
+    private func setupCloseButton() {
+        closeButton = UIButton(type: .system)
+        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.tintColor = .white
+        closeButton.addTarget(self, action: #selector(handleClose), for: .touchUpInside)
+        view.addSubview(closeButton)
+        
+        closeButton.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(16)
+            make.left.equalToSuperview().offset(16)
+            make.width.height.equalTo(44)
         }
     }
     
@@ -124,6 +146,9 @@ import SnapKit
             make.height.equalTo(60)
             make.width.equalTo(300)
         }
+        
+        // 确保约束立即生效
+        view.layoutIfNeeded()
     }
     
     private func setupInfoView() {
@@ -136,6 +161,21 @@ import SnapKit
             make.bottom.equalTo(toolbar.snp.top).offset(-20)
             make.height.equalTo(60)
         }
+    }
+    
+    private func setupFilterOptionView() {
+        filterOptionView = SCFilterOptionView(templates: SCFilterTemplate.templates)
+        filterOptionView.delegate = self
+        view.addSubview(filterOptionView)
+        
+        filterOptionView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(toolbar.snp.top)
+            make.height.equalTo(100)
+        }
+        
+        // 初始状态隐藏
+        filterOptionView.alpha = 0
     }
     
     private func setupProgressView() {
@@ -183,94 +223,30 @@ import SnapKit
     
     // MARK: - Gestures
     private func setupGestures() {
-        // 平移手势
-        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        panGesture.delegate = self
-        view.addGestureRecognizer(panGesture)
+        // 移除下拉退出手势的设置
     }
     
-    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-        // 如果图片处于放大状态，不响应下滑手势
-        if zoomView.isZoomed {
-            return
-        }
-        
-        let translation = gesture.translation(in: view)
-        let velocity = gesture.velocity(in: view)
-        
-        switch gesture.state {
-        case .changed:
-            // 计算垂直和水平移动的比例
-            let verticalRatio = abs(translation.y / view.bounds.height)
-            let horizontalRatio = abs(translation.x / view.bounds.width)
-            
-            // 如果水平移动比垂直移动大，不处理
-            if horizontalRatio > verticalRatio {
-                return
-            }
-            
-            // 计算缩放和透明度
-            let scale = max(0.5, 1 - verticalRatio)
-            let alpha = max(0, 1 - verticalRatio * 2)
-            
-            // 应用变换
-            zoomView.transform = CGAffineTransform(scaleX: scale, y: scale)
-                .translatedBy(x: translation.x, y: translation.y)
-            
-            // 更新界面透明度
-            view.backgroundColor = UIColor.black.withAlphaComponent(alpha)
-            blurEffectView.alpha = alpha
-            toolbar.alpha = alpha
-            infoView.alpha = alpha
-            
-        case .ended, .cancelled:
-            // 判断是否需要关闭预览
-            let shouldDismiss = abs(translation.y) > view.bounds.height * 0.3 || abs(velocity.y) > 500
-            
-            if shouldDismiss {
-                // 继续移动方向的动画
-                let translationDirection = translation.y > 0 ? 1.0 : -1.0
-                UIView.animate(withDuration: 0.2, animations: {
-                    self.zoomView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
-                        .translatedBy(x: 0, y: self.view.bounds.height * translationDirection)
-                    self.view.backgroundColor = .clear
-                    self.blurEffectView.alpha = 0
-                    self.toolbar.alpha = 0
-                    self.infoView.alpha = 0
-                }) { _ in
-                    self.dismiss(animated: false)
-                }
-            } else {
-                // 恢复原状
-                UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.2, options: .curveEaseOut) {
-                    self.zoomView.transform = .identity
-                    self.view.backgroundColor = .black
-                    self.blurEffectView.alpha = 1
-                    self.toolbar.alpha = 1
-                    self.infoView.alpha = 1
-                }
-            }
-            
-        default:
-            break
+    @objc private func handleClose() {
+        animateDismissal {
+            self.dismiss(animated: false)
         }
     }
     
     // MARK: - Animations
     private func animateAppearance() {
         view.alpha = 0
-        zoomView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        filterView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
         
         UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
             self.view.alpha = 1
-            self.zoomView.transform = .identity
+            self.filterView.transform = .identity
         }
     }
     
     private func animateDismissal(completion: @escaping () -> Void) {
         UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
             self.view.alpha = 0
-            self.zoomView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            self.filterView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
         } completion: { _ in
             completion()
         }
@@ -314,11 +290,16 @@ import SnapKit
     }
     
     @objc private func edit() {
-        // 显示编辑功能提示
-        let view = MessageView.viewFromNib(layout: .statusLine)
-        view.configureTheme(.info)
-        view.configureContent(title: "提示", body: "后续会开发滤镜等图片编辑操作")
-        SwiftMessages.show(view: view)
+        if isEditingMode {
+            exitEditingMode()
+        } else {
+            enterEditingMode()
+            // 显示编辑功能提示
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.info)
+            view.configureContent(title: "提示", body: "后续会开发滤镜等图片编辑操作")
+            SwiftMessages.show(view: view)
+        }
     }
     
     private func shareImage() {
@@ -437,7 +418,7 @@ import SnapKit
                     guard let self = self else { return }
                     
                     // 更新图片视图
-                    self.zoomView.image = downsampledImage
+                    self.filterView.setImage(downsampledImage)
                     self.downsampledImage = downsampledImage
                 }
             }
@@ -486,14 +467,23 @@ import SnapKit
     }
     
     private func toggleInterfaceVisibility() {
-        let newAlpha: CGFloat = toolbar.alpha > 0 ? 0 : 1
-        
-        UIView.animate(withDuration: 0.25) {
-            self.toolbar.alpha = newAlpha
-            self.infoView.alpha = newAlpha
-            self.blurEffectView.alpha = newAlpha
-            self.isStatusBarHidden.toggle()
-            self.setNeedsStatusBarAppearanceUpdate()
+        // 如果在编辑模式下，不允许显示信息视图
+        if isEditingMode {
+            let newAlpha: CGFloat = toolbar.alpha > 0 ? 0 : 1
+            UIView.animate(withDuration: 0.25) {
+                self.toolbar.alpha = newAlpha
+                self.isStatusBarHidden.toggle()
+                self.setNeedsStatusBarAppearanceUpdate()
+            }
+        } else {
+            let newAlpha: CGFloat = toolbar.alpha > 0 ? 0 : 1
+            UIView.animate(withDuration: 0.25) {
+                self.toolbar.alpha = newAlpha
+                self.infoView.alpha = newAlpha
+                self.blurEffectView.alpha = newAlpha
+                self.isStatusBarHidden.toggle()
+                self.setNeedsStatusBarAppearanceUpdate()
+            }
         }
     }
     
@@ -538,6 +528,94 @@ import SnapKit
         infoView?.updateSaveState(isSaved: true)
     }
 
+    // MARK: - Editing Mode
+    private func updateUIForEditingMode(_ isEditing: Bool) {
+        // 计算图片宽高比
+        let imageAspectRatio = image.size.width / image.size.height
+        
+        // 更新约束
+        if isEditing {
+            filterView.snp.remakeConstraints { make in
+                make.left.right.equalToSuperview()
+                make.top.equalTo(view.safeAreaLayoutGuide)
+                
+                // 根据图片宽高比设置高度
+                let width = UIScreen.main.bounds.width
+                let height = width / imageAspectRatio
+                make.height.equalTo(height)
+                
+                // 确保不超出 filterOptionView
+                make.bottom.lessThanOrEqualTo(filterOptionView.snp.top)
+            }
+            
+            // 居中显示
+            filterView.snp.makeConstraints { make in
+                make.centerY.equalTo(view.safeAreaLayoutGuide).priority(.high)
+            }
+        } else {
+            filterView.snp.remakeConstraints { make in
+                make.edges.equalToSuperview()
+            }
+        }
+        
+        // 执行动画
+        UIView.animate(withDuration: 0.3) {
+            // 更新 infoView 和背景
+            self.infoView.alpha = isEditing ? 0 : 1
+            self.blurEffectView.alpha = isEditing ? 0 : 1
+            self.filterOptionView.alpha = isEditing ? 1 : 0
+            
+            self.view.layoutIfNeeded()
+        }
+    }
+
+    private func showExitEditingConfirmation(completion: @escaping (Bool) -> Void) {
+        SCAlert.show(
+            title: "退出编辑",
+            message: "确定要退出编辑模式吗？未保存的修改将会丢失。",
+            style: .warning,
+            cancelTitle: "取消",
+            confirmTitle: "退出编辑",
+            completion: completion
+        )
+    }
+
+    private func enterEditingMode() {
+        isEditingMode = true
+        toolbar.setEditingMode(true)
+        updateUIForEditingMode(true)
+        
+        // 等待布局更新完成后重新加载图片
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            guard let self = self else { return }
+            if let downsampledImage = self.downsampledImage {
+                self.filterView.setImage(downsampledImage)
+            } else {
+                self.filterView.setImage(self.image)
+            }
+        }
+    }
+
+    private func exitEditingMode() {
+        showExitEditingConfirmation { [weak self] shouldExit in
+            guard let self = self, shouldExit else { return }
+            
+            self.isEditingMode = false
+            self.toolbar.setEditingMode(false)
+            self.updateUIForEditingMode(false)
+            
+            // 等待布局更新完成后重新加载图片
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                guard let self = self else { return }
+                if let downsampledImage = self.downsampledImage {
+                    self.filterView.setImage(downsampledImage)
+                } else {
+                    self.filterView.setImage(self.image)
+                }
+            }
+        }
+    }
+
 }
 
 // MARK: - UIGestureRecognizerDelegate
@@ -559,71 +637,76 @@ extension SCPhotoPreviewVC: UIGestureRecognizerDelegate {
 // MARK: - SCPhotoPreviewToolbarDelegate
 extension SCPhotoPreviewVC: SCPhotoPreviewToolbarDelegate {
     func toolbarDidTapCancel(_ toolbar: SCPhotoPreviewToolbar) {
-        animateDismissal {
-            self.dismiss(animated: false)
+        if isEditingMode {
+            exitEditingMode()
+        } else {
+            animateDismissal {
+                self.dismiss(animated: false)
+            }
         }
     }
     
     func toolbarDidTapEdit(_ toolbar: SCPhotoPreviewToolbar) {
-        // 显示编辑功能提示
-        let view = MessageView.viewFromNib(layout: .statusLine)
-        view.configureTheme(.info)
-        view.configureContent(title: "提示", body: "后续会开发滤镜等图片编辑操作")
-        SwiftMessages.show(view: view)
+        if !isEditingMode {
+            enterEditingMode()
+        }
     }
     
     func toolbarDidTapConfirm(_ toolbar: SCPhotoPreviewToolbar) {
-        // 显示进度条
-        showProgressView()
-        progressView.progress = 0
-        
-        // 添加触觉反馈
-        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-        feedbackGenerator.prepare()
-        
-        // 模拟保存进度
-        var progress: Float = 0
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
-            }
+        if isEditingMode {
+            // TODO: 保存编辑效果
+            isEditingMode = false
+            updateUIForEditingMode(false)
+        } else {
+            // 原有的保存逻辑
+            // 显示进度条
+            showProgressView()
+            progressView.progress = 0
             
-            progress += 0.1
-            self.progressView.progress = min(progress, 1.0)
+            // 添加触觉反馈
+            let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+            feedbackGenerator.prepare()
             
-            if progress >= 1.0 {
-                timer.invalidate()
-                feedbackGenerator.impactOccurred()
+            // 模拟保存进度
+            var progress: Float = 0
+            Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
+                guard let self = self else {
+                    timer.invalidate()
+                    return
+                }
                 
-                // 保存照片到相册
-                UIImageWriteToSavedPhotosAlbum(self.image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
+                progress += 0.1
+                self.progressView.progress = min(progress, 1.0)
                 
-                // 隐藏进度条
-                self.hideProgressView()
+                if progress >= 1.0 {
+                    timer.invalidate()
+                    feedbackGenerator.impactOccurred()
+                    
+                    // 保存照片到相册
+                    UIImageWriteToSavedPhotosAlbum(self.image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
+                    
+                    // 隐藏进度条
+                    self.hideProgressView()
+                }
             }
         }
     }
 }
 
-// MARK: - SCPhotoZoomViewDelegate
-extension SCPhotoPreviewVC: SCPhotoZoomViewDelegate {
-    func zoomViewDidTap(_ zoomView: SCPhotoZoomView) {
-        // 如果图片处于放大状态，先恢复原始大小
-        if zoomView.isZoomed {
-            zoomView.resetZoom()
-            return
-        }
-        
-        // 切换界面元素显示状态
+// MARK: - SCFilterViewDelegate
+extension SCPhotoPreviewVC: SCFilterViewDelegate {
+    func filterViewDidTap(_ filterView: SCFilterView) {
         toggleInterfaceVisibility()
     }
     
-    func zoomViewDidDoubleTap(_ zoomView: SCPhotoZoomView) {
-        // 双击时不需要额外处理，缩放逻辑在 ZoomView 内部已处理
+    func filterViewDidDoubleTap(_ filterView: SCFilterView) {
+        // 双击时不需要特殊处理
     }
     
-    func zoomViewDidLongPress(_ zoomView: SCPhotoZoomView) {
+    func filterViewDidLongPress(_ filterView: SCFilterView) {
+        // 在编辑模式下不响应长按手势
+        if isEditingMode { return }
+        
         // 显示操作菜单
         SCActionSheet.show(actions: [
             .init(title: "保存到相册", icon: UIImage(systemName: "square.and.arrow.down"), style: .default) { [weak self] in
@@ -636,24 +719,15 @@ extension SCPhotoPreviewVC: SCPhotoZoomViewDelegate {
         ])
     }
     
-    func zoomView(_ zoomView: SCPhotoZoomView, didPanWithProgress progress: CGFloat) {
-        // 更新背景透明度
-        view.backgroundColor = UIColor.black.withAlphaComponent(1 - progress)
-        
-        // 同时更新工具栏的透明度
-        toolbar.alpha = 1 - progress
+    func filterView(_ filterView: SCFilterView, didChangeFilter template: SCFilterTemplate?) {
+        // 处理滤镜变化
     }
-    
-    func zoomViewDidEndPan(_ zoomView: SCPhotoZoomView, shouldDismiss: Bool) {
-        if shouldDismiss {
-            // 关闭预览
-            cancel()
-        } else {
-            // 恢复背景和工具栏透明度
-            UIView.animate(withDuration: 0.3) {
-                self.view.backgroundColor = .black
-                self.toolbar.alpha = 1
-            }
-        }
+}
+
+// MARK: - SCFilterOptionViewDelegate
+extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
+    func filterOptionView(_ view: SCFilterOptionView, didSelectTemplate template: SCFilterTemplate) {
+        // 应用滤镜
+        filterView.filterTemplate = template
     }
 } 
