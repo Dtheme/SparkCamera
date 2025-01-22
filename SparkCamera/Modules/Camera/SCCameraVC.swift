@@ -1448,7 +1448,7 @@ class SCCameraVC: UIViewController {
         generator.impactOccurred()
         
         // 显示提示
-        let message = newState ? "已开启自动保存" : "已关闭自动保存"
+        let message = newState ? "已开启自动保存原图" : "已关闭自动保存原图"
         let view = MessageView.viewFromNib(layout: .statusLine)
         view.configureTheme(newState ? .success : .info)
         view.configureContent(title: "", body: message)
