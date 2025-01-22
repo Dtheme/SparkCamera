@@ -197,67 +197,67 @@ struct SCFilterTemplate {
     static let templates: [SCFilterTemplate] = [
         SCFilterTemplate(
             name: "原图",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_original"),
             type: .original,
             parameters: FilterParameters()
         ),
         SCFilterTemplate(
             name: "富士胶片",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_fujifilm"),
             type: .fujiFilm,
             parameters: FilterParameters.fujiFilm
         ),
         SCFilterTemplate(
             name: "拍立得",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_polaroid"),
             type: .polaroid,
             parameters: FilterParameters.polaroid
         ),
         SCFilterTemplate(
             name: "黑白",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_blackwhite"),
             type: .blackAndWhite,
             parameters: FilterParameters.blackAndWhite
         ),
         SCFilterTemplate(
             name: "复古",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_vintage"),
             type: .vintage,
             parameters: FilterParameters.vintage
         ),
         SCFilterTemplate(
             name: "梦幻",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_dreamy"),
             type: .dreamy,
             parameters: FilterParameters.dreamy
         ),
         SCFilterTemplate(
             name: "电影",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_cinematic"),
             type: .cinematic,
             parameters: FilterParameters.cinematic
         ),
         SCFilterTemplate(
             name: "蓝调",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_retroblue"),
             type: .retroBlue,
             parameters: FilterParameters.retroBlue
         ),
         SCFilterTemplate(
             name: "柔焦",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_softfocus"),
             type: .softFocus,
             parameters: FilterParameters.softFocus
         ),
         SCFilterTemplate(
             name: "日系清新",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_japanese"),
             type: .japaneseStyle,
             parameters: FilterParameters.japaneseStyle
         ),
         SCFilterTemplate(
             name: "偏振滤镜",
-            thumbnail: nil,
+            thumbnail: UIImage(named: "sample_polarizing"),
             type: .polarizing,
             parameters: FilterParameters.polarizing
         )
