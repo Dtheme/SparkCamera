@@ -23,8 +23,53 @@ class SCFilterView: UIView {
     private var currentPicture: GPUImagePicture?
     private var originalImage: UIImage?
     
+    // 添加滤镜参数属性
+    private var brightness: CGFloat = 0.0
+    private var contrast: CGFloat = 1.0
+    private var saturation: CGFloat = 1.0
+    private var exposure: CGFloat = 0.0
+    private var highlights: CGFloat = 0.0
+    private var shadows: CGFloat = 0.0
+    private var grain: CGFloat = 0.0
+    private var sharpness: CGFloat = 0.0
+    private var blur: CGFloat = 0.0
+    private var glow: CGFloat = 0.0
+    private var edgeStrength: CGFloat = 0.0
+    private var redChannel: CGFloat = 1.0
+    private var greenChannel: CGFloat = 1.0
+    private var blueChannel: CGFloat = 1.0
+    
+    // 添加滤镜对象
+    private var brightnessFilter: GPUImageBrightnessFilter?
+    private var contrastFilter: GPUImageContrastFilter?
+    private var saturationFilter: GPUImageSaturationFilter?
+    private var exposureFilter: GPUImageExposureFilter?
+    private var highlightsFilter: GPUImageHighlightShadowFilter?
+    private var grainFilter: GPUImageJFAVoronoiFilter?  // 使用 Voronoi 滤镜模拟颗粒感
+    private var sharpenFilter: GPUImageSharpenFilter?
+    private var gaussianBlurFilter: GPUImageGaussianBlurFilter?
+    private var sobelEdgeFilter: GPUImageSobelEdgeDetectionFilter?
+    private var rgbFilter: GPUImageRGBFilter?
+    
     var filterTemplate: SCFilterTemplate? {
         didSet {
+            if let template = filterTemplate {
+                // 更新所有参数
+                brightness = template.parameters.brightness
+                contrast = template.parameters.contrast
+                saturation = template.parameters.saturation
+                exposure = template.parameters.exposure
+                highlights = template.parameters.highlights
+                shadows = template.parameters.shadows
+                grain = template.parameters.grain
+                sharpness = template.parameters.sharpness
+                blur = template.parameters.blur
+                glow = template.parameters.glow
+                edgeStrength = template.parameters.edgeStrength
+                redChannel = template.parameters.red
+                greenChannel = template.parameters.green
+                blueChannel = template.parameters.blue
+            }
             applyFilter()
             delegate?.filterView(self, didChangeFilter: filterTemplate)
         }
@@ -120,6 +165,25 @@ class SCFilterView: UIView {
         super.init(frame: frame)
         setupUI()
         setupGestures()
+        setupFilters()
+        
+        // 如果有模板，立即应用参数
+        if let template = template {
+            brightness = template.parameters.brightness
+            contrast = template.parameters.contrast
+            saturation = template.parameters.saturation
+            exposure = template.parameters.exposure
+            highlights = template.parameters.highlights
+            shadows = template.parameters.shadows
+            grain = template.parameters.grain
+            sharpness = template.parameters.sharpness
+            blur = template.parameters.blur
+            glow = template.parameters.glow
+            edgeStrength = template.parameters.edgeStrength
+            redChannel = template.parameters.red
+            greenChannel = template.parameters.green
+            blueChannel = template.parameters.blue
+        }
     }
     
     required init?(coder: NSCoder) {
@@ -186,12 +250,151 @@ class SCFilterView: UIView {
             let picture = GPUImagePicture(image: correctedImage)
             self.currentPicture = picture
             
-            // 应用滤镜或显示原图
-            self.applyFilter()
+            // 如果没有滤镜，直接显示原图
+            if self.filterTemplate == nil && self.allFiltersAtDefaultValues() {
+                picture!.addTarget(self.gpuImageView)
+                picture!.processImage()
+            } else {
+                // 应用滤镜
+                self.applyFilter()
+            }
         }
     }
     
-    // MARK: - Private Methods
+    // 检查是否所有滤镜参数都是默认值
+    private func allFiltersAtDefaultValues() -> Bool {
+        return brightness == 0.0 &&
+               contrast == 1.0 &&
+               saturation == 1.0 &&
+               exposure == 0.0 &&
+               highlights == 0.0 &&
+               shadows == 0.0 &&
+               grain == 0.0 &&
+               sharpness == 0.0 &&
+               blur == 0.0 &&
+               glow == 0.0 &&
+               edgeStrength == 0.0 &&
+               redChannel == 1.0 &&
+               greenChannel == 1.0 &&
+               blueChannel == 1.0
+    }
+    
+    // MARK: - Filter Updates
+    func updateBrightness(_ value: Float) {
+        brightness = CGFloat(value)
+        brightnessFilter?.brightness = brightness
+        applyFilter()
+    }
+    
+    func updateContrast(_ value: Float) {
+        contrast = CGFloat(value)
+        contrastFilter?.contrast = contrast
+        applyFilter()
+    }
+    
+    func updateSaturation(_ value: Float) {
+        saturation = CGFloat(value)
+        saturationFilter?.saturation = saturation
+        applyFilter()
+    }
+    
+    func updateExposure(_ value: Float) {
+        exposure = CGFloat(value)
+        exposureFilter?.exposure = exposure
+        applyFilter()
+    }
+    
+    func updateHighlights(_ value: Float) {
+        highlights = CGFloat(value)
+        highlightsFilter?.highlights = highlights
+        applyFilter()
+    }
+    
+    func updateShadows(_ value: Float) {
+        shadows = CGFloat(value)
+        highlightsFilter?.shadows = shadows
+        applyFilter()
+    }
+    
+    func updateGrain(_ value: Float) {
+        grain = CGFloat(value)
+        let size = CGFloat(value * 100)
+        grainFilter?.sizeInPixels = CGSize(width: size, height: size)
+        applyFilter()
+    }
+    
+    func updateSharpness(_ value: Float) {
+        sharpness = CGFloat(value)
+        sharpenFilter?.sharpness = sharpness
+        applyFilter()
+    }
+    
+    func updateBlur(_ value: Float) {
+        blur = CGFloat(value)
+        gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value * 10)
+        applyFilter()
+    }
+    
+    func updateGlow(_ value: Float) {
+        glow = CGFloat(value)
+        // 移除 glowFilter，因为 GPUImage 中没有这个滤镜
+        applyFilter()
+    }
+    
+    func updateEdgeStrength(_ value: Float) {
+        edgeStrength = CGFloat(value)
+        sobelEdgeFilter?.edgeStrength = edgeStrength
+        applyFilter()
+    }
+    
+    func updateRedChannel(_ value: Float) {
+        redChannel = CGFloat(value)
+        rgbFilter?.red = redChannel
+        applyFilter()
+    }
+    
+    func updateGreenChannel(_ value: Float) {
+        greenChannel = CGFloat(value)
+        rgbFilter?.green = greenChannel
+        applyFilter()
+    }
+    
+    func updateBlueChannel(_ value: Float) {
+        blueChannel = CGFloat(value)
+        rgbFilter?.blue = blueChannel
+        applyFilter()
+    }
+    
+    private func setupFilters() {
+        // 创建滤镜对象
+        brightnessFilter = GPUImageBrightnessFilter()
+        contrastFilter = GPUImageContrastFilter()
+        saturationFilter = GPUImageSaturationFilter()
+        exposureFilter = GPUImageExposureFilter()
+        highlightsFilter = GPUImageHighlightShadowFilter()
+        grainFilter = GPUImageJFAVoronoiFilter()
+        sharpenFilter = GPUImageSharpenFilter()
+        gaussianBlurFilter = GPUImageGaussianBlurFilter()
+        sobelEdgeFilter = GPUImageSobelEdgeDetectionFilter()
+        rgbFilter = GPUImageRGBFilter()
+        
+        // 设置初始值
+        brightnessFilter?.brightness = brightness
+        contrastFilter?.contrast = contrast
+        saturationFilter?.saturation = saturation
+        exposureFilter?.exposure = exposure
+        highlightsFilter?.highlights = highlights
+        highlightsFilter?.shadows = shadows
+        let grainSize = grain * 100
+        grainFilter?.sizeInPixels = CGSize(width: grainSize, height: grainSize)
+        sharpenFilter?.sharpness = sharpness
+        gaussianBlurFilter?.blurRadiusInPixels = blur * 10
+        sobelEdgeFilter?.edgeStrength = edgeStrength
+        rgbFilter?.red = redChannel
+        rgbFilter?.green = greenChannel
+        rgbFilter?.blue = blueChannel
+    }
+    
     private func applyFilter() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self,
@@ -200,12 +403,40 @@ class SCFilterView: UIView {
             // 清理现有的渲染内容
             picture.removeAllTargets()
             
-            // 应用新的滤镜
+            // 如果有滤镜模板，使用模板的滤镜链
             if let template = self.filterTemplate {
                 template.applyFilter(to: picture, output: self.gpuImageView)
-            } else {
+                picture.processImage()
+                return
+            }
+            
+            // 否则使用自定义滤镜链
+            let filterChain = [
+                brightnessFilter,
+                contrastFilter,
+                saturationFilter,
+                exposureFilter,
+                highlightsFilter,
+                grainFilter,
+                sharpenFilter,
+                gaussianBlurFilter,
+                sobelEdgeFilter,
+                rgbFilter
+            ].compactMap { $0 }
+            
+            if filterChain.isEmpty {
                 // 如果没有滤镜，直接显示原图
                 picture.addTarget(self.gpuImageView)
+            } else {
+                // 连接滤镜链
+                var previousFilter: GPUImageOutput = picture
+                for filter in filterChain {
+                    previousFilter.addTarget(filter)
+                    previousFilter = filter
+                }
+                
+                // 连接到输出
+                previousFilter.addTarget(self.gpuImageView)
             }
             
             // 处理图像

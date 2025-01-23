@@ -20,6 +20,7 @@ import GPUImage
     private var toolbar: SCPhotoPreviewToolbar!
     private var infoView: SCPhotoInfoView!
     private var filterOptionView: SCFilterOptionView!
+    private var filterAdjustView: SCFilterAdjustView!
     private var closeButton: UIButton!
     private var isStatusBarHidden = false
     private var progressView: UIProgressView!
@@ -31,6 +32,16 @@ import GPUImage
     
     // MARK: - Editing Mode
     private var isEditingMode: Bool = false
+    
+    private lazy var adjustButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "slider.horizontal.3"), for: .normal)
+        button.tintColor = .white
+        button.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        button.layer.cornerRadius = 20
+        button.addTarget(self, action: #selector(handleAdjustButtonTap), for: .touchUpInside)
+        return button
+    }()
     
     // MARK: - Initialization
     init(image: UIImage, photoInfo: SCPhotoInfo) {
@@ -94,6 +105,7 @@ import GPUImage
         setupToolbar()
         setupInfoView()
         setupFilterOptionView()
+        setupFilterAdjustView()
         setupProgressView()
         setupCloseButton()
     }
@@ -176,6 +188,44 @@ import GPUImage
         
         // 初始状态隐藏
         filterOptionView.alpha = 0
+    }
+    
+    private func setupFilterAdjustView() {
+        filterAdjustView = SCFilterAdjustView(frame: .zero)
+        filterAdjustView.delegate = self
+        view.addSubview(filterAdjustView)
+        
+        filterAdjustView.snp.makeConstraints { make in
+            make.top.bottom.trailing.equalToSuperview()
+            make.width.equalTo(280)
+        }
+        
+        // 初始状态为隐藏，并设置初始位置在屏幕右侧
+        filterAdjustView.isHidden = true
+        filterAdjustView.transform = CGAffineTransform(translationX: 280, y: 0)
+        
+        // 添加点击手势来关闭抽屉
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
+        tapGesture.delegate = self
+        view.addGestureRecognizer(tapGesture)
+        
+        // 设置调整按钮
+        view.addSubview(adjustButton)
+        adjustButton.snp.makeConstraints { make in
+            make.right.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+        
+        // 添加左滑手势到调整按钮
+        let swipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleAdjustButtonTap))
+        swipeGesture.direction = .left
+        adjustButton.addGestureRecognizer(swipeGesture)
+        
+        // 添加右滑手势到调整视图
+        let rightSwipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleRightSwipe))
+        rightSwipeGesture.direction = .right
+        filterAdjustView.addGestureRecognizer(rightSwipeGesture)
     }
     
     private func setupProgressView() {
@@ -567,10 +617,28 @@ import GPUImage
             filterView.snp.makeConstraints { make in
                 make.centerY.equalTo(view.safeAreaLayoutGuide).priority(.high)
             }
+            
+            // 显示抽屉视图
+            filterAdjustView.isHidden = false
+            filterAdjustView.frame.origin.x = view.bounds.width
+            
+            // 添加点击空白区域关闭抽屉的手势
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
+            view.addGestureRecognizer(tapGesture)
+            
+            // 添加右侧提示按钮
+            setupAdjustButton()
         } else {
             filterView.snp.remakeConstraints { make in
                 make.edges.equalToSuperview()
             }
+            
+            // 隐藏抽屉视图
+            filterAdjustView.isHidden = true
+            
+            // 移除手势和按钮
+            view.gestureRecognizers?.forEach { view.removeGestureRecognizer($0) }
+            adjustButton.removeFromSuperview()
         }
         
         // 执行动画
@@ -628,6 +696,62 @@ import GPUImage
                     self.filterView.setImage(self.image)
                 }
             }
+        }
+    }
+
+    // MARK: - Adjust Button
+    private func setupAdjustButton() {
+        // 设置调整按钮
+        view.addSubview(adjustButton)
+        adjustButton.snp.makeConstraints { make in
+            make.right.equalToSuperview()
+            make.centerY.equalToSuperview()
+            make.width.height.equalTo(40)
+        }
+        
+        // 添加左滑手势到调整按钮
+        let swipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleAdjustButtonTap))
+        swipeGesture.direction = .left
+        adjustButton.addGestureRecognizer(swipeGesture)
+        
+        // 添加右滑手势到调整视图
+        let rightSwipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleRightSwipe))
+        rightSwipeGesture.direction = .right
+        filterAdjustView.addGestureRecognizer(rightSwipeGesture)
+    }
+    
+    @objc private func handleAdjustButtonTap() {
+        // 显示抽屉视图
+        filterAdjustView.isHidden = false
+        adjustButton.isHidden = true
+        
+        // 展开动画
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            self.filterAdjustView.transform = .identity
+        }
+    }
+    
+    @objc private func handleRightSwipe() {
+        // 收起动画
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
+            self.filterAdjustView.transform = CGAffineTransform(translationX: 280, y: 0)
+        } completion: { _ in
+            self.filterAdjustView.isHidden = true
+            self.adjustButton.isHidden = false
+        }
+    }
+    
+    @objc private func handleBackgroundTap(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: view)
+        
+        // 如果点击位置在抽屉视图内，不处理
+        if filterAdjustView.frame.contains(location) {
+            return
+        }
+        
+        // 如果抽屉是展开状态，收起抽屉
+        if !filterAdjustView.isHidden {
+            handleRightSwipe()
         }
     }
 
@@ -841,5 +965,44 @@ extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
     func filterOptionView(_ view: SCFilterOptionView, didSelectTemplate template: SCFilterTemplate) {
         // 应用滤镜
         filterView.filterTemplate = template
+    }
+}
+
+// MARK: - SCFilterAdjustViewDelegate
+extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
+    func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float) {
+        // 处理参数更新
+        switch parameter {
+        case "亮度":
+            filterView.updateBrightness(value)
+        case "对比度":
+            filterView.updateContrast(value)
+        case "饱和度":
+            filterView.updateSaturation(value)
+        case "曝光":
+            filterView.updateExposure(value)
+        case "高光":
+            filterView.updateHighlights(value)
+        case "阴影":
+            filterView.updateShadows(value)
+        case "颗粒感":
+            filterView.updateGrain(value)
+        case "锐度":
+            filterView.updateSharpness(value)
+        case "模糊":
+            filterView.updateBlur(value)
+        case "光晕":
+            filterView.updateGlow(value)
+        case "边缘强度":
+            filterView.updateEdgeStrength(value)
+        case "红色":
+            filterView.updateRedChannel(value)
+        case "绿色":
+            filterView.updateGreenChannel(value)
+        case "蓝色":
+            filterView.updateBlueChannel(value)
+        default:
+            break
+        }
     }
 } 
