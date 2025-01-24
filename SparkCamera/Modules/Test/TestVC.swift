@@ -12,8 +12,9 @@ class TestVC: UIViewController {
     }()
     
     private lazy var filterOptionView: SCFilterOptionView = {
-        let view = SCFilterOptionView(templates: SCFilterTemplate.templates)
+        let view = SCFilterOptionView()
         view.delegate = self
+        view.templates = SCFilterTemplate.templates
         return view
     }()
     

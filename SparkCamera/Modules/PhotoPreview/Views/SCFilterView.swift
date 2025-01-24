@@ -54,24 +54,20 @@ class SCFilterView: UIView {
     var filterTemplate: SCFilterTemplate? {
         didSet {
             if let template = filterTemplate {
-                // 更新所有参数
-                brightness = template.parameters.brightness
-                contrast = template.parameters.contrast
-                saturation = template.parameters.saturation
-                exposure = template.parameters.exposure
-                highlights = template.parameters.highlights
-                shadows = template.parameters.shadows
-                grain = template.parameters.grain
-                sharpness = template.parameters.sharpness
-                blur = template.parameters.blur
-                glow = template.parameters.glow
-                edgeStrength = template.parameters.edgeStrength
-                redChannel = template.parameters.red
-                greenChannel = template.parameters.green
-                blueChannel = template.parameters.blue
+                print("[FilterView] 设置滤镜模板: \(template.name)")
+                // 清理现有的渲染内容
+                currentPicture?.removeAllTargets()
+                // 应用新的滤镜模板
+                if let picture = currentPicture {
+                    template.applyFilter(to: picture, output: gpuImageView)
+                    picture.processImage()
+                }
+                // 通知代理
+                delegate?.filterView(self, didChangeFilter: template)
+            } else {
+                print("[FilterView] 清除滤镜模板")
+                resetFilters()
             }
-            applyFilter()
-            delegate?.filterView(self, didChangeFilter: filterTemplate)
         }
     }
     
@@ -169,20 +165,21 @@ class SCFilterView: UIView {
         
         // 如果有模板，立即应用参数
         if let template = template {
-            brightness = template.parameters.brightness
-            contrast = template.parameters.contrast
-            saturation = template.parameters.saturation
-            exposure = template.parameters.exposure
-            highlights = template.parameters.highlights
-            shadows = template.parameters.shadows
-            grain = template.parameters.grain
-            sharpness = template.parameters.sharpness
-            blur = template.parameters.blur
-            glow = template.parameters.glow
-            edgeStrength = template.parameters.edgeStrength
-            redChannel = template.parameters.red
-            greenChannel = template.parameters.green
-            blueChannel = template.parameters.blue
+            let params = template.toParameters()
+            brightness = CGFloat(params["亮度"] ?? 0.0)
+            contrast = CGFloat(params["对比度"] ?? 1.0)
+            saturation = CGFloat(params["饱和度"] ?? 1.0)
+            exposure = CGFloat(params["曝光"] ?? 0.0)
+            highlights = CGFloat(params["高光"] ?? 1.0)
+            shadows = CGFloat(params["阴影"] ?? 1.0)
+            grain = CGFloat(params["颗粒感"] ?? 0.0)
+            sharpness = CGFloat(params["锐度"] ?? 1.0)
+            blur = CGFloat(params["模糊"] ?? 0.0)
+            glow = CGFloat(params["光晕"] ?? 0.0)
+            edgeStrength = CGFloat(params["边缘强度"] ?? 0.0)
+            redChannel = CGFloat(params["红色"] ?? 1.0)
+            greenChannel = CGFloat(params["绿色"] ?? 1.0)
+            blueChannel = CGFloat(params["蓝色"] ?? 1.0)
         }
     }
     
@@ -444,6 +441,30 @@ class SCFilterView: UIView {
         }
     }
     
+    // MARK: - Filter Reset
+    private func resetFilters() {
+        // 重置所有滤镜参数为默认值
+        let defaultParams = SCFilterTemplate.defaultParameters()
+        
+        updateBrightness(Float(defaultParams["亮度"] ?? 0.0))
+        updateContrast(Float(defaultParams["对比度"] ?? 1.0))
+        updateSaturation(Float(defaultParams["饱和度"] ?? 1.0))
+        updateExposure(Float(defaultParams["曝光"] ?? 0.0))
+        updateHighlights(Float(defaultParams["高光"] ?? 1.0))
+        updateShadows(Float(defaultParams["阴影"] ?? 1.0))
+        updateSharpness(Float(defaultParams["锐度"] ?? 1.0))
+        updateBlur(Float(defaultParams["模糊"] ?? 0.0))
+        updateGrain(Float(defaultParams["颗粒感"] ?? 0.0))
+        updateGlow(Float(defaultParams["光晕"] ?? 0.0))
+        updateEdgeStrength(Float(defaultParams["边缘强度"] ?? 0.0))
+        updateRedChannel(Float(defaultParams["红色"] ?? 1.0))
+        updateGreenChannel(Float(defaultParams["绿色"] ?? 1.0))
+        updateBlueChannel(Float(defaultParams["蓝色"] ?? 1.0))
+        
+        // 应用重置后的滤镜链
+        applyFilter()
+    }
+    
     // MARK: - Gesture Handlers
     @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
         delegate?.filterViewDidTap(self)
@@ -465,5 +486,63 @@ class SCFilterView: UIView {
         currentPicture?.removeAllTargets()
         currentPicture = nil
         originalImage = nil
+    }
+    
+    // MARK: - Public Methods
+    func applyTemplate(_ template: SCFilterTemplate) {
+        print("[FilterView] 应用滤镜模板: \(template.name)")
+        
+        guard let picture = currentPicture else {
+            print("[FilterView] 错误：没有可用的图片")
+            return
+        }
+        
+        // 清理现有的渲染内容
+        picture.removeAllTargets()
+        
+        // 应用滤镜模板
+        template.applyFilter(to: picture, output: gpuImageView)
+        
+        // 处理图像
+        picture.processImage()
+        
+        // 通知代理
+        delegate?.filterView(self, didChangeFilter: template)
+    }
+    
+    // MARK: - Parameter Updates
+    public func updateParameter(_ parameter: String, value: Float) {
+        switch parameter {
+        case "亮度":
+            updateBrightness(value)
+        case "对比度":
+            updateContrast(value)
+        case "饱和度":
+            updateSaturation(value)
+        case "曝光":
+            updateExposure(value)
+        case "高光":
+            updateHighlights(value)
+        case "阴影":
+            updateShadows(value)
+        case "颗粒感":
+            updateGrain(value)
+        case "锐度":
+            updateSharpness(value)
+        case "模糊":
+            updateBlur(value)
+        case "光晕":
+            updateGlow(value)
+        case "边缘强度":
+            updateEdgeStrength(value)
+        case "红色":
+            updateRedChannel(value)
+        case "绿色":
+            updateGreenChannel(value)
+        case "蓝色":
+            updateBlueChannel(value)
+        default:
+            print("[FilterView] 未知的参数类型: \(parameter)")
+        }
     }
 } 

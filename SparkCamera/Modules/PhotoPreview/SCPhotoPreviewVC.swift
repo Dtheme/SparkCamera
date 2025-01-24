@@ -176,14 +176,18 @@ import GPUImage
     }
     
     private func setupFilterOptionView() {
-        filterOptionView = SCFilterOptionView(templates: SCFilterTemplate.templates)
+        filterOptionView = SCFilterOptionView()
         filterOptionView.delegate = self
+        filterOptionView.templates = SCFilterTemplate.templates
+        filterOptionView.isUserInteractionEnabled = true
+        print("[PhotoPreview] 设置 filterOptionView delegate: \(String(describing: filterOptionView.delegate))")
+        print("[PhotoPreview] 设置 filterOptionView templates 数量: \(SCFilterTemplate.templates.count)")
         view.addSubview(filterOptionView)
         
         filterOptionView.snp.makeConstraints { make in
             make.left.right.equalToSuperview()
             make.bottom.equalTo(toolbar.snp.top)
-            make.height.equalTo(100)
+            make.height.equalTo(120)
         }
         
         // 初始状态隐藏
@@ -668,6 +672,12 @@ import GPUImage
         toolbar.setEditingMode(true)
         updateUIForEditingMode(true)
         
+        // 显示滤镜选项视图和调整按钮
+        UIView.animate(withDuration: 0.3) {
+            self.filterOptionView.alpha = 1
+            self.adjustButton.isHidden = false
+        }
+        
         // 等待布局更新完成后重新加载图片
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard let self = self else { return }
@@ -963,46 +973,30 @@ extension SCPhotoPreviewVC: SCFilterViewDelegate {
 // MARK: - SCFilterOptionViewDelegate
 extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
     func filterOptionView(_ view: SCFilterOptionView, didSelectTemplate template: SCFilterTemplate) {
-        // 应用滤镜
-        filterView.filterTemplate = template
+        print("[PhotoPreview] 选择滤镜模板: \(template.name)")
+        
+        // 更新滤镜视图
+        filterView.applyTemplate(template)
+        
+        // 更新调整视图的参数
+        filterAdjustView.updateParameters(template.toParameters())
+        
+        // 如果调整视图是展开状态，更新其显示的值
+        if filterAdjustView.isExpanded {
+            filterAdjustView.reloadData()
+        }
     }
 }
 
 // MARK: - SCFilterAdjustViewDelegate
 extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
     func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float) {
-        // 处理参数更新
-        switch parameter {
-        case "亮度":
-            filterView.updateBrightness(value)
-        case "对比度":
-            filterView.updateContrast(value)
-        case "饱和度":
-            filterView.updateSaturation(value)
-        case "曝光":
-            filterView.updateExposure(value)
-        case "高光":
-            filterView.updateHighlights(value)
-        case "阴影":
-            filterView.updateShadows(value)
-        case "颗粒感":
-            filterView.updateGrain(value)
-        case "锐度":
-            filterView.updateSharpness(value)
-        case "模糊":
-            filterView.updateBlur(value)
-        case "光晕":
-            filterView.updateGlow(value)
-        case "边缘强度":
-            filterView.updateEdgeStrength(value)
-        case "红色":
-            filterView.updateRedChannel(value)
-        case "绿色":
-            filterView.updateGreenChannel(value)
-        case "蓝色":
-            filterView.updateBlueChannel(value)
-        default:
-            break
-        }
+        // 更新滤镜参数
+        filterView.updateParameter(parameter, value: value)
+    }
+    
+    func filterAdjustView(_ view: SCFilterAdjustView, didChangeExpandState isExpanded: Bool) {
+        // 只在编辑模式下且抽屉未展开时显示调整按钮
+        adjustButton.isHidden = !isEditingMode || isExpanded
     }
 } 

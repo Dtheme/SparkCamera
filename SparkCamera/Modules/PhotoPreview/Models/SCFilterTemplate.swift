@@ -2,18 +2,18 @@ import UIKit
 import GPUImage
 
 /// 滤镜模板
-struct SCFilterTemplate {
+public struct SCFilterTemplate {
     /// 滤镜名称
-    let name: String
+    public let name: String
     /// 预览图
-    let thumbnail: UIImage?
+    public let thumbnail: UIImage?
     /// 滤镜类型
-    let type: FilterType
+    public let type: FilterType
     /// 滤镜参数
-    let parameters: FilterParameters
+    public let parameters: FilterParameters
     
     /// 滤镜类型
-    enum FilterType {
+    public enum FilterType {
         case original           // 原图
         case fujiFilm          // 富士胶片
         case polaroid          // 拍立得
@@ -28,7 +28,7 @@ struct SCFilterTemplate {
     }
     
     /// 滤镜参数
-    struct FilterParameters {
+    public struct FilterParameters {
         // 基础参数
         var brightness: CGFloat = 0.0     // 亮度 (-1.0 to 1.0)
         var contrast: CGFloat = 1.0       // 对比度 (0.0 to 4.0)
@@ -355,5 +355,44 @@ struct SCFilterTemplate {
         }
         
         print("[FilterTemplate] 滤镜链构建完成")
+    }
+    
+    public func toParameters() -> [String: Float] {
+        return [
+            "亮度": Float(parameters.brightness),
+            "对比度": Float(parameters.contrast),
+            "饱和度": Float(parameters.saturation),
+            "曝光": Float(parameters.exposure),
+            "高光": Float(parameters.highlights),
+            "阴影": Float(parameters.shadows),
+            "颗粒感": Float(parameters.grain),
+            "锐度": Float(parameters.sharpness),
+            "模糊": Float(parameters.blur),
+            "光晕": Float(parameters.glow),
+            "边缘强度": Float(parameters.edgeStrength),
+            "红色": Float(parameters.red),
+            "绿色": Float(parameters.green),
+            "蓝色": Float(parameters.blue)
+        ]
+    }
+    
+    public static func defaultParameters() -> [String: Float] {
+        let defaultParams = FilterParameters()
+        return [
+            "亮度": Float(defaultParams.brightness),
+            "对比度": Float(defaultParams.contrast),
+            "饱和度": Float(defaultParams.saturation),
+            "曝光": Float(defaultParams.exposure),
+            "高光": Float(defaultParams.highlights),
+            "阴影": Float(defaultParams.shadows),
+            "颗粒感": Float(defaultParams.grain),
+            "锐度": Float(defaultParams.sharpness),
+            "模糊": Float(defaultParams.blur),
+            "光晕": Float(defaultParams.glow),
+            "边缘强度": Float(defaultParams.edgeStrength),
+            "红色": Float(defaultParams.red),
+            "绿色": Float(defaultParams.green),
+            "蓝色": Float(defaultParams.blue)
+        ]
     }
 } 
