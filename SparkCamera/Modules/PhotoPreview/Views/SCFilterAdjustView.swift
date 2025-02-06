@@ -11,7 +11,16 @@ import SnapKit
 
 public protocol SCFilterAdjustViewDelegate: AnyObject {
     func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float)
-    func filterAdjustView(_ view: SCFilterAdjustView, didChangeExpandState isExpanded: Bool)
+    func filterAdjustView(_ view: SCFilterAdjustView, didChangeExpandState state: Bool)
+}
+
+// 滤镜参数结构体
+struct FilterParameter {
+    let name: String
+    let minValue: Float
+    let maxValue: Float
+    let defaultValue: Float
+    let step: Float
 }
 
 public class SCFilterAdjustView: UIView {
@@ -22,11 +31,6 @@ public class SCFilterAdjustView: UIView {
     private var tableView: UITableView!
     private var handleView: UIView!
     private var expandedWidth: CGFloat = 280
-    private var initialX: CGFloat = 0
-    private var isDragging: Bool = false
-    
-    // 添加右边距常量
-    private let rightMargin: CGFloat = 0
     
     // 添加重置按钮
     private lazy var resetButton: UIButton = {
@@ -41,21 +45,21 @@ public class SCFilterAdjustView: UIView {
     }()
     
     // 参数配置
-    private let parameters: [(name: String, range: ClosedRange<Float>, step: Float, defaultValue: Float)] = [
-        ("亮度", -1.0...1.0, 0.05, 0.0),      // Brightness
-        ("对比度", 0.0...4.0, 0.1, 1.0),      // Contrast
-        ("饱和度", 0.0...2.0, 0.05, 1.0),     // Saturation
-        ("曝光", -4.0...4.0, 0.1, 0.0),       // Exposure
-        ("高光", 0.0...1.0, 0.05, 1.0),       // Highlights
-        ("阴影", 0.0...1.0, 0.05, 1.0),       // Shadows
-        ("锐度", 0.0...4.0, 0.1, 1.0),        // Sharpness
-        ("模糊", 0.0...2.0, 0.05, 0.0),       // Blur
-        ("颗粒感", 0.0...1.0, 0.05, 0.0),     // Grain
-        ("光晕", 0.0...1.0, 0.05, 0.0),       // Glow
-        ("边缘强度", 0.0...1.0, 0.05, 0.0),   // Edge Strength
-        ("红色", 0.0...2.0, 0.05, 1.0),       // Red Channel
-        ("绿色", 0.0...2.0, 0.05, 1.0),       // Green Channel
-        ("蓝色", 0.0...2.0, 0.05, 1.0)        // Blue Channel
+    private let parameters: [FilterParameter] = [
+//        FilterParameter(name: "亮度", minValue: -1.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+        FilterParameter(name: "对比度", minValue: 0.0, maxValue: 4.0, defaultValue: 1.0, step: 0.1),
+//        FilterParameter(name: "饱和度", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
+//        FilterParameter(name: "曝光", minValue: -4.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
+//        FilterParameter(name: "高光", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
+//        FilterParameter(name: "阴影", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
+//        FilterParameter(name: "颗粒感", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+//        FilterParameter(name: "锐度", minValue: 0.0, maxValue: 4.0, defaultValue: 1.0, step: 0.1),
+//        FilterParameter(name: "模糊", minValue: 0.0, maxValue: 2.0, defaultValue: 0.0, step: 0.05),
+//        FilterParameter(name: "光晕", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+//        FilterParameter(name: "边缘强度", minValue: 0.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
+//        FilterParameter(name: "红色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
+//        FilterParameter(name: "绿色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
+//        FilterParameter(name: "蓝色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1)
     ]
     
     private var currentValues: [String: Float] = [:]
@@ -83,13 +87,9 @@ public class SCFilterAdjustView: UIView {
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]
         clipsToBounds = true
         
-        // 添加阴影效果
-        layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOffset = CGSize(width: -2, height: 0)
-        layer.shadowOpacity = 0.3
-        layer.shadowRadius = 4
-        
+        // 先添加所有子视图
         setupViews()
+        // 然后设置约束
         setupConstraints()
     }
     
@@ -106,6 +106,8 @@ public class SCFilterAdjustView: UIView {
         tableView.delegate = self
         tableView.dataSource = self
         tableView.register(SCFilterAdjustCell.self, forCellReuseIdentifier: "AdjustCell")
+        tableView.delaysContentTouches = false
+        tableView.canCancelContentTouches = true
         addSubview(tableView)
         
         resetButton.backgroundColor = UIColor(white: 0.15, alpha: 1.0)
@@ -127,7 +129,7 @@ public class SCFilterAdjustView: UIView {
         }
         
         tableView.snp.makeConstraints { make in
-            make.top.equalToSuperview()
+            make.top.equalToSuperview().offset(20)
             make.left.right.equalToSuperview()
             make.bottom.equalTo(resetButton.snp.top).offset(-10)
         }
@@ -139,20 +141,46 @@ public class SCFilterAdjustView: UIView {
         handleView.isUserInteractionEnabled = true
         
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan))
-        addGestureRecognizer(panGesture)  // 将手势添加到整个视图
-        
-        // 添加右滑手势
-        let rightSwipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleRightSwipe))
-        rightSwipeGesture.direction = .right
-        addGestureRecognizer(rightSwipeGesture)
+        handleView.addGestureRecognizer(panGesture)
     }
     
-    // MARK: - Gesture Handlers
+    // MARK: - Actions
     @objc private func handleTap() {
-        if isExpanded {
-            collapse()
-        } else {
-            expand()
+        toggleDrawer()
+    }
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self)
+        
+        switch gesture.state {
+        case .changed:
+            let newX = frame.origin.x + translation.x
+            if newX <= 0 && newX >= -expandedWidth {
+                frame.origin.x = newX
+                gesture.setTranslation(.zero, in: self)
+                
+                // 根据拖动进度更新状态
+                isExpanded = frame.origin.x < -expandedWidth/2
+                delegate?.filterAdjustView(self, didChangeExpandState: isExpanded)
+            }
+        case .ended:
+            let velocity = gesture.velocity(in: self)
+            if velocity.x > 500 {
+                // 快速右滑，收起抽屉
+                collapse()
+            } else if velocity.x < -500 {
+                // 快速左滑，展开抽屉
+                expand()
+            } else {
+                // 根据当前位置决定展开或收起
+                if frame.origin.x < -expandedWidth/2 {
+                    expand()
+                } else {
+                    collapse()
+                }
+            }
+        default:
+            break
         }
     }
     
@@ -182,74 +210,19 @@ public class SCFilterAdjustView: UIView {
         }
     }
     
-    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-        guard let superview = self.superview else { return }
-        
-        let translation = gesture.translation(in: superview)
-        let velocity = gesture.velocity(in: superview)
-        
-        switch gesture.state {
-        case .began:
-            isDragging = true
-            initialX = frame.origin.x
-            
-        case .changed:
-            let newX = initialX + translation.x
-            // 限制拖动范围在收起和展开位置之间
-            let collapsedX = superview.bounds.width - rightMargin
-            let expandedX = collapsedX - expandedWidth
-            
-            if newX <= collapsedX && newX >= expandedX {
-                frame.origin.x = newX
-                
-                // 根据拖动位置调整透明度
-                let progress = (collapsedX - newX) / expandedWidth
-                backgroundColor = UIColor(white: 0.1, alpha: 0.95 * max(0.5, progress))
-            }
-            
-        case .ended, .cancelled:
-            isDragging = false
-            let finalVelocity = velocity.x
-            
-            // 根据速度和位置决定展开或收起
-            if abs(finalVelocity) > 500 {
-                if finalVelocity > 0 {
-                    collapse()
-                } else {
-                    expand()
-                }
-            } else {
-                let collapsedX = superview.bounds.width - rightMargin
-                let expandedX = collapsedX - expandedWidth
-                let middleX = expandedX + (expandedWidth / 2)
-                
-                if frame.origin.x < middleX {
-                    expand()
-                } else {
-                    collapse()
-                }
-            }
-            
-        default:
-            break
-        }
-    }
-    
-    @objc private func handleRightSwipe(_ gesture: UISwipeGestureRecognizer) {
+    // MARK: - Public Methods
+    public func toggleDrawer() {
         if isExpanded {
             collapse()
+        } else {
+            expand()
         }
     }
     
-    // MARK: - Animation Methods
     public func expand() {
         isExpanded = true
-        let animator = UIViewPropertyAnimator(duration: 0.3, dampingRatio: 0.8) {
-            // 计算展开时的 x 坐标：屏幕宽度减去展开宽度和右边距
-            if let superview = self.superview {
-                self.frame.origin.x = superview.bounds.width - self.expandedWidth - self.rightMargin
-            }
-            self.backgroundColor = UIColor(white: 0.1, alpha: 0.95)
+        let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeOut) {
+            self.frame.origin.x = -self.expandedWidth
         }
         animator.addCompletion { [weak self] _ in
             guard let self = self else { return }
@@ -260,12 +233,8 @@ public class SCFilterAdjustView: UIView {
     
     public func collapse() {
         isExpanded = false
-        let animator = UIViewPropertyAnimator(duration: 0.3, dampingRatio: 0.8) {
-            // 计算收起时的 x 坐标：屏幕宽度减去右边距
-            if let superview = self.superview {
-                self.frame.origin.x = superview.bounds.width - self.rightMargin
-            }
-            self.backgroundColor = UIColor(white: 0.1, alpha: 0.5)
+        let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeOut) {
+            self.frame.origin.x = 0
         }
         animator.addCompletion { [weak self] _ in
             guard let self = self else { return }
@@ -274,15 +243,29 @@ public class SCFilterAdjustView: UIView {
         animator.startAnimation()
     }
     
-    // MARK: - Public Methods
     public func updateParameters(_ parameters: [String: Float]) {
-        // 添加动画效果
-        UIView.animate(withDuration: 0.2) {
-            for (key, value) in parameters {
-                self.currentValues[key] = value
+        // 更新当前值
+        for (key, value) in parameters {
+            // 确保值在有效范围内
+            if let parameter = self.parameters.first(where: { $0.name == key }) {
+                let clampedValue = min(max(value, parameter.minValue), parameter.maxValue)
+                currentValues[key] = clampedValue
+            } else {
+                currentValues[key] = value
             }
-            self.tableView.reloadData()
         }
+        // 刷新表格
+        tableView.reloadData()
+    }
+    
+    public func resetParameters() {
+        // 重置所有参数到默认值
+        for parameter in parameters {
+            currentValues[parameter.name] = parameter.defaultValue
+            delegate?.filterAdjustView(self, didUpdateParameter: parameter.name, value: parameter.defaultValue)
+        }
+        // 刷新表格
+        tableView.reloadData()
     }
     
     public func reloadData() {
@@ -299,21 +282,40 @@ extension SCFilterAdjustView: UITableViewDelegate, UITableViewDataSource {
     public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "AdjustCell", for: indexPath) as! SCFilterAdjustCell
         let parameter = parameters[indexPath.row]
-        cell.configure(
-            name: parameter.name,
-            value: currentValues[parameter.name] ?? parameter.defaultValue,
-            range: parameter.range,
-            step: parameter.step
-        ) { [weak self] value in
+        // 打印参数内容：
+        print("parameter: \(parameter.name),\(parameter.minValue),\(parameter.maxValue),\(parameter.defaultValue)")
+
+        // 获取当前值，如果不存在则使用默认值
+        let currentValue = currentValues[parameter.name] ?? parameter.defaultValue
+        
+        // 使用新的configure方法
+        cell.configure(parameter: parameter, currentValue: currentValue)
+        
+        // 配置值变化回调
+        cell.valueChanged = { [weak self] value in
             guard let self = self else { return }
+            // 更新当前值
             self.currentValues[parameter.name] = value
+            // 通知代理
             self.delegate?.filterAdjustView(self, didUpdateParameter: parameter.name, value: value)
         }
+        
         return cell
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 120
+        return 120  // 固定高度，确保滑块和刻度显示完整
+    }
+    
+    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        // 当滚动时，如果有正在编辑的滑块，结束其编辑状态
+        if let visibleCells = tableView.visibleCells as? [SCFilterAdjustCell] {
+            for cell in visibleCells {
+                if let slider = cell.contentView.subviews.first(where: { $0 is SCScaleSlider }) as? SCScaleSlider {
+                    slider.endEditing(true)
+                }
+            }
+        }
     }
 }
 
@@ -339,16 +341,10 @@ class SCFilterAdjustCell: UITableViewCell {
         return label
     }()
     
-    private lazy var slider: SCScaleSlider = {
-        let config = SCScaleSliderConfig(minValue: -1.0, maxValue: 1.0, step: 0.1, defaultValue: 0.0)
-        let slider = SCScaleSlider(config: config)
-        slider.style = .Style.vertical.style
-        return slider
-    }()
-    
-    private var valueChanged: ((Float) -> Void)?
+    private var slider: SCScaleSlider!
+    public var valueChanged: ((Float) -> Void)?
     private var defaultValue: Float = 0.0
-    private var currentRange: ClosedRange<Float> = -1.0...1.0
+    private var parameter: FilterParameter?  // 添加参数属性
     
     // MARK: - Initialization
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -365,16 +361,14 @@ class SCFilterAdjustCell: UITableViewCell {
     private func setupUI() {
         backgroundColor = .clear
         selectionStyle = .none
-
-        contentView.addSubview(valueLabel)
-        contentView.addSubview(slider)
+        
         contentView.addSubview(titleLabel)
-        contentView.bringSubviewToFront(titleLabel)
+        contentView.addSubview(valueLabel)
+        
         titleLabel.snp.makeConstraints { make in
             make.top.equalToSuperview().offset(12)
             make.left.equalToSuperview().offset(16)
             make.height.equalTo(30)
-            make.right.equalTo(valueLabel.snp.left).offset(-8)
         }
         
         valueLabel.snp.makeConstraints { make in
@@ -382,13 +376,7 @@ class SCFilterAdjustCell: UITableViewCell {
             make.right.equalToSuperview().offset(-16)
             make.width.equalTo(64)
             make.height.equalTo(26)
-        }
-        
-        slider.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.top).offset(8)
-            make.left.equalToSuperview().offset(20)
-            make.right.equalToSuperview().offset(-20)
-            make.bottom.equalToSuperview().offset(-8)
+            make.left.equalTo(titleLabel.snp.right).offset(8)
         }
     }
     
@@ -410,54 +398,91 @@ class SCFilterAdjustCell: UITableViewCell {
         valueChanged?(defaultValue)
     }
     
-    // MARK: - Configuration
-    func configure(name: String, value: Float, range: ClosedRange<Float>, step: Float, valueChanged: @escaping (Float) -> Void) {
-        titleLabel.text = name
-        defaultValue = value
-        currentRange = range
-        
-        // 创建新的配置
-        let config = SCScaleSliderConfig(
-            minValue: range.lowerBound,
-            maxValue: range.upperBound,
-            step: step,
-            defaultValue: value
-        )
-        
-        // 重新配置滑块
-        slider = SCScaleSlider(config: config)
-        slider.style = .Style.vertical.style
-        slider.valueChangedHandler = { [weak self] value in
-            self?.updateValueLabel(value)
-            valueChanged(value)
-        }
-        
-        // 设置初始值
-        slider.setValue(value, animated: false)
-        updateValueLabel(value)
-        
-        self.valueChanged = valueChanged
-    }
-    
     private func updateValueLabel(_ value: Float) {
-        // 根据值的范围和类型调整显示格式
-        let format: String
-        if abs(currentRange.upperBound - currentRange.lowerBound) <= 2.0 {
-            // 小范围值使用更精确的格式
-            format = "%.2f"
-        } else if abs(value) < 10 {
-            format = "%.1f"
-        } else {
-            format = "%.0f"
-        }
+        guard let parameter = parameter else { return }
         
+        // 根据参数范围选择合适的显示格式
+        let absValue = abs(value)
+        let format: String
+        if parameter.maxValue >= 10 {
+            format = "%.0f"  // 大范围值（如对比度）使用整数
+        } else if parameter.maxValue >= 2 {
+            format = "%.1f"  // 中等范围值（如饱和度）保留一位小数
+        } else {
+            format = "%.2f"  // 小范围值（如亮度）保留两位小数
+        }
         valueLabel.text = String(format: format, value)
         
         // 根据值是否为默认值调整显示样式
-        if abs(value - defaultValue) < Float.ulpOfOne {
-            valueLabel.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
-        } else {
-            valueLabel.backgroundColor = UIColor(white: 1.0, alpha: 0.3)
+        valueLabel.backgroundColor = abs(value - parameter.defaultValue) < Float.ulpOfOne
+            ? UIColor(white: 1.0, alpha: 0.15)
+            : UIColor(white: 1.0, alpha: 0.3)
+    }
+    
+    // MARK: - Configuration
+    func configure(parameter: FilterParameter, currentValue: Float) {
+        self.parameter = parameter  // 保存参数
+        titleLabel.text = parameter.name
+        defaultValue = parameter.defaultValue
+        
+        // 移除旧的滑块
+        slider?.removeFromSuperview()
+
+        // 创建新的滑块
+        let config = SCScaleSliderConfig(
+            minValue: parameter.minValue,
+            maxValue: parameter.maxValue,
+            step: parameter.step,
+            defaultValue: parameter.defaultValue
+        )
+        
+        slider = SCScaleSlider(config: config)
+        slider.style = .Style.default.style
+        contentView.addSubview(slider)
+        
+        // 设置滑块约束
+        slider.snp.makeConstraints { make in
+            make.top.equalTo(titleLabel.snp.bottom).offset(8)
+            make.left.equalToSuperview().offset(20)
+            make.right.equalToSuperview().offset(-20)
+            make.height.equalTo(60)
+            make.bottom.equalToSuperview().offset(-8)
         }
+        
+        // 确保当前值在有效范围内
+        let clampedValue = min(max(currentValue, parameter.minValue), parameter.maxValue)
+        
+        // 设置初始值
+        slider.setValue(clampedValue, animated: false)
+        updateValueLabel(clampedValue)
+        
+        // 配置回调
+        slider.valueChangedHandler = { [weak self] value in
+            guard let self = self else { return }
+            // 确保值在有效范围内
+            let clampedValue = min(max(value, parameter.minValue), parameter.maxValue)
+            // 根据步长对齐值
+            let steps = round(clampedValue / parameter.step)
+            let alignedValue = steps * parameter.step
+            
+            self.updateValueLabel(alignedValue)
+            self.valueChanged?(alignedValue)
+        }
+        
+        // 打印调试信息
+        print("配置滑块 - 参数：\(parameter.name)")
+        print("最小值：\(parameter.minValue)")
+        print("最大值：\(parameter.maxValue)")
+        print("默认值：\(parameter.defaultValue)")
+        print("当前值：\(clampedValue)")
+        print("步长：\(parameter.step)")
+    }
+    
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        slider?.removeFromSuperview()
+        slider = nil
+        parameter = nil  // 清理参数
+        valueChanged = nil
     }
 } 

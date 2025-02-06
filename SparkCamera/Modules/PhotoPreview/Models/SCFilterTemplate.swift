@@ -54,7 +54,7 @@ public struct SCFilterTemplate {
             saturation: 1.25,      // 降低饱和度，避免过度鲜艳
             exposure: -0.15,       // 降低曝光，增加富士特有的暗调
             highlights: 0.25,      // 降低高光，避免过曝
-            shadows: 0.7,          // 提升阴影，增加细节
+            shadows: 0.7,          // 提升阴影，增加细节 
             grain: 0.25,          // 增加颗粒感，模拟胶片质感
             sharpness: 0.9,       // 降低锐化，更柔和
             glow: 0.15,           // 添加轻微光晕，增加胶片感

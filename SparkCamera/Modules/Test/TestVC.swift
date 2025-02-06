@@ -18,6 +18,18 @@ class TestVC: UIViewController {
         return view
     }()
     
+    private var slider: SCScaleSlider!
+    private let valueLabel: UILabel = {
+        let label = UILabel()
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 15, weight: .medium)
+        label.textAlignment = .center
+        label.backgroundColor = UIColor(white: 1.0, alpha: 0.15)
+        label.layer.cornerRadius = 10
+        label.clipsToBounds = true
+        return label
+    }()
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -42,6 +54,49 @@ class TestVC: UIViewController {
             make.bottom.equalTo(view.safeAreaLayoutGuide)
             make.height.equalTo(120)
         }
+        
+        // 配置滑块
+        let config = SCScaleSliderConfig(
+            minValue: 0,
+            maxValue: 4.0,
+            step: 0.1,
+            defaultValue: 1.0
+        )
+        
+        slider = SCScaleSlider(config: config)
+        slider.style = .Style.default.style
+        view.addSubview(slider)
+        
+        // 添加值显示标签
+        view.addSubview(valueLabel)
+        
+        // 设置约束
+        slider.snp.makeConstraints { make in
+            make.center.equalToSuperview()
+            make.left.equalToSuperview().offset(40)
+            make.right.equalToSuperview().offset(-40)
+            make.height.equalTo(60)
+        }
+        
+        valueLabel.snp.makeConstraints { make in
+            make.bottom.equalTo(slider.snp.top).offset(-20)
+            make.centerX.equalToSuperview()
+            make.width.equalTo(80)
+            make.height.equalTo(30)
+        }
+        
+        // 配置值变化回调
+        slider.valueChangedHandler = { [weak self] value in
+            guard let self = self else { return }
+            // 根据步长对齐值
+            let steps = round(value / config.step)
+            let alignedValue = steps * config.step
+            // 更新显示
+            self.updateValueLabel(alignedValue)
+        }
+        
+        // 设置初始值
+        updateValueLabel(0.0)
     }
     
     private func loadImage() {
@@ -107,6 +162,13 @@ class TestVC: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
+    }
+    
+    private func updateValueLabel(_ value: Float) {
+        // 根据值的大小选择合适的格式
+        let absValue = abs(value)
+        let format = absValue >= 10 ? "%.0f" : (absValue >= 1 ? "%.1f" : "%.2f")
+        valueLabel.text = String(format: format, value)
     }
 }
 

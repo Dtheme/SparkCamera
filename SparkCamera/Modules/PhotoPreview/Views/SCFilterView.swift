@@ -315,8 +315,10 @@ class SCFilterView: UIView {
     
     func updateGrain(_ value: Float) {
         grain = CGFloat(value)
-        let size = CGFloat(value * 100)
-        grainFilter?.sizeInPixels = CGSize(width: size, height: size)
+        if let filter = grainFilter {
+            let size = Int(value * 50)
+            filter.sizeInPixels = CGSize(width: size, height: size)
+        }
         applyFilter()
     }
     
@@ -512,37 +514,61 @@ class SCFilterView: UIView {
     
     // MARK: - Parameter Updates
     public func updateParameter(_ parameter: String, value: Float) {
+        print("[FilterView] 更新参数: \(parameter) = \(value)")
+        
         switch parameter {
         case "亮度":
-            updateBrightness(value)
+            brightness = CGFloat(value)
+            brightnessFilter?.brightness = CGFloat(value)
         case "对比度":
-            updateContrast(value)
+            contrast = CGFloat(value)
+            contrastFilter?.contrast = CGFloat(value)
         case "饱和度":
-            updateSaturation(value)
+            saturation = CGFloat(value)
+            saturationFilter?.saturation = CGFloat(value)
         case "曝光":
-            updateExposure(value)
+            exposure = CGFloat(value)
+            exposureFilter?.exposure = CGFloat(value)
         case "高光":
-            updateHighlights(value)
+            highlights = CGFloat(value)
+            highlightsFilter?.highlights = CGFloat(value)
         case "阴影":
-            updateShadows(value)
+            shadows = CGFloat(value)
+            highlightsFilter?.shadows = CGFloat(value)
         case "颗粒感":
-            updateGrain(value)
+            grain = CGFloat(value)
+            if let filter = grainFilter {
+                let size = Int(value * 50)
+                filter.sizeInPixels = CGSize(width: size, height: size)
+            }
         case "锐度":
-            updateSharpness(value)
+            sharpness = CGFloat(value)
+            sharpenFilter?.sharpness = CGFloat(value)
         case "模糊":
-            updateBlur(value)
+            blur = CGFloat(value)
+            gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value * 2.0)
         case "光晕":
-            updateGlow(value)
+            glow = CGFloat(value)
+            // 光晕效果需要特殊处理
         case "边缘强度":
-            updateEdgeStrength(value)
+            edgeStrength = CGFloat(value)
+            sobelEdgeFilter?.edgeStrength = CGFloat(value)
         case "红色":
-            updateRedChannel(value)
+            redChannel = CGFloat(value)
+            rgbFilter?.red = CGFloat(value)
         case "绿色":
-            updateGreenChannel(value)
+            greenChannel = CGFloat(value)
+            rgbFilter?.green = CGFloat(value)
         case "蓝色":
-            updateBlueChannel(value)
+            blueChannel = CGFloat(value)
+            rgbFilter?.blue = CGFloat(value)
         default:
             print("[FilterView] 未知的参数类型: \(parameter)")
+        }
+        
+        // 如果有图片，重新处理
+        if let picture = currentPicture {
+            picture.processImage()
         }
     }
 } 

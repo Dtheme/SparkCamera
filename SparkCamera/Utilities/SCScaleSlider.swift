@@ -247,6 +247,9 @@ class SCScaleSlider: UIView {
         setupGestures()
         setupAccessibility()
         updateScalePosition(animated: false)
+        
+        // 初始化时更新值标签
+        updateValueLabel()
     }
     
     required init?(coder: NSCoder) {
@@ -337,8 +340,8 @@ class SCScaleSlider: UIView {
         let stepWidth = style.scaleWidth
         let screenWidth = UIScreen.main.bounds.width
         
-        // 计算0点位置
-        let zeroPosition = screenWidth / 2
+        // 计算起始位置：从屏幕中心开始
+        let centerPosition = screenWidth / 2
         
         for i in 0...totalSteps {
             let value = config.minValue + Float(i) * config.step
@@ -349,7 +352,7 @@ class SCScaleSlider: UIView {
             self.scaleView.addSubview(scaleView)
             
             // 计算x位置：从最小值开始
-            let x = CGFloat(i) * stepWidth + zeroPosition
+            let x = CGFloat(i) * stepWidth + centerPosition
             let height: CGFloat = isMainScale ? style.mainScaleHeight : style.subScaleHeight
             
             scaleView.snp.makeConstraints { make in
@@ -375,9 +378,9 @@ class SCScaleSlider: UIView {
             }
         }
         
-        // 计算初始偏移：将0点对准中心
-        let stepsFromZero = -config.minValue / config.step
-        let initialOffset = CGFloat(stepsFromZero) * stepWidth
+        // 初始位置：将默认值对准中心
+        let stepsFromMin = (currentValue - config.minValue) / config.step
+        let initialOffset = -CGFloat(stepsFromMin) * stepWidth
         contentView.transform = CGAffineTransform(translationX: initialOffset, y: 0)
     }
     
@@ -398,28 +401,22 @@ class SCScaleSlider: UIView {
             // 左滑尺子向左移动，数值增加
             let valueChange = Float(translation.x / stepWidth) * config.step * Float(sensitivity)
             
-            var newValue = currentValue - valueChange  // 注意这里改为减法
+            var newValue = currentValue - valueChange  // 保持减法，因为移动方向和值的变化方向是相反的
             newValue = min(config.maxValue, max(config.minValue, newValue))
             
             if newValue != currentValue {
                 currentValue = newValue
                 updateScalePosition(animated: true)
+                updateValueLabel()
+                valueChangedHandler?(currentValue)
             }
             gesture.setTranslation(.zero, in: self)
             
-        case .ended:
+        case .ended, .cancelled:
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
                 self.thumbView.transform = .identity
                 self.snapToNearestStep()
             }
-//            print("📏 [ScaleSlider] 滑动结束，最终值: \(currentValue)")
-            
-        case .cancelled:
-            UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
-                self.thumbView.transform = .identity
-                self.snapToNearestStep()
-            }
-//            print("📏 [ScaleSlider] 滑动取消，最终值: \(currentValue)")
             
         default:
             break
@@ -458,10 +455,13 @@ class SCScaleSlider: UIView {
         
         var newValue = currentValue + valueChange  // 点击右侧值增大，点击左侧值减小
         newValue = min(config.maxValue, max(config.minValue, newValue))
-        currentValue = newValue
         
-        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
-            self.snapToNearestStep()
+        if newValue != currentValue {
+            currentValue = newValue
+            updateScalePosition(animated: true)
+            updateValueLabel()
+            valueChangedHandler?(currentValue)
+            snapToNearestStep()
         }
     }
     
@@ -502,9 +502,9 @@ class SCScaleSlider: UIView {
     private func updateScalePosition(animated: Bool) {
         let stepWidth = style.scaleWidth
         
-        // 计算当前值相对于0点的步数
-        let stepsFromZero = -currentValue / config.step
-        let offset = CGFloat(stepsFromZero) * stepWidth
+        // 计算当前值相对于最小值的步数
+        let stepsFromMin = (currentValue - config.minValue) / config.step
+        let offset = -CGFloat(stepsFromMin) * stepWidth
         
         let transform = CGAffineTransform(translationX: offset, y: 0)
         

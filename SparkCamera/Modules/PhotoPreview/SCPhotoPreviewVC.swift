@@ -677,16 +677,6 @@ import GPUImage
             self.filterOptionView.alpha = 1
             self.adjustButton.isHidden = false
         }
-        
-        // 等待布局更新完成后重新加载图片
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            guard let self = self else { return }
-            if let downsampledImage = self.downsampledImage {
-                self.filterView.setImage(downsampledImage)
-            } else {
-                self.filterView.setImage(self.image)
-            }
-        }
     }
 
     private func exitEditingMode() {
@@ -697,14 +687,11 @@ import GPUImage
             self.toolbar.setEditingMode(false)
             self.updateUIForEditingMode(false)
             
-            // 等待布局更新完成后重新加载图片
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                guard let self = self else { return }
-                if let downsampledImage = self.downsampledImage {
-                    self.filterView.setImage(downsampledImage)
-                } else {
-                    self.filterView.setImage(self.image)
-                }
+            // 隐藏滤镜选项视图和调整按钮
+            UIView.animate(withDuration: 0.3) {
+                self.filterOptionView.alpha = 0
+                self.adjustButton.isHidden = true
+                self.filterAdjustView.collapse()
             }
         }
     }
@@ -770,15 +757,10 @@ import GPUImage
 // MARK: - UIGestureRecognizerDelegate
 extension SCPhotoPreviewVC: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // 如果点击了工具栏，不触发手势
-        if touch.view?.isDescendant(of: toolbar) == true {
+        // 如果点击的是调整视图，不响应背景点击手势
+        if touch.view?.isDescendant(of: filterAdjustView) ?? false {
             return false
         }
-        return true
-    }
-    
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        // 允许平移手势和滚动视图同时工作
         return true
     }
 }
@@ -992,11 +974,50 @@ extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
 extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
     func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float) {
         // 更新滤镜参数
-        filterView.updateParameter(parameter, value: value)
+        switch parameter {
+        case "亮度":
+            filterView.updateBrightness(value)
+        case "对比度":
+            filterView.updateContrast(value)
+        case "饱和度":
+            filterView.updateSaturation(value)
+        case "曝光":
+            filterView.updateExposure(value)
+        case "高光":
+            filterView.updateHighlights(value)
+        case "阴影":
+            filterView.updateShadows(value)
+        case "颗粒感":
+            filterView.updateGrain(value)
+        case "锐度":
+            filterView.updateSharpness(value)
+        case "模糊":
+            filterView.updateBlur(value)
+        case "光晕":
+            filterView.updateGlow(value)
+        case "边缘强度":
+            filterView.updateEdgeStrength(value)
+        case "红色":
+            filterView.updateRedChannel(value)
+        case "绿色":
+            filterView.updateGreenChannel(value)
+        case "蓝色":
+            filterView.updateBlueChannel(value)
+        default:
+            print("⚠️ 未知的滤镜参数：\(parameter)")
+        }
     }
     
     func filterAdjustView(_ view: SCFilterAdjustView, didChangeExpandState isExpanded: Bool) {
-        // 只在编辑模式下且抽屉未展开时显示调整按钮
-        adjustButton.isHidden = !isEditingMode || isExpanded
+        // 更新调整按钮的显示状态
+        adjustButton.isHidden = isExpanded
+        
+        // 更新抽屉视图的位置
+        UIView.animate(withDuration: 0.3) {
+            self.filterAdjustView.transform = CGAffineTransform(
+                translationX: isExpanded ? 0 : self.filterAdjustView.bounds.width,
+                y: 0
+            )
+        }
     }
 } 
