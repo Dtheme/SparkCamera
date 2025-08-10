@@ -25,6 +25,13 @@ import GPUImage
     private var parameterListView: SCParameterListView!
     private var parameterEditorView: SCParameterEditorView!
     private var currentSelectedParameter: SCFilterParameter = .presetTemplates
+    private var parameterHistory: [SCFilterParameter: [Float]] = [:]
+    private var parameterRedoStack: [SCFilterParameter: [Float]] = [:]
+    // 基线参数：进入编辑模式时从当前图片读取，用于重置与修改判断
+    private var baselineParameters: [SCFilterParameter: Float] = [:]
+    private var resetAllButton: UIButton!
+    // 新增：承载预置/参数编辑的容器，避免层级/命中问题
+    private var editContainerView: UIView!
     private var closeButton: UIButton!
     private var isStatusBarHidden = false
     private var progressView: UIProgressView!
@@ -115,6 +122,7 @@ import GPUImage
         setupToolbar()
         setupInfoView()
         setupParameterListView()
+        setupEditContainerView()
         setupFilterOptionView()
         setupParameterEditorView()
         setupFilterAdjustView()
@@ -189,16 +197,18 @@ import GPUImage
     private func setupFilterOptionView() {
         filterOptionView = SCFilterOptionView()
         filterOptionView.delegate = self
-        filterOptionView.templates = SCFilterTemplate.templates
+        // 预置 + 自定义
+        let customTemplates = SCCustomFilterManager.shared.allFilters().map { $0.toTemplate() }
+        filterOptionView.templates = SCFilterTemplate.templates + customTemplates
         filterOptionView.isUserInteractionEnabled = true
         print("[PhotoPreview] 设置 filterOptionView delegate: \(String(describing: filterOptionView.delegate))")
-        print("[PhotoPreview] 设置 filterOptionView templates 数量: \(SCFilterTemplate.templates.count)")
-        view.addSubview(filterOptionView)
+        print("[PhotoPreview] 设置 filterOptionView templates 数量: \(filterOptionView.templates.count)")
+        editContainerView.addSubview(filterOptionView)
         
         filterOptionView.snp.makeConstraints { make in
             make.left.right.equalToSuperview()
-            // 预置滤镜列表位于参数列表之上
-            make.bottom.equalTo(parameterListView.snp.top)
+            make.top.equalToSuperview()
+            make.bottom.equalToSuperview()
             make.height.equalTo(120)
         }
         
@@ -206,25 +216,69 @@ import GPUImage
         filterOptionView.alpha = 0
     }
 
+    private func setupEditContainerView() {
+        editContainerView = UIView()
+        editContainerView.backgroundColor = .clear
+        view.addSubview(editContainerView)
+        editContainerView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(parameterListView.snp.top)
+            make.height.equalTo(120)
+        }
+    }
+
     private func setupParameterListView() {
+        // 先添加重置全部按钮，避免与列表重叠
+        resetAllButton = UIButton(type: .system)
+        resetAllButton.setTitle("重置全部", for: .normal)
+        resetAllButton.setTitleColor(.white, for: .normal)
+        resetAllButton.backgroundColor = UIColor.white.withAlphaComponent(0.15)
+        resetAllButton.layer.cornerRadius = 8
+        resetAllButton.titleLabel?.font = .systemFont(ofSize: 13, weight: .medium)
+        resetAllButton.addTarget(self, action: #selector(handleResetAll), for: .touchUpInside)
+        view.addSubview(resetAllButton)
+        resetAllButton.snp.makeConstraints { make in
+            make.right.equalToSuperview().offset(-12)
+            make.bottom.equalTo(toolbar.snp.top).offset(-8)
+            make.height.equalTo(28)
+            make.width.equalTo(76)
+        }
+        resetAllButton.alpha = 0
+
+        // 再添加参数列表，并让其右侧不与按钮重叠
         parameterListView = SCParameterListView(parameters: SCFilterParameter.allCases)
         parameterListView.delegate = self
         view.addSubview(parameterListView)
         parameterListView.snp.makeConstraints { make in
-            make.left.right.equalToSuperview()
+            make.left.equalToSuperview()
+            make.right.equalTo(resetAllButton.snp.left).offset(-8)
             make.bottom.equalTo(toolbar.snp.top)
             make.height.equalTo(44)
         }
         parameterListView.alpha = 0
+        parameterListView.layer.zPosition = 10
+
+        // 解决与容器/抽屉手势冲突：要求容器和抽屉的pan/tap失败后，collectionView再处理
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let gestures = self.parameterListView.gesturesForConflictResolution()
+            if let editGestures = self.editContainerView.gestureRecognizers {
+                for g in gestures { editGestures.forEach { g.require(toFail: $0) } }
+            }
+            if let adjustGestures = self.filterAdjustView.gestureRecognizers {
+                for g in gestures { adjustGestures.forEach { g.require(toFail: $0) } }
+            }
+        }
     }
 
     private func setupParameterEditorView() {
         parameterEditorView = SCParameterEditorView()
         parameterEditorView.delegate = self
-        view.addSubview(parameterEditorView)
+        parameterEditorView.isUserInteractionEnabled = true
+        editContainerView.addSubview(parameterEditorView)
         parameterEditorView.snp.makeConstraints { make in
             make.left.right.equalToSuperview()
-            make.bottom.equalTo(parameterListView.snp.top)
+            make.top.bottom.equalToSuperview()
             make.height.equalTo(120)
         }
         parameterEditorView.alpha = 0
@@ -252,6 +306,10 @@ import GPUImage
         // 添加点击手势来关闭抽屉
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
         tapGesture.delegate = self
+        // 避免与参数列表手势冲突：只有当参数列表未处理时才触发背景点击
+        if let gestures = parameterListView?.gesturesForConflictResolution() {
+            gestures.forEach { tapGesture.require(toFail: $0) }
+        }
         view.addGestureRecognizer(tapGesture)
         
         // 设置调整按钮
@@ -757,25 +815,18 @@ import GPUImage
         let bottomReservedSpace: CGFloat
         if isEditing {
             // safeArea + toolbar边距(20) + toolbar(60) + 参数列表(44) + 预置/编辑区域(120) + 额外bottom(20)
-            bottomReservedSpace = view.safeAreaInsets.bottom + 20 + 60 + 44 + 120 + 20
+            bottomReservedSpace = view.safeAreaInsets.bottom + 20.0 + 60.0 + 44.0 + 120.0 + 20.0
         } else {
             // 非编辑模式下仅保留底部工具栏与信息视图
             // infoView(60) + 与toolbar间距(20) + toolbar(60) + safeArea bottom
-            bottomReservedSpace = view.safeAreaInsets.bottom + 60 + 20 + 60 + 20
+            bottomReservedSpace = view.safeAreaInsets.bottom + 60.0 + 20.0 + 60.0 + 20.0
         }
         let availableHeight = view.bounds.height - view.safeAreaInsets.top - topMargin - bottomReservedSpace
-        let maxWidth = view.bounds.width - (isEditing ? 40 : 0)
-        let widthBasedHeight = maxWidth / imageAspectRatio
-        let heightBasedWidth = availableHeight * imageAspectRatio
-        let finalWidth: CGFloat
-        let finalHeight: CGFloat
-        if widthBasedHeight <= availableHeight {
-            finalWidth = maxWidth
-            finalHeight = widthBasedHeight
-        } else {
-            finalWidth = heightBasedWidth
-            finalHeight = availableHeight
-        }
+        let maxWidth = view.bounds.width - (isEditing ? 40.0 : 0.0)
+        let widthBasedHeight: CGFloat = maxWidth / imageAspectRatio
+        let heightBasedWidth: CGFloat = availableHeight * imageAspectRatio
+        let finalWidth: CGFloat = (widthBasedHeight <= availableHeight) ? maxWidth : heightBasedWidth
+        let finalHeight: CGFloat = (widthBasedHeight <= availableHeight) ? widthBasedHeight : availableHeight
         filterView.snp.remakeConstraints { make in
             make.centerX.equalToSuperview()
             make.top.equalTo(view.safeAreaLayoutGuide).offset(topMargin)
@@ -807,6 +858,8 @@ import GPUImage
         isEditingMode = true
         toolbar.setEditingMode(true)
         updateUIForEditingMode(true)
+        // 捕获当前图片的参数作为本次会话的基线
+        captureBaselineParameters()
         
         // 显示参数列表与预置滤镜
         print("🔧 [DEBUG] 进入编辑模式，显示调整按钮")
@@ -816,25 +869,39 @@ import GPUImage
         print("  安全区域: \(view.safeAreaLayoutGuide.layoutFrame)")
         print("  视图bounds: \(view.bounds)")
         
-        // 确保按钮在最前面并强制显示
+        // 旧的右侧抽屉按钮不再使用，保持隐藏
         view.bringSubviewToFront(adjustButton)
-        
-        // 立即显示按钮，不等动画
-        adjustButton.isHidden = false
-        adjustButton.alpha = 1.0
+        adjustButton.isHidden = true
+        adjustButton.alpha = 0.0
         
         UIView.animate(withDuration: 0.3) {
             self.parameterListView.alpha = 1
+            self.resetAllButton.alpha = 1
             self.filterOptionView.alpha = 1
             self.parameterEditorView.alpha = 0
             self.parameterEditorView.isHidden = true
-            self.adjustButton.isHidden = false
-            self.adjustButton.alpha = 1.0  // 确保透明度正确
+            self.adjustButton.isHidden = true
+            self.adjustButton.alpha = 0.0
         } completion: { _ in
             print("🔧 [DEBUG] 动画完成后调整按钮状态: isHidden=\(self.adjustButton.isHidden), alpha=\(self.adjustButton.alpha)")
             print("🔧 [DEBUG] 调整按钮frame: \(self.adjustButton.frame)")
             print("🔧 [DEBUG] 调整按钮在父视图中: \(self.view.subviews.contains(self.adjustButton) ? "存在" : "不存在")")
+            // 保证参数列表位于最前，避免被容器遮挡导致初次无法点击
+            self.view.bringSubviewToFront(self.parameterListView)
+            // 初始禁用容器交互，防止抢先响应；点击参数后才切换目标视图并恢复
+            self.editContainerView.isUserInteractionEnabled = false
         }
+
+        // 默认选中“预置”，并刷新徽标
+        parameterListView.select(parameter: .presetTemplates, animated: true)
+        refreshModifiedParameterBadges()
+        // 确保选中高亮同步
+        DispatchQueue.main.async {
+            self.parameterListView.select(parameter: .presetTemplates, animated: false)
+        }
+        // 默认选中“预置”参数项，并刷新已修改标记
+        parameterListView.select(parameter: .presetTemplates, animated: true)
+        refreshModifiedParameterBadges()
         
         // 验证滤镜功能
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -862,6 +929,7 @@ import GPUImage
             UIView.animate(withDuration: 0.3) {
                 self.filterOptionView.alpha = 0
                 self.parameterListView.alpha = 0
+                self.resetAllButton.alpha = 0
                 self.parameterEditorView.alpha = 0
                 self.adjustButton.isHidden = true
             }
@@ -1019,8 +1087,14 @@ import GPUImage
 // MARK: - UIGestureRecognizerDelegate
 extension SCPhotoPreviewVC: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        // 如果点击的是调整视图，不响应背景点击手势
+        // 如果点击的是可交互区域（抽屉、参数列表、编辑容器），不响应背景点击手势
         if touch.view?.isDescendant(of: filterAdjustView) ?? false {
+            return false
+        }
+        if let parameterListView = self.parameterListView, touch.view?.isDescendant(of: parameterListView) ?? false {
+            return false
+        }
+        if let editContainerView = self.editContainerView, touch.view?.isDescendant(of: editContainerView) ?? false {
             return false
         }
         return true
@@ -1202,6 +1276,30 @@ extension SCPhotoPreviewVC: SCFilterViewDelegate {
             .init(title: "保存到相册", icon: UIImage(systemName: "square.and.arrow.down"), style: .default) { [weak self] in
                 self?.saveImageToAlbum()
             },
+            .init(title: "保存为预设滤镜", icon: UIImage(systemName: "tray.and.arrow.down.fill"), style: .default) { [weak self] in
+                guard let self = self else { return }
+                let params = self.filterView.getCurrentParameters()
+                SCAlert.promptForText(
+                    title: "保存为预设滤镜",
+                    message: "请输入滤镜名称",
+                    placeholder: "自定义滤镜",
+                    defaultText: nil,
+                    cancelTitle: "取消",
+                    confirmTitle: "保存"
+                ) { confirmed, text in
+                    guard confirmed, let name = text, !name.isEmpty else { return }
+                    do {
+                        let saved = try SCCustomFilterManager.shared.saveFilter(name: name, parameters: params)
+                        // 刷新预设列表：将自定义模板追加到展示中
+                        let customTemplates = SCCustomFilterManager.shared.allFilters().map { $0.toTemplate() }
+                        self.filterOptionView.templates = SCFilterTemplate.templates + customTemplates
+                        // 成功提示
+                        SCAlert.show(title: "保存成功", message: "已保存为预设：\(name)", style: .success, cancelTitle: "", confirmTitle: "确定") { _ in }
+                    } catch {
+                        SCAlert.show(title: "保存失败", message: error.localizedDescription, style: .error, cancelTitle: "", confirmTitle: "确定") { _ in }
+                    }
+                }
+            },
             .init(title: "分享", icon: UIImage(systemName: "square.and.arrow.up"), style: .default) { [weak self] in
                 self?.shareImage()
             },
@@ -1219,46 +1317,88 @@ extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
     func filterOptionView(_ view: SCFilterOptionView, didSelectTemplate template: SCFilterTemplate) {
         print("[PhotoPreview] 选择滤镜模板: \(template.name)")
         
-        // 更新滤镜视图
-        filterView.applyTemplate(template)
-        
-        // 更新调整视图与参数编辑器的参数
-        let params = template.toParameters()
+        // 1) 仅将模板参数写入自定义参数链，不长期保留模板链，确保自定义参数依然可用
+        filterView.filterTemplate = nil
+
+        // 2) 写入模板参数到引擎参数，作为新基线的值
+        let templateParams = template.toParameters() // 引擎值
+        for (k, v) in templateParams { filterView.updateParameter(k, value: v) }
+
+        // 3) 更新基线：将 baselineParameters 设置为此次模板对应的引擎值
+        var newBaseline: [SCFilterParameter: Float] = [:]
+        for p in SCFilterParameter.allCases {
+            guard let key = p.key else { continue }
+            let engineDefault = p.uiToEngine(p.defaultValue)
+            newBaseline[p] = templateParams[key] ?? engineDefault
+        }
+        baselineParameters = newBaseline
+
+        // 4) 更新调整视图与参数编辑器的参数（引擎值 → UI 值）
+        let params = templateParams
         filterAdjustView.updateParameters(params)
-        if let key = currentSelectedParameter.key, let value = params[key] {
-            parameterEditorView.configure(parameter: currentSelectedParameter, currentValue: value)
+        if let key = currentSelectedParameter.key, let engineValue = params[key] {
+            let baselineEngine = baselineParameters[currentSelectedParameter] ?? currentSelectedParameter.uiToEngine(currentSelectedParameter.defaultValue)
+            let uiValue = currentSelectedParameter.engineToUi(engineValue)
+            let uiBaseline = currentSelectedParameter.engineToUi(baselineEngine)
+            parameterEditorView.configure(parameter: currentSelectedParameter, currentValue: uiValue, defaultValue: uiBaseline)
         }
         
         // 如果调整视图是展开状态，更新其显示的值
         if filterAdjustView.isExpanded {
             filterAdjustView.reloadData()
         }
+        // 模板应用后基线已更新，清空修改标记
+        refreshModifiedParameterBadges()
     }
 }
 
 // MARK: - SCFilterAdjustViewDelegate
 extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
     func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float) {
+        // 任意手动调整后，退出模板链，切回自定义链（保证参数调整立即生效）
+        if filterView.filterTemplate != nil {
+            filterView.filterTemplate = nil
+        }
         // 使用统一的参数更新方法
         filterView.updateParameter(parameter, value: value)
         // 同步参数编辑器
         if let p = SCFilterParameter.allCases.first(where: { $0.key == parameter }) {
             currentSelectedParameter = p
-            parameterEditorView.configure(parameter: p, currentValue: value)
+            let baselineEngine = baselineParameters[p] ?? p.uiToEngine(p.defaultValue)
+            let uiValue = p.engineToUi(value)
+            let uiBaseline = p.engineToUi(baselineEngine)
+            parameterEditorView.configure(parameter: p, currentValue: uiValue, defaultValue: uiBaseline)
         }
+        refreshModifiedParameterBadges()
     }
     
     func filterAdjustView(_ view: SCFilterAdjustView, didChangeExpandState isExpanded: Bool) {
         // 更新调整按钮的显示状态
         adjustButton.isHidden = isExpanded
         
-        // 当展开时，同步当前的滤镜参数值
+        // 展开/收起时同步 UI 层级与可交互性
         if isExpanded {
             let currentParameters = filterView.getCurrentParameters()
             filterAdjustView.updateParameters(currentParameters)
+            // 抽屉展开：避免上方容器抢占触摸
+            editContainerView.isUserInteractionEnabled = false
+            editContainerView.alpha = 1.0
         } else {
-            // 收起时隐藏滤镜调整视图
+            // 抽屉收起：恢复上方容器与当前视图
             filterAdjustView.isHidden = true
+            editContainerView.isUserInteractionEnabled = true
+            self.view.bringSubviewToFront(self.editContainerView)
+            if currentSelectedParameter == .presetTemplates {
+                self.editContainerView.bringSubviewToFront(self.filterOptionView)
+                self.filterOptionView.isHidden = false
+                self.parameterEditorView.isHidden = true
+            } else {
+                self.editContainerView.bringSubviewToFront(self.parameterEditorView)
+                self.parameterEditorView.isHidden = false
+                self.filterOptionView.isHidden = true
+            }
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
         }
     }
 } 
@@ -1267,28 +1407,69 @@ extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
 extension SCPhotoPreviewVC: SCParameterListViewDelegate {
     func parameterListView(_ view: SCParameterListView, didSelect parameter: SCFilterParameter) {
         currentSelectedParameter = parameter
+        // 调试打印，确认命中逻辑
+        print("[ParameterList] select: \(parameter.displayName)")
+        print("[Container] editContainer frame=\(editContainerView.frame), filterOption alpha=\(filterOptionView.alpha) hidden=\(filterOptionView.isHidden), editor alpha=\(parameterEditorView.alpha) hidden=\(parameterEditorView.isHidden)")
         if parameter == .presetTemplates {
             // 展示预置滤镜列表
+            self.view.bringSubviewToFront(self.parameterListView)
+            self.view.bringSubviewToFront(self.editContainerView)
+            self.editContainerView.bringSubviewToFront(self.filterOptionView)
             UIView.animate(withDuration: 0.25) {
                 self.parameterEditorView.alpha = 0
                 self.parameterEditorView.isHidden = true
                 self.filterOptionView.alpha = 1
             }
+            self.filterOptionView.isHidden = false
+            self.filterOptionView.isUserInteractionEnabled = true
+            self.filterOptionView.layer.zPosition = 0
+            self.parameterEditorView.layer.zPosition = -1
+            print("[ParameterList] show presets")
+            self.editContainerView.isUserInteractionEnabled = true
         } else {
             // 切换到参数编辑视图（占据原预置滤镜区域）
-            let currentValue: Float
-            if let key = parameter.key {
-                currentValue = self.filterView.getCurrentParameters()[key] ?? parameter.defaultValue
-            } else {
-                currentValue = parameter.defaultValue
-            }
-            parameterEditorView.configure(parameter: parameter, currentValue: currentValue)
+            let key = parameter.key
+            let currentParams = self.filterView.getCurrentParameters()
+            // 引擎值 -> UI 值
+            let engineDefault = parameter.uiToEngine(parameter.defaultValue)
+            let engineCurrent: Float = (key != nil) ? (currentParams[key!] ?? engineDefault) : engineDefault
+            let engineBaseline: Float = baselineParameters[parameter] ?? engineDefault
+            let uiCurrent = parameter.engineToUi(engineCurrent)
+            let uiBaseline = parameter.engineToUi(engineBaseline)
+            parameterEditorView.configure(parameter: parameter, currentValue: uiCurrent, defaultValue: uiBaseline)
+            // 确保编辑器在最前
+            self.view.bringSubviewToFront(self.editContainerView)
+            self.editContainerView.bringSubviewToFront(self.parameterEditorView)
             UIView.animate(withDuration: 0.25) {
                 self.filterOptionView.alpha = 0
                 self.parameterEditorView.isHidden = false
                 self.parameterEditorView.alpha = 1
             }
+            self.filterOptionView.isHidden = true
+            self.filterOptionView.isUserInteractionEnabled = false
+            self.filterOptionView.layer.zPosition = -1
+            self.parameterEditorView.layer.zPosition = 1
+            print("[ParameterList] show editor for: \(parameter.displayName), value=\(uiCurrent)")
+            self.editContainerView.isUserInteractionEnabled = true
         }
+        // 每次点击后保持参数列表在最前，保证命中
+        self.view.bringSubviewToFront(self.parameterListView)
+        print("[Z] parameterList top, z=\(parameterListView.layer.zPosition), filterOption z=\(filterOptionView.layer.zPosition), editor z=\(parameterEditorView.layer.zPosition)")
+    }
+    
+    func parameterListView(_ view: SCParameterListView, didLongPress parameter: SCFilterParameter) {
+        guard let key = parameter.key else { return }
+        // 恢复单个参数为默认值
+        let baseline = baselineParameters[parameter] ?? parameter.uiToEngine(parameter.defaultValue)
+        filterView.updateParameter(key, value: baseline)
+        if currentSelectedParameter == parameter {
+            let uiBaseline = parameter.engineToUi(baseline)
+            parameterEditorView.setExternalValue(uiBaseline)
+        }
+        // 清理历史/重做栈对应项
+        parameterHistory[parameter] = []
+        parameterRedoStack[parameter] = []
+        refreshModifiedParameterBadges()
     }
 }
 
@@ -1296,6 +1477,115 @@ extension SCPhotoPreviewVC: SCParameterListViewDelegate {
 extension SCPhotoPreviewVC: SCParameterEditorViewDelegate {
     func parameterEditorView(_ view: SCParameterEditorView, didChange value: Float, for parameter: SCFilterParameter) {
         guard let key = parameter.key else { return }
+        // value 为 UI 值，需转换为引擎值
+        let engineNew = parameter.uiToEngine(value)
+        // 入栈历史（存引擎值），清空重做栈
+        var history = parameterHistory[parameter] ?? []
+        let current = filterView.getCurrentParameters()[key] ?? 0
+        if history.last != current { history.append(current) }
+        parameterHistory[parameter] = history
+        parameterRedoStack[parameter] = []
+        // 应用
+        filterView.updateParameter(key, value: engineNew)
+    }
+
+    func parameterEditorViewDidTapUndo(_ view: SCParameterEditorView, for parameter: SCFilterParameter) {
+        guard let key = parameter.key else { return }
+        var history = parameterHistory[parameter] ?? []
+        guard let last = history.popLast() else { return }
+        // 将当前值推入 redo 栈
+        let current = filterView.getCurrentParameters()[key] ?? 0
+        var redo = parameterRedoStack[parameter] ?? []
+        redo.append(current)
+        parameterRedoStack[parameter] = redo
+        parameterHistory[parameter] = history
+        // 应用撤销值
+        let uiValue = parameter.engineToUi(last)
+        parameterEditorView.setExternalValue(uiValue)
+        filterView.updateParameter(key, value: last)
+    }
+
+    func parameterEditorViewDidTapRedo(_ view: SCParameterEditorView, for parameter: SCFilterParameter) {
+        guard let key = parameter.key else { return }
+        var redo = parameterRedoStack[parameter] ?? []
+        guard let value = redo.popLast() else { return }
+        // 当前值入历史
+        let current = filterView.getCurrentParameters()[key] ?? 0
+        var history = parameterHistory[parameter] ?? []
+        history.append(current)
+        parameterHistory[parameter] = history
+        parameterRedoStack[parameter] = redo
+        // 应用重做值
+        let uiValue = parameter.engineToUi(value)
+        parameterEditorView.setExternalValue(uiValue)
         filterView.updateParameter(key, value: value)
+    }
+
+    func parameterEditorViewDidTapSavePreset(_ view: SCParameterEditorView) {
+        // 以当前所有参数保存为预设
+        let params = filterView.getCurrentParameters()
+        SCAlert.promptForText(
+            title: "保存为预设",
+            message: "请输入滤镜名称",
+            placeholder: "自定义滤镜",
+            defaultText: nil,
+            cancelTitle: "取消",
+            confirmTitle: "保存"
+        ) { [weak self] confirmed, text in
+            guard let self = self, confirmed, let name = text, !name.isEmpty else { return }
+            do {
+                _ = try SCCustomFilterManager.shared.saveFilter(name: name, parameters: params)
+                let customTemplates = SCCustomFilterManager.shared.allFilters().map { $0.toTemplate() }
+                self.filterOptionView.templates = SCFilterTemplate.templates + customTemplates
+                SCAlert.show(title: "保存成功", message: "已保存为预设：\(name)", style: .success, cancelTitle: "", confirmTitle: "确定") { _ in }
+            } catch {
+                SCAlert.show(title: "保存失败", message: error.localizedDescription, style: .error, cancelTitle: "", confirmTitle: "确定") { _ in }
+            }
+        }
+    }
+}
+
+// MARK: - Modified badges
+private extension SCPhotoPreviewVC {
+    /// 捕获当前图片的参数作为基线
+    func captureBaselineParameters() {
+        let currentParams = filterView.getCurrentParameters() // 引擎值
+        var map: [SCFilterParameter: Float] = [:]
+        for p in SCFilterParameter.allCases {
+            guard let key = p.key else { continue }
+            let engineDefault = p.uiToEngine(p.defaultValue)
+            map[p] = currentParams[key] ?? engineDefault
+        }
+        baselineParameters = map
+    }
+    func refreshModifiedParameterBadges() {
+        let params = filterView.getCurrentParameters()
+        var modified = Set<SCFilterParameter>()
+        for p in SCFilterParameter.allCases {
+            guard let key = p.key else { continue }
+            let currentEngine = params[key] ?? 0
+            let baselineEngine = baselineParameters[p] ?? 0
+            if abs(currentEngine - baselineEngine) > Float.ulpOfOne { modified.insert(p) }
+        }
+        parameterListView.setModifiedParameters(modified)
+    }
+
+    @objc func handleResetAll() {
+        // 将所有参数恢复到基线
+        for p in SCFilterParameter.allCases {
+            guard let key = p.key else { continue }
+            let baseline = baselineParameters[p] ?? p.uiToEngine(p.defaultValue)
+            filterView.updateParameter(key, value: baseline)
+            // 清理历史/重做
+            parameterHistory[p] = []
+            parameterRedoStack[p] = []
+        }
+        // 同步当前编辑器
+        if let key = currentSelectedParameter.key {
+            let baseline = baselineParameters[currentSelectedParameter] ?? currentSelectedParameter.uiToEngine(currentSelectedParameter.defaultValue)
+            let uiBaseline = currentSelectedParameter.engineToUi(baseline)
+            parameterEditorView.setExternalValue(uiBaseline)
+        }
+        refreshModifiedParameterBadges()
     }
 }

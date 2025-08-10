@@ -25,6 +25,7 @@ public struct SCFilterTemplate {
         case softFocus         // 软焦
         case japaneseStyle     // 日系清新
         case polarizing        // 偏振滤镜
+        case custom            // 自定义
     }
     
     /// 滤镜参数
@@ -191,6 +192,26 @@ public struct SCFilterTemplate {
             green: 1.1,            // 增加绿色，增强自然色
             blue: 1.4              // 显著增加蓝色，增强天空色彩
         )
+    }
+
+    // MARK: - 从参数字典构造模板
+    public static func customTemplate(name: String, parameters: [String: Float]) -> SCFilterTemplate {
+        var p = FilterParameters()
+        p.brightness = CGFloat(parameters["亮度"] ?? 0.0)
+        p.contrast = CGFloat(parameters["对比度"] ?? 1.0)
+        p.saturation = CGFloat(parameters["饱和度"] ?? 1.0)
+        p.exposure = CGFloat(parameters["曝光"] ?? 0.0)
+        p.highlights = CGFloat(parameters["高光"] ?? 1.0)
+        p.shadows = CGFloat(parameters["阴影"] ?? 0.0)
+        p.grain = CGFloat(parameters["颗粒感"] ?? 0.0)
+        p.sharpness = CGFloat(parameters["锐度"] ?? 0.0)
+        p.blur = CGFloat(parameters["模糊"] ?? 0.0)
+        p.glow = CGFloat(parameters["光晕"] ?? 0.0)
+        p.edgeStrength = CGFloat(parameters["边缘强度"] ?? 0.0)
+        p.red = CGFloat(parameters["红色"] ?? 1.0)
+        p.green = CGFloat(parameters["绿色"] ?? 1.0)
+        p.blue = CGFloat(parameters["蓝色"] ?? 1.0)
+        return SCFilterTemplate(name: name, thumbnail: nil, type: .custom, parameters: p)
     }
     
     // MARK: - 预设滤镜模板

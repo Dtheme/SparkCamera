@@ -369,57 +369,76 @@ class SCScaleSlider: UIView {
         let totalScaleWidth = CGFloat(totalSteps) * stepWidth
         let screenWidth = UIScreen.main.bounds.width
         let scaleStartOffset = screenWidth  // 左边留一个屏幕宽度的缓冲区
-        
+
+        // 计算“合理”的主刻度间隔：目标标签数量约 10
+        func niceNumber(_ range: Float, round: Bool) -> Float {
+            guard range > 0 else { return 1 }
+            let exponent = floor(log10(range))
+            let fraction = range / pow(10.0, exponent)
+            let nice: Float
+            if round {
+                if fraction < 1.5 { nice = 1 }
+                else if fraction < 3 { nice = 2 }
+                else if fraction < 7 { nice = 5 }
+                else { nice = 10 }
+            } else {
+                if fraction <= 1 { nice = 1 }
+                else if fraction <= 2 { nice = 2 }
+                else if fraction <= 5 { nice = 5 }
+                else { nice = 10 }
+            }
+            return nice * pow(10.0, exponent)
+        }
+
+        let valueRange = config.maxValue - config.minValue
+        let targetLabels: Float = 10
+        let rawInterval = max(valueRange / targetLabels, config.step)
+        let mainInterval = max(niceNumber(rawInterval, round: true), config.step)
+        let stepsPerLabel = max(1, Int(round(mainInterval / config.step)))
+
+        // 根据主刻度间隔决定小刻度间隔（可见性适中）
+        let stepsPerMinor = max(1, stepsPerLabel / 5)
+
         // 修正：确保刻度数量正确，不超过最大值
         for i in 0...totalSteps {
             let value = config.minValue + Float(i) * config.step
-            
-            // 确保值不超过最大值
-            if value > config.maxValue {
-                break
-            }
-            
-            // 优化主刻度判断逻辑：对于曝光补偿，每0.5一个主刻度
-            let isMainScale: Bool
-            if config.maxValue - config.minValue <= 4.0 {
-                // 对于小范围（如曝光补偿 -2.0 到 2.0），每0.5一个主刻度
-                isMainScale = abs(value.truncatingRemainder(dividingBy: 0.5)) < .ulpOfOne
-            } else {
-                // 对于大范围，每1.0一个主刻度
-                isMainScale = abs(value.truncatingRemainder(dividingBy: 1.0)) < .ulpOfOne
-            }
-            
+
+            if value > config.maxValue { break }
+
+            let isMainScale = (i % stepsPerLabel == 0) || (i == totalSteps)
+            let isMinorScale = !isMainScale && (i % stepsPerMinor == 0)
+
             let scaleLine = UIView()
             scaleLine.backgroundColor = style.scaleColor
             scaleView.addSubview(scaleLine)
-            
-            // 刻度从左边缓冲区开始的线性排列
+
             let scaleX = scaleStartOffset + CGFloat(i) * stepWidth
-            let height: CGFloat = isMainScale ? style.mainScaleHeight : style.subScaleHeight
+            let height: CGFloat = isMainScale ? style.mainScaleHeight : (isMinorScale ? style.subScaleHeight : (style.subScaleHeight * 0.6))
             let scaleY = (scaleView.bounds.height - height) / 2
-            
+
             scaleLine.frame = CGRect(
                 x: scaleX,
                 y: scaleY,
                 width: 1,
                 height: height
             )
-            
+
             if isMainScale {
                 let label = UILabel()
-                // 优化标签格式：对于整数显示整数，对于小数显示一位小数
-                if value.truncatingRemainder(dividingBy: 1.0) == 0 {
-                    label.text = String(format: "%.0f", value)
-                } else {
-                    label.text = String(format: "%.1f", value)
-                }
+                // 标签格式：根据主间隔决定小数位
+                let absInterval = abs(mainInterval)
+                let decimals: Int
+                if absInterval >= 10 { decimals = 0 }
+                else if absInterval >= 1 { decimals = 0 }
+                else if absInterval >= 0.1 { decimals = 1 }
+                else { decimals = 2 }
+                label.text = String(format: "%0.*f", decimals, value)
                 label.font = .systemFont(ofSize: style.labelFontSize)
                 label.textColor = style.mainScaleTextColor
                 label.textAlignment = .center
                 scaleView.addSubview(label)
                 scaleLabels.append(label)
-                
-                // 使用frame布局标签
+
                 let labelSize = label.sizeThatFits(CGSize(width: 50, height: 20))
                 label.frame = CGRect(
                     x: scaleX - labelSize.width / 2,

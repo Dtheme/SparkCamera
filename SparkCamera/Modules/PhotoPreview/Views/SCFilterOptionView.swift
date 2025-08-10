@@ -23,6 +23,11 @@ class SCFilterOptionView: UIView {
             collectionView.reloadData()
         }
     }
+
+    /// 追加更多模板（例如自定义模板）
+    func appendTemplates(_ extra: [SCFilterTemplate]) {
+        templates += extra
+    }
     
     private var collectionView: UICollectionView!
     

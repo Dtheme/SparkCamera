@@ -31,8 +31,8 @@ class SCFilterView: UIView {
     private var contrast: CGFloat = 1.0
     private var saturation: CGFloat = 1.0
     private var exposure: CGFloat = 0.0
-    private var highlights: CGFloat = 0.0
-    private var shadows: CGFloat = 0.0
+    private var highlights: CGFloat = 1.0  // GPUImage 默认 1.0 表示不改变高光
+    private var shadows: CGFloat = 0.0     // GPUImage 默认 0.0 表示不改变阴影
     private var grain: CGFloat = 0.0
     private var sharpness: CGFloat = 0.0
     private var blur: CGFloat = 0.0
@@ -52,6 +52,7 @@ class SCFilterView: UIView {
     private var sharpenFilter: GPUImageSharpenFilter?
     private var gaussianBlurFilter: GPUImageGaussianBlurFilter?
     private var sobelEdgeFilter: GPUImageSobelEdgeDetectionFilter?
+    private var edgeBlendFilter: GPUImageDissolveBlendFilter?
     private var rgbFilter: GPUImageRGBFilter?
     
     var filterTemplate: SCFilterTemplate? {
@@ -278,7 +279,7 @@ class SCFilterView: UIView {
                contrast == 1.0 &&
                saturation == 1.0 &&
                exposure == 0.0 &&
-               highlights == 0.0 &&
+               highlights == 1.0 &&
                shadows == 0.0 &&
                grain == 0.0 &&
                sharpness == 0.0 &&
@@ -330,9 +331,10 @@ class SCFilterView: UIView {
     func updateGrain(_ value: Float) {
         grain = CGFloat(value)
         if let filter = grainFilter {
-            let size = Int(value * 50)
+            let size = Int(value * 100)
             filter.sizeInPixels = CGSize(width: size, height: size)
         }
+        // 颗粒感暂不纳入GPU链，后续可叠加噪声纹理
         applyFilter()
     }
     
@@ -344,7 +346,7 @@ class SCFilterView: UIView {
     
     func updateBlur(_ value: Float) {
         blur = CGFloat(value)
-        gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value * 10)
+        gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value)
         applyFilter()
     }
     
@@ -390,6 +392,7 @@ class SCFilterView: UIView {
         gaussianBlurFilter = GPUImageGaussianBlurFilter()
         sobelEdgeFilter = GPUImageSobelEdgeDetectionFilter()
         rgbFilter = GPUImageRGBFilter()
+        edgeBlendFilter = GPUImageDissolveBlendFilter()
         
         // 设置初始值
         brightnessFilter?.brightness = brightness
@@ -401,11 +404,13 @@ class SCFilterView: UIView {
         let grainSize = grain * 100
         grainFilter?.sizeInPixels = CGSize(width: grainSize, height: grainSize)
         sharpenFilter?.sharpness = sharpness
-        gaussianBlurFilter?.blurRadiusInPixels = blur * 10
+        gaussianBlurFilter?.blurRadiusInPixels = blur
         sobelEdgeFilter?.edgeStrength = edgeStrength
         rgbFilter?.red = redChannel
         rgbFilter?.green = greenChannel
         rgbFilter?.blue = blueChannel
+
+        // 注意：不要默认把所有滤镜入链，实际入链在 applyFilter 中按需连接
     }
     
     private func applyFilter() {
@@ -423,33 +428,48 @@ class SCFilterView: UIView {
                 return
             }
             
-            // 否则使用自定义滤镜链
-            let filterChain = [
-                brightnessFilter,
-                contrastFilter,
-                saturationFilter,
-                exposureFilter,
-                highlightsFilter,
-                grainFilter,
-                sharpenFilter,
-                gaussianBlurFilter,
-                sobelEdgeFilter,
-                rgbFilter
-            ].compactMap { $0 }
+            // 构建自定义链：必要时加入滤镜；边缘使用叠加混合避免跳变
+            // 先清理各滤镜的连接，避免重复连接导致渲染异常
+            [brightnessFilter, contrastFilter, saturationFilter, exposureFilter,
+             highlightsFilter, sharpenFilter, gaussianBlurFilter, sobelEdgeFilter,
+             rgbFilter, edgeBlendFilter].forEach { $0?.removeAllTargets() }
+
+            var filterChain: [GPUImageOutput & GPUImageInput] = []
+            if brightness != 0.0, let f = brightnessFilter { filterChain.append(f) }
+            if contrast != 1.0, let f = contrastFilter { filterChain.append(f) }
+            if saturation != 1.0, let f = saturationFilter { filterChain.append(f) }
+            if exposure != 0.0, let f = exposureFilter { filterChain.append(f) }
+            if (highlights != 1.0 || shadows != 0.0), let f = highlightsFilter { filterChain.append(f) }
+            if sharpness != 0.0, let f = sharpenFilter { filterChain.append(f) }
+            if blur > 0.0, let f = gaussianBlurFilter { filterChain.append(f) }
+            if (redChannel != 1.0 || greenChannel != 1.0 || blueChannel != 1.0), let f = rgbFilter { filterChain.append(f) }
             
             if filterChain.isEmpty {
                 // 如果没有滤镜，直接显示原图
                 picture.addTarget(self.gpuImageView)
             } else {
                 // 连接滤镜链
-                var previousFilter: GPUImageOutput = picture
+                var previous: GPUImageOutput = picture
                 for filter in filterChain {
-                    previousFilter.addTarget(filter)
-                    previousFilter = filter
+                    previous.addTarget(filter)
+                    previous = filter
                 }
-                
-                // 连接到输出
-                previousFilter.addTarget(self.gpuImageView)
+
+                // 边缘叠加：基于当前链输出生成轮廓图，并按强度混合到图像上，避免风格跳变
+                if edgeStrength > 0.0, let sobel = sobelEdgeFilter, let blend = edgeBlendFilter {
+                    // 轮廓基于当前图像生成
+                    previous.addTarget(sobel)
+                    sobel.edgeStrength = edgeStrength
+                    blend.mix = min(1.0, edgeStrength / 5.0) // 将 0..5 映射到 0..1
+                    // 输入0：原图链；输入1：轮廓
+                    previous.addTarget(blend, atTextureLocation: 0)
+                    sobel.addTarget(blend, atTextureLocation: 1)
+                    // 输出到预览
+                    blend.addTarget(self.gpuImageView)
+                } else {
+                    // 直接输出
+                    previous.addTarget(self.gpuImageView)
+                }
             }
             
             // 处理图像
@@ -545,15 +565,22 @@ class SCFilterView: UIView {
             exposure = CGFloat(value)
             exposureFilter?.exposure = CGFloat(value)
         case "高光":
-            highlights = CGFloat(value)
-            highlightsFilter?.highlights = CGFloat(value)
+            // 平滑过渡：限制 0..1，并通过小步动画过渡
+            let v = CGFloat(max(0.0, min(1.0, value)))
+            if abs(v - highlights) > 0.0001 {
+                highlights = v
+                highlightsFilter?.highlights = v
+            }
         case "阴影":
-            shadows = CGFloat(value)
-            highlightsFilter?.shadows = CGFloat(value)
+            let v = CGFloat(max(0.0, min(1.0, value)))
+            if abs(v - shadows) > 0.0001 {
+                shadows = v
+                highlightsFilter?.shadows = v
+            }
         case "颗粒感":
             grain = CGFloat(value)
             if let filter = grainFilter {
-                let size = Int(value * 50)
+                let size = Int(value * 100)
                 filter.sizeInPixels = CGSize(width: size, height: size)
             }
         case "锐度":
@@ -561,13 +588,16 @@ class SCFilterView: UIView {
             sharpenFilter?.sharpness = CGFloat(value)
         case "模糊":
             blur = CGFloat(value)
-            gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value * 2.0)
+            gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value)
         case "光晕":
             glow = CGFloat(value)
             // 光晕效果需要特殊处理，暂时跳过
         case "边缘强度":
-            edgeStrength = CGFloat(value)
-            sobelEdgeFilter?.edgeStrength = CGFloat(value)
+            let v = CGFloat(max(0.0, min(5.0, value)))
+            if abs(v - edgeStrength) > 0.0001 {
+                edgeStrength = v
+                sobelEdgeFilter?.edgeStrength = v
+            }
         case "红色":
             redChannel = CGFloat(value)
             rgbFilter?.red = CGFloat(value)
@@ -583,7 +613,7 @@ class SCFilterView: UIView {
         
         // 使用防抖机制延迟应用滤镜，避免过于频繁的重新渲染
         updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: false) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: false) { [weak self] _ in
             self?.applyFilter()
         }
     }
