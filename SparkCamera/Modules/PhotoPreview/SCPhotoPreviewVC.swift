@@ -1293,8 +1293,8 @@ extension SCPhotoPreviewVC: SCFilterViewDelegate {
                         // 刷新预设列表：将自定义模板追加到展示中
                         let customTemplates = SCCustomFilterManager.shared.allFilters().map { $0.toTemplate() }
                         self.filterOptionView.templates = SCFilterTemplate.templates + customTemplates
-                        // 成功提示
-                        SCAlert.show(title: "保存成功", message: "已保存为预设：\(name)", style: .success, cancelTitle: "", confirmTitle: "确定") { _ in }
+                        // 成功提示改为 SwiftMessages
+                        SwiftMessages.showSuccessMessage("已保存为预设滤镜：\(name)", title: "保存成功")
                     } catch {
                         SCAlert.show(title: "保存失败", message: error.localizedDescription, style: .error, cancelTitle: "", confirmTitle: "确定") { _ in }
                     }
@@ -1537,7 +1537,7 @@ extension SCPhotoPreviewVC: SCParameterEditorViewDelegate {
                 _ = try SCCustomFilterManager.shared.saveFilter(name: name, parameters: params)
                 let customTemplates = SCCustomFilterManager.shared.allFilters().map { $0.toTemplate() }
                 self.filterOptionView.templates = SCFilterTemplate.templates + customTemplates
-                SCAlert.show(title: "保存成功", message: "已保存为预设：\(name)", style: .success, cancelTitle: "", confirmTitle: "确定") { _ in }
+                SwiftMessages.showSuccessMessage("已保存为预设滤镜：\(name)", title: "保存成功")
             } catch {
                 SCAlert.show(title: "保存失败", message: error.localizedDescription, style: .error, cancelTitle: "", confirmTitle: "确定") { _ in }
             }
