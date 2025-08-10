@@ -41,7 +41,8 @@ extension SCCameraVC: SCSessionDelegate {
             if let focusState = value as? SCFocusState {
                 print("  [Focus] 对焦状态：\(focusState)")
                 DispatchQueue.main.async { [weak self] in
-                    self?.handleFocusStateChange(focusState)
+                    guard let self = self else { return }
+                    self.handleFocusStateChange(focusState)
                 }
             }
             
@@ -52,7 +53,7 @@ extension SCCameraVC: SCSessionDelegate {
                     guard let self = self else { return }
                     if let previewLayer = self.previewView.previewLayer {
                         let pointInLayer = previewLayer.layerPointConverted(fromCaptureDevicePoint: point)
-                        self.showFocusAnimation(at: pointInLayer)
+                        self.showFocusAnimation(at: pointInLayer, state: .focusing)
                     }
                 }
             }

@@ -87,11 +87,8 @@ class SCCameraVC: UIViewController {
         return button
     }()
     
-    private lazy var focusView: UIView = {
-        let view = UIView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
-        view.layer.borderWidth = 1
-        view.layer.borderColor = SCConstants.themeColor.cgColor
-        view.backgroundColor = .clear
+    private lazy var focusBoxView: SCFocusBoxView = {
+        let view = SCFocusBoxView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
         view.isHidden = true
         return view
     }()
@@ -255,30 +252,11 @@ class SCCameraVC: UIViewController {
     }
 
     @objc private func handleSingleTap(recognizer: UITapGestureRecognizer) {
-        let location = recognizer.location(in: previewView)
-        
-        // 确保点击位置在预览视图范围内
-        guard location.x >= 0 && location.x <= previewView.bounds.width &&
-              location.y >= 0 && location.y <= previewView.bounds.height else {
-            return
-        }
-        
-        // 将点击位置转换为预览层的坐标
+        let locationInPreview = recognizer.location(in: previewView)
         guard let previewLayer = previewView.previewLayer else { return }
-        
-        // 将点击位置转换为 AVCaptureDevice 可用的坐标（范围在 0-1 之间）
-        let normalizedPoint = CGPoint(
-            x: location.x / previewView.bounds.width,
-            y: location.y / previewView.bounds.height
-        )
-        
-        // 在点击位置显示对焦动画
-        showFocusAnimation(at: location)
-        
-        // 设置对焦点
-        photoSession.focus(at: normalizedPoint)
-        
-        print("  [Focus] 点击位置: \(location), 归一化坐标: \(normalizedPoint)")
+        let devicePoint = previewLayer.captureDevicePointConverted(fromLayerPoint: locationInPreview)
+        photoSession.focus(at: devicePoint)
+        print("  [Focus] 点击位置: \(locationInPreview), 设备坐标: \(devicePoint)")
     }
 
     @objc private func handlePinch(recognizer: UIPinchGestureRecognizer) {
@@ -422,13 +400,13 @@ class SCCameraVC: UIViewController {
         view.addSubview(gridButton)
         view.addSubview(zoomIndicatorView)
         zoomIndicatorView.addSubview(zoomLabel)
-        previewView.addSubview(focusView)
+        previewView.addSubview(focusBoxView)
         view.addSubview(lensSelectorView)
         previewView.addSubview(horizontalIndicator)
         
         // 6. 设置初始状态
         zoomIndicatorView.isHidden = true
-        focusView.isHidden = true
+        focusBoxView.isHidden = true
         horizontalIndicator.isHidden = !isHorizontalIndicatorVisible
         
         view.addSubview(autoSaveButton)
@@ -990,38 +968,15 @@ class SCCameraVC: UIViewController {
         SwiftMessages.show(view: view)
     }
     
-    internal func showFocusAnimation(at point: CGPoint) {
-        // 确保对焦框在预览视图内
-        let focusViewSize = focusView.bounds.size
-        let minX = focusViewSize.width / 2
-        let maxX = previewView.bounds.width - focusViewSize.width / 2
-        let minY = focusViewSize.height / 2
-        let maxY = previewView.bounds.height - focusViewSize.height / 2
-        
-        let clampedPoint = CGPoint(
-            x: min(maxX, max(minX, point.x)),
-            y: min(maxY, max(minY, point.y))
-        )
-        
-        // 确保对焦框在最上层
-        previewView.bringSubviewToFront(focusView)
-        
-        // 更新对焦框的位置
-        focusView.center = clampedPoint
-        focusView.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
-        focusView.alpha = 1.0
-        focusView.isHidden = false
-        
-        // 执行动画
-        UIView.animate(withDuration: 0.3, animations: {
-            self.focusView.transform = .identity
-        }) { _ in
-            UIView.animate(withDuration: 0.2, delay: 0.5) {
-                self.focusView.alpha = 0
-            } completion: { _ in
-                self.focusView.isHidden = true
-            }
-        }
+    internal func showFocusAnimation(at point: CGPoint, state: SCFocusState) {
+        let boxSize = focusBoxView.bounds.size
+        let clampedX = min(max(boxSize.width/2, point.x), previewView.bounds.width - boxSize.width/2)
+        let clampedY = min(max(boxSize.height/2, point.y), previewView.bounds.height - boxSize.height/2)
+        let clampedPoint = CGPoint(x: clampedX, y: clampedY)
+        previewView.bringSubviewToFront(focusBoxView)
+        focusBoxView.center = clampedPoint
+        focusBoxView.isHidden = false
+        focusBoxView.animate(for: state)
     }
     
     private func showCameraSwitchMessage(_ message: String) {
@@ -1386,9 +1341,8 @@ class SCCameraVC: UIViewController {
 //    }
     
     internal func handleFocusStateChange(_ state: SCFocusState) {
-        let focusBoxView = SCFocusBoxView(frame: CGRect(x: 0, y: 0, width: 80, height: 80))
+        // 根据对焦状态更新现有对焦框的外观动画
         focusBoxView.animate(for: state)
-        
         switch state {
         case .focusing:
             print("  [Focus] 正在对焦...")

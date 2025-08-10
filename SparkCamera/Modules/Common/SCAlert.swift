@@ -69,9 +69,8 @@ class SCAlert {
             // 添加自定义按钮容器
             let buttonsView = UIStackView()
             buttonsView.axis = .horizontal
-            buttonsView.distribution = .fillEqually
+            // 间距和分布在下面根据是否包含取消按钮分别配置
             buttonsView.alignment = .fill
-            buttonsView.spacing = 0.5
             buttonsView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
             view.backgroundView.addSubview(buttonsView)
             
@@ -101,21 +100,20 @@ class SCAlert {
                 }
             }), for: .touchUpInside)
             
-            // 添加按钮到按钮容器（如果取消文案为空，仅居中显示“确定”按钮）
+            // 添加按钮到按钮容器（如果取消文案为空，让“确定”按钮充满底部，无边距）
             let hasCancel = !cancelTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             if hasCancel {
                 buttonsView.distribution = .fillEqually
                 buttonsView.alignment = .fill
+                buttonsView.spacing = 0.5
                 buttonsView.addArrangedSubview(cancelButton)
                 buttonsView.addArrangedSubview(confirmButton)
             } else {
-                buttonsView.distribution = .equalCentering
-                buttonsView.alignment = .center
+                // 单按钮：去掉间距，充满左右和底部
+                buttonsView.spacing = 0
+                buttonsView.distribution = .fillEqually
+                buttonsView.alignment = .fill
                 buttonsView.addArrangedSubview(confirmButton)
-                // 适度设置确认按钮宽度，便于视觉居中
-                confirmButton.snp.makeConstraints { make in
-                    make.width.greaterThanOrEqualTo(120)
-                }
             }
             
             // 使用 SnapKit 设置约束

@@ -4,9 +4,11 @@ class SCFocusBoxView: UIView {
     
     // MARK: - Properties
     private let focusBox = UIView()
-    private let animationDuration: TimeInterval = 0.3
+    private let animationDuration: TimeInterval = 0.25
     private let boxSize: CGFloat = 80
-    private let borderWidth: CGFloat = 1
+    private let cornerLength: CGFloat = 18
+    private let lineWidth: CGFloat = 2
+    private let cornerLayer = CAShapeLayer()
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -19,14 +21,54 @@ class SCFocusBoxView: UIView {
         setupView()
     }
     
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        focusBox.frame = bounds
+        updateCornerPath()
+    }
+    
     // MARK: - Setup
     private func setupView() {
+        // 容器
         focusBox.frame = CGRect(x: 0, y: 0, width: boxSize, height: boxSize)
-        focusBox.layer.borderWidth = borderWidth
-        focusBox.layer.borderColor = UIColor.white.cgColor
         focusBox.backgroundColor = .clear
         focusBox.isHidden = true
         addSubview(focusBox)
+        
+        // 角标描边
+        cornerLayer.fillColor = UIColor.clear.cgColor
+        cornerLayer.strokeColor = UIColor.white.cgColor
+        cornerLayer.lineWidth = lineWidth
+        cornerLayer.lineCap = .round
+        cornerLayer.lineJoin = .round
+        focusBox.layer.addSublayer(cornerLayer)
+        
+        updateCornerPath()
+    }
+    
+    private func updateCornerPath() {
+        let rect = focusBox.bounds.insetBy(dx: lineWidth/2, dy: lineWidth/2)
+        let path = UIBezierPath()
+        let cl = cornerLength
+        
+        // 左上
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + cl))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX + cl, y: rect.minY))
+        // 右上
+        path.move(to: CGPoint(x: rect.maxX - cl, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cl))
+        // 右下
+        path.move(to: CGPoint(x: rect.maxX, y: rect.maxY - cl))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX - cl, y: rect.maxY))
+        // 左下
+        path.move(to: CGPoint(x: rect.minX + cl, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cl))
+        
+        cornerLayer.path = path.cgPath
     }
     
     // MARK: - Public Methods
@@ -46,30 +88,31 @@ class SCFocusBoxView: UIView {
     // MARK: - Private Methods
     private func animateFocusing() {
         focusBox.isHidden = false
-        focusBox.transform = CGAffineTransform(scaleX: 1.5, y: 1.5)
-        focusBox.layer.borderColor = UIColor.yellow.cgColor
+        focusBox.alpha = 1
+        focusBox.transform = CGAffineTransform(scaleX: 1.4, y: 1.4)
+        cornerLayer.strokeColor = UIColor.yellow.cgColor
         
-        UIView.animate(withDuration: self.animationDuration) {
+        UIView.animate(withDuration: animationDuration, delay: 0, options: [.curveEaseOut]) {
             self.focusBox.transform = .identity
         }
     }
     
     private func animateFocused() {
-        focusBox.layer.borderColor = UIColor.green.cgColor
-        
-        UIView.animate(withDuration: self.animationDuration, delay: 0.5) {
+        cornerLayer.strokeColor = UIColor.green.cgColor
+        UIView.animate(withDuration: animationDuration, delay: 0.45, options: [.curveEaseIn]) {
             self.focusBox.alpha = 0
         } completion: { _ in
             self.focusBox.isHidden = true
             self.focusBox.alpha = 1
+            self.cornerLayer.strokeColor = UIColor.white.cgColor
         }
     }
     
     private func animateFailed() {
-        focusBox.layer.borderColor = UIColor.red.cgColor
-        
-        UIView.animate(withDuration: self.animationDuration) {
-            self.focusBox.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+        cornerLayer.strokeColor = UIColor.red.cgColor
+        let pulse1 = CGAffineTransform(scaleX: 1.1, y: 1.1)
+        UIView.animate(withDuration: animationDuration) {
+            self.focusBox.transform = pulse1
         } completion: { _ in
             UIView.animate(withDuration: self.animationDuration) {
                 self.focusBox.transform = .identity
@@ -78,12 +121,11 @@ class SCFocusBoxView: UIView {
     }
     
     private func animateLocked() {
-        focusBox.layer.borderColor = UIColor.white.cgColor
+        cornerLayer.strokeColor = UIColor.white.cgColor
         focusBox.isHidden = false
         focusBox.alpha = 1
-        
-        UIView.animate(withDuration: self.animationDuration) {
-            self.focusBox.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        UIView.animate(withDuration: animationDuration) {
+            self.focusBox.transform = CGAffineTransform(scaleX: 0.92, y: 0.92)
         }
     }
     
@@ -91,6 +133,6 @@ class SCFocusBoxView: UIView {
         focusBox.isHidden = true
         focusBox.transform = .identity
         focusBox.alpha = 1
-        focusBox.layer.borderColor = UIColor.white.cgColor
+        cornerLayer.strokeColor = UIColor.white.cgColor
     }
-} 
+}

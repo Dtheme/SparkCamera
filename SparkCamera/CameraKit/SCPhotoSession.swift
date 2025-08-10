@@ -311,6 +311,8 @@ extension SCSession.FlashMode {
             if device.isFocusPointOfInterestSupported {
                 device.focusPointOfInterest = point
                 print("  [Focus] 设置对焦点：\(point)")
+                // 通知 UI 对焦点（便于显示动画）
+                delegate?.didChangeValue(session: self, value: point, key: "focusPoint")
             }
             
             // 根据当前模式设置对焦
@@ -340,8 +342,8 @@ extension SCSession.FlashMode {
             
             device.unlockForConfiguration()
             
-            // 延迟更新对焦状态
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            // 监听对焦状态变化或延迟回调 focused
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.focusState = .focused
             }
             
