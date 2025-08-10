@@ -150,7 +150,7 @@ class SCCameraVC: UIViewController {
         // 显示加载状态
         showLoading()
         
-        // 初始化预览视图
+        // 初始化预览视图（不重复在 setupUI 内再次创建）
         previewView = SCPreviewView(frame: view.bounds)
         view.addSubview(previewView)
         
@@ -175,10 +175,10 @@ class SCCameraVC: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // 在视图完全显示后启动会话
-        if photoSession?.session.isRunning == false {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                self?.photoSession?.startSession()
+        // 在视图完全显示后，若已拥有会话但未运行，则启动；若还未创建会话，等待权限回调中的 setupCamera
+        if let session = photoSession, session.session.isRunning == false {
+            DispatchQueue.global(qos: .userInitiated).async { [weak session] in
+                session?.startSession()
             }
         }
     }
@@ -193,18 +193,10 @@ class SCCameraVC: UIViewController {
         // 停止水平指示器
         motionManager.stopDeviceMotionUpdates()
         
-        // 在主线程中同步停止相机会话
-//        if let session = photoSession {
-//            session.stopSession()
-//            
-//            // 清理预览视图
-//            previewView?.session = nil
-//            
-//            // 清理相机会话
-//            photoSession?.delegate = nil
-//            photoSession = nil
-//            cameraManager = nil
-//        }
+        // 停止会话但不销毁对象，避免快速返回时重复重建；真正释放在 deinit
+        if let session = photoSession {
+            session.stopSession()
+        }
     }
     // 禁止该视图控制器旋转
     override var shouldAutorotate: Bool {
@@ -337,9 +329,13 @@ class SCCameraVC: UIViewController {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // 1. 初始化相机会话
-            self.photoSession = SCPhotoSession()
-            self.photoSession.delegate = self
+            // 1. 初始化或复用相机会话
+            if self.photoSession == nil {
+                self.photoSession = SCPhotoSession()
+                self.photoSession.delegate = self
+            } else {
+                self.photoSession.delegate = self
+            }
             
             // 2. 初始化相机管理器
             self.cameraManager = SCCameraManager(session: self.photoSession, photoSession: self.photoSession)
@@ -359,27 +355,28 @@ class SCCameraVC: UIViewController {
             // 6. 检查并设置闪光灯初始状态
             self.setupFlashState()
             
-            // 7. 在后台线程启动相机会话
+            // 7. 在后台线程启动相机会话（若尚未运行）
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                self.photoSession?.startSession()
-                
-                // 8. 在主线程更新 UI
-                DispatchQueue.main.async {
-                    self.hideLoading()
+                guard let self = self, let session = self.photoSession else { return }
+                if session.session.isRunning == false {
+                    session.startSession()
                 }
+                // 8. 在主线程更新 UI
+                DispatchQueue.main.async { self.hideLoading() }
             }
         }
     }
     
     private func setupUI() {
-        // 1. 初始化基础组件
-        photoSession = SCPhotoSession()
-        photoSession?.delegate = self
-        
-        previewView = SCPreviewView()
+        // 1. 初始化基础组件（避免重复创建 photoSession 与 previewView）
+        if photoSession == nil {
+            photoSession = SCPhotoSession()
+            photoSession?.delegate = self
+        }
+        if previewView.superview == nil {
+            view.addSubview(previewView)
+        }
         previewView.session = photoSession
-        view.addSubview(previewView)
         
         // 2. 设置预览比例和分辨率
         let ratioState = SCRatioState(rawValue: SCCameraSettingsManager.shared.ratioMode) ?? .ratio4_3
@@ -1435,7 +1432,7 @@ class SCCameraVC: UIViewController {
         // 停止水平指示器
         motionManager.stopDeviceMotionUpdates()
         
-        // 清理预览视图
+        // 清理预览视图（先解除与 session 的关联，再置空，以防预览层仍持有 session）
         previewView?.session = nil
         previewView = nil
         

@@ -88,7 +88,7 @@ extension SCSession.CameraPosition {
     @objc public let session: AVCaptureSession
     
     @objc public var previewLayer: AVCaptureVideoPreviewLayer?
-    @objc public var overlayView: UIView?
+    @objc public weak var overlayView: UIView?
     
     @objc public weak var delegate: SCSessionDelegate?
     
