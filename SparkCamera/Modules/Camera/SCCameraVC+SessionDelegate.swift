@@ -34,12 +34,12 @@ extension SCCameraVC: SCSessionDelegate {
             
         case "focusMode":
             if let focusMode = value as? SCFocusMode {
-                print("📸 [Focus] 对焦模式：\(focusMode)")
+                print("  [Focus] 对焦模式：\(focusMode)")
             }
             
         case "focusState":
             if let focusState = value as? SCFocusState {
-                print("📸 [Focus] 对焦状态：\(focusState)")
+                print("  [Focus] 对焦状态：\(focusState)")
                 DispatchQueue.main.async { [weak self] in
                     self?.handleFocusStateChange(focusState)
                 }
@@ -47,7 +47,7 @@ extension SCCameraVC: SCSessionDelegate {
             
         case "focusPoint":
             if let point = value as? CGPoint {
-                print("📸 [Focus] 设置对焦点：\(point)")
+                print("  [Focus] 设置对焦点：\(point)")
                 DispatchQueue.main.async { [weak self] in
                     guard let self = self else { return }
                     if let previewLayer = self.previewView.previewLayer {
@@ -97,7 +97,7 @@ extension SCCameraVC: SCSessionDelegate {
             }
             
         default:
-            print("📸 [Unknown] 未知的值变更: \(value) for key: \(key)")
+            print("  [Unknown] 未知的值变更: \(value) for key: \(key)")
         }
     }
 } 

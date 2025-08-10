@@ -278,7 +278,7 @@ class SCCameraVC: UIViewController {
         // 设置对焦点
         photoSession.focus(at: normalizedPoint)
         
-        print("📸 [Focus] 点击位置: \(location), 归一化坐标: \(normalizedPoint)")
+        print("  [Focus] 点击位置: \(location), 归一化坐标: \(normalizedPoint)")
     }
 
     @objc private func handlePinch(recognizer: UIPinchGestureRecognizer) {
@@ -522,7 +522,7 @@ class SCCameraVC: UIViewController {
             let screenWidth = UIScreen.main.bounds.width * UIScreen.main.scale
             let screenHeight = screenWidth * ratio
             session.resolution = CGSize(width: screenWidth, height: screenHeight)
-            print("📸 [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
+            print("  [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
         }
         
         // 更新镜头选择器位置
@@ -786,12 +786,12 @@ class SCCameraVC: UIViewController {
         if let timerItem = toolBar.getItem(for: .timer),
            let timerState = timerItem.state as? SCTimerState,
            timerState != .off {
-            print("📸 [Timer] 检测到定时器状态：\(timerState.seconds)秒")
+            print("  [Timer] 检测到定时器状态：\(timerState.seconds)秒")
             // 开始倒计时拍照
             startCountdown(seconds: timerState.seconds)
         } else {
             // 不是定时拍照模式，直接拍照
-            print("📸 [Camera] 直接拍照模式")
+            print("  [Camera] 直接拍照模式")
             capturePhotoWithFlash(flashState.avFlashMode)
         }
     }
@@ -824,7 +824,7 @@ class SCCameraVC: UIViewController {
             
             // 如果是定时拍照，直接保存原图到相册
             if self.countdownTimer != nil {
-                print("📸 [Timer Photo] 定时拍照完成，准备保存原图")
+                print("  [Timer Photo] 定时拍照完成，准备保存原图")
                 self.savePhotoToAlbum(image)
             }
             
@@ -914,13 +914,13 @@ class SCCameraVC: UIViewController {
     // MARK: - Helpers
     private func handleCapturedImage(_ image: UIImage) {
         // 打印原始图片信息
-        print("📸 [Original Image] 尺寸: \(image.size.width) x \(image.size.height)")
-        print("📸 [Original Image] 方向: \(image.imageOrientation.rawValue)")
-        print("📸 [Original Image] 比例: \(image.scale)")
+        print("  [Original Image] 尺寸: \(image.size.width) x \(image.size.height)")
+        print("  [Original Image] 方向: \(image.imageOrientation.rawValue)")
+        print("  [Original Image] 比例: \(image.scale)")
         
         // 如果开启了自动保存，先保存照片
         if SCCameraSettingsManager.shared.isAutoSaveEnabled {
-            print("📸 [Auto Save] 自动保存已开启，准备保存原始图片")
+            print("  [Auto Save] 自动保存已开启，准备保存原始图片")
             UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
         }
         
@@ -1124,7 +1124,7 @@ class SCCameraVC: UIViewController {
                 flashItem.isSelected = false
                 toolBar.updateItem(flashItem)
             }
-            print("📸 [Flash] 初始化闪光灯状态: \(flashState.title)")
+            print("  [Flash] 初始化闪光灯状态: \(flashState.title)")
         } else {
             print("⚠️ [Flash] 设置闪光灯状态失败")
             // 如果设置失败，将状态设置为关闭
@@ -1290,7 +1290,7 @@ class SCCameraVC: UIViewController {
     }
     
     private func savePhotoToAlbum(_ image: UIImage) {
-        print("📸 [Photo Save] 准备保存照片到相册")
+        print("  [Photo Save] 准备保存照片到相册")
         
         // 检查相册访问权限
         PHPhotoLibrary.requestAuthorization { [weak self] status in
@@ -1299,7 +1299,7 @@ class SCCameraVC: UIViewController {
             DispatchQueue.main.async {
                 switch status {
                 case .authorized, .limited:
-                    print("📸 [Photo Save] 相册访问权限已获取，开始保存")
+                    print("  [Photo Save] 相册访问权限已获取，开始保存")
                     UIImageWriteToSavedPhotosAlbum(image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
                     
                 case .denied, .restricted:
@@ -1391,15 +1391,15 @@ class SCCameraVC: UIViewController {
         
         switch state {
         case .focusing:
-            print("📸 [Focus] 正在对焦...")
+            print("  [Focus] 正在对焦...")
         case .focused:
-            print("📸 [Focus] 对焦成功")
+            print("  [Focus] 对焦成功")
         case .failed:
-            print("📸 [Focus] 对焦失败")
+            print("  [Focus] 对焦失败")
             let error = NSError(domain: "com.sparkcamera.focus", code: -1, userInfo: [NSLocalizedDescriptionKey: "对焦失败"])
             showError(error)
         case .locked:
-            print("📸 [Focus] 对焦已锁定")
+            print("  [Focus] 对焦已锁定")
         }
     }
     
@@ -1466,13 +1466,13 @@ class SCCameraVC: UIViewController {
         // 更新session的resolution
         if let session = photoSession {
             session.resolution = CGSize(width: screenWidth, height: screenHeight)
-            print("📸 [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
+            print("  [Camera] 更新相机会话输出尺寸: \(screenWidth) x \(screenHeight)")
         }
     }
     
     // MARK: - Deinitialization
     deinit {
-        print("📸 [Camera] SCCameraVC 正在释放...")
+        print("  [Camera] SCCameraVC 正在释放...")
         
         // 停止倒计时
         countdownTimer?.invalidate()
@@ -1490,7 +1490,7 @@ class SCCameraVC: UIViewController {
         photoSession = nil
         cameraManager = nil
         
-        print("📸 [Camera] SCCameraVC 已释放")
+        print("  [Camera] SCCameraVC 已释放")
     }
 }
 

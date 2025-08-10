@@ -21,6 +21,10 @@ import GPUImage
     private var infoView: SCPhotoInfoView!
     private var filterOptionView: SCFilterOptionView!
     private var filterAdjustView: SCFilterAdjustView!
+    // 新增：参数列表与参数编辑视图
+    private var parameterListView: SCParameterListView!
+    private var parameterEditorView: SCParameterEditorView!
+    private var currentSelectedParameter: SCFilterParameter = .presetTemplates
     private var closeButton: UIButton!
     private var isStatusBarHidden = false
     private var progressView: UIProgressView!
@@ -83,6 +87,8 @@ import GPUImage
         super.viewDidAppear(animated)
         isViewVisible = true
         animateAppearance()
+        // 在安全区域与最终布局稳定后，按比例重新应用一次，避免初次进入时全屏铺满
+        applyAspectLayout(isEditing: isEditingMode)
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -98,13 +104,19 @@ import GPUImage
         return isStatusBarHidden
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+    }
+    
     // MARK: - UI Setup
     private func setupUI() {
         setupBackground()
         setupFilterView()
         setupToolbar()
         setupInfoView()
+        setupParameterListView()
         setupFilterOptionView()
+        setupParameterEditorView()
         setupFilterAdjustView()
         setupProgressView()
         setupCloseButton()
@@ -125,9 +137,8 @@ import GPUImage
         filterView.delegate = self
         view.addSubview(filterView)
         
-        filterView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
+        // 默认按图片比例布局，而不是全屏铺满
+        applyAspectLayout(isEditing: false)
         
         // 设置图片
         filterView.setImage(image)
@@ -186,12 +197,38 @@ import GPUImage
         
         filterOptionView.snp.makeConstraints { make in
             make.left.right.equalToSuperview()
-            make.bottom.equalTo(toolbar.snp.top)
+            // 预置滤镜列表位于参数列表之上
+            make.bottom.equalTo(parameterListView.snp.top)
             make.height.equalTo(120)
         }
         
         // 初始状态隐藏
         filterOptionView.alpha = 0
+    }
+
+    private func setupParameterListView() {
+        parameterListView = SCParameterListView(parameters: SCFilterParameter.allCases)
+        parameterListView.delegate = self
+        view.addSubview(parameterListView)
+        parameterListView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(toolbar.snp.top)
+            make.height.equalTo(44)
+        }
+        parameterListView.alpha = 0
+    }
+
+    private func setupParameterEditorView() {
+        parameterEditorView = SCParameterEditorView()
+        parameterEditorView.delegate = self
+        view.addSubview(parameterEditorView)
+        parameterEditorView.snp.makeConstraints { make in
+            make.left.right.equalToSuperview()
+            make.bottom.equalTo(parameterListView.snp.top)
+            make.height.equalTo(120)
+        }
+        parameterEditorView.alpha = 0
+        parameterEditorView.isHidden = true
     }
     
     private func setupFilterAdjustView() {
@@ -206,7 +243,11 @@ import GPUImage
         
         // 初始状态为隐藏，并设置初始位置在屏幕右侧
         filterAdjustView.isHidden = true
-        filterAdjustView.transform = CGAffineTransform(translationX: 280, y: 0)
+        
+        // 在布局完成后设置初始transform
+        DispatchQueue.main.async {
+            self.filterAdjustView.transform = CGAffineTransform(translationX: self.filterAdjustView.bounds.width, y: 0)
+        }
         
         // 添加点击手势来关闭抽屉
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
@@ -216,10 +257,30 @@ import GPUImage
         // 设置调整按钮
         view.addSubview(adjustButton)
         adjustButton.snp.makeConstraints { make in
-            make.right.equalToSuperview()
-            make.centerY.equalToSuperview()
+            make.trailing.equalTo(view.safeAreaLayoutGuide).offset(-16)
+            make.centerY.equalTo(view.safeAreaLayoutGuide).offset(50)  // 相对于安全区域中心偏上一点
             make.width.height.equalTo(40)
         }
+        
+        // 初始状态隐藏调整按钮
+        adjustButton.isHidden = true
+        adjustButton.alpha = 1.0
+        
+        // 设置按钮样式，确保更容易看到
+        adjustButton.backgroundColor = SCConstants.themeColor.withAlphaComponent(0.9)
+        adjustButton.layer.cornerRadius = 20
+        adjustButton.layer.borderWidth = 2
+        adjustButton.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        adjustButton.layer.shadowColor = UIColor.black.cgColor
+        adjustButton.layer.shadowOffset = CGSize(width: 0, height: 2)
+        adjustButton.layer.shadowOpacity = 0.3
+        adjustButton.layer.shadowRadius = 4
+        
+        print("🔧 [SETUP] 调整按钮已创建并添加到视图")
+        print("🔧 [SETUP] 调整按钮约束: trailing=-16, centerY=safeArea+50")
+        
+        // 确保按钮在最前面
+        view.bringSubviewToFront(adjustButton)
         
         // 添加左滑手势到调整按钮
         let swipeGesture = UISwipeGestureRecognizer(target: self, action: #selector(handleAdjustButtonTap))
@@ -604,63 +665,138 @@ import GPUImage
         
         // 更新约束
         if isEditing {
+            // 动态计算可用空间，避免硬编码
+            let maxWidth = UIScreen.main.bounds.width - 40 // 左右各20点边距
+            
+            // 计算实际需要预留的空间
+            let topMargin: CGFloat = 20 // 图片顶部边距
+            let bottomMargin: CGFloat = 20 // 额外的底部安全边距
+            let bottomReservedSpace = view.safeAreaInsets.bottom + 20 + 60 + 120 + bottomMargin // safeArea + toolbar边距 + toolbar高度 + filterOption高度 + 安全边距
+            let availableHeight = UIScreen.main.bounds.height - view.safeAreaInsets.top - topMargin - bottomReservedSpace
+            
+            // 根据比例计算最佳尺寸，确保不压扁图片
+            let widthBasedHeight = maxWidth / imageAspectRatio
+            let heightBasedWidth = availableHeight * imageAspectRatio
+            
+            var finalWidth: CGFloat
+            var finalHeight: CGFloat
+            
+            // 选择能保持比例且不超出边界的最大尺寸
+            if widthBasedHeight <= availableHeight {
+                // 按宽度缩放，图片不会太高
+                finalWidth = maxWidth
+                finalHeight = widthBasedHeight
+            } else {
+                // 按高度缩放，图片不会太宽
+                finalWidth = heightBasedWidth
+                finalHeight = availableHeight
+            }
+            
+            // 验证比例是否正确，如果差异过大则修正
+            let calculatedRatio = finalWidth / finalHeight
+            if abs(imageAspectRatio - calculatedRatio) > 0.01 {
+                let correctedHeight = finalWidth / imageAspectRatio
+                if correctedHeight <= availableHeight {
+                    finalHeight = correctedHeight
+                }
+            }
+            
+            // 使用明确的尺寸约束，避免Auto Layout混乱
             filterView.snp.remakeConstraints { make in
-                make.left.right.equalToSuperview()
-                make.top.equalTo(view.safeAreaLayoutGuide)
-                
-                // 根据图片宽高比设置高度
-                let width = UIScreen.main.bounds.width
-                let height = width / imageAspectRatio
-                make.height.equalTo(height)
-                
-                // 确保不超出 filterOptionView
-                make.bottom.lessThanOrEqualTo(filterOptionView.snp.top)
+                make.centerX.equalToSuperview()
+                make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
+                make.width.equalTo(finalWidth)
+                make.height.equalTo(finalHeight)
             }
             
-            // 居中显示
-            filterView.snp.makeConstraints { make in
-                make.centerY.equalTo(view.safeAreaLayoutGuide).priority(.high)
-            }
+            // 立即更新布局
+            view.layoutIfNeeded()
             
-            // 显示抽屉视图
+            // 显示抽屉视图，但保持隐藏状态，等待用户点击调整按钮
             filterAdjustView.isHidden = false
-            filterAdjustView.frame.origin.x = view.bounds.width
+            // 确保抽屉在正确的初始位置（屏幕右侧外）- 通过transform控制
+            DispatchQueue.main.async {
+                self.filterAdjustView.transform = CGAffineTransform(translationX: self.filterAdjustView.bounds.width, y: 0)
+            }
             
             // 添加点击空白区域关闭抽屉的手势
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap))
             view.addGestureRecognizer(tapGesture)
             
-            // 添加右侧提示按钮
-            setupAdjustButton()
         } else {
-            filterView.snp.remakeConstraints { make in
-                make.edges.equalToSuperview()
-            }
+            // 非编辑模式下也保持按比例展示
+            applyAspectLayout(isEditing: false)
             
             // 隐藏抽屉视图
             filterAdjustView.isHidden = true
-            
-            // 移除手势和按钮
-            view.gestureRecognizers?.forEach { view.removeGestureRecognizer($0) }
-            adjustButton.removeFromSuperview()
         }
         
         // 执行动画
-        UIView.animate(withDuration: 0.3) {
+        UIView.animate(withDuration: 0.3, animations: {
             // 更新 infoView 和背景
             self.infoView.alpha = isEditing ? 0 : 1
             self.blurEffectView.alpha = isEditing ? 0 : 1
+            self.parameterListView.alpha = isEditing ? 1 : 0
+            // 默认进入编辑时显示预置列表
             self.filterOptionView.alpha = isEditing ? 1 : 0
+            self.parameterEditorView.alpha = 0
             
             self.view.layoutIfNeeded()
+        }, completion: { _ in
+            // 退出编辑模式或收起抽屉后，强制刷新预览区域布局，避免比例被错误挤压
+            if !isEditing {
+                self.filterView.refreshLayout()
+            }
+        })
+    }
+
+    /// 根据是否编辑模式，按图片原比例为 `filterView` 计算并应用合适的约束
+    private func applyAspectLayout(isEditing: Bool) {
+        let imageAspectRatio = image.size.width / image.size.height
+        let topMargin: CGFloat = isEditing ? 20 : 0
+        let bottomReservedSpace: CGFloat
+        if isEditing {
+            // safeArea + toolbar边距(20) + toolbar(60) + 参数列表(44) + 预置/编辑区域(120) + 额外bottom(20)
+            bottomReservedSpace = view.safeAreaInsets.bottom + 20 + 60 + 44 + 120 + 20
+        } else {
+            // 非编辑模式下仅保留底部工具栏与信息视图
+            // infoView(60) + 与toolbar间距(20) + toolbar(60) + safeArea bottom
+            bottomReservedSpace = view.safeAreaInsets.bottom + 60 + 20 + 60 + 20
         }
+        let availableHeight = view.bounds.height - view.safeAreaInsets.top - topMargin - bottomReservedSpace
+        let maxWidth = view.bounds.width - (isEditing ? 40 : 0)
+        let widthBasedHeight = maxWidth / imageAspectRatio
+        let heightBasedWidth = availableHeight * imageAspectRatio
+        let finalWidth: CGFloat
+        let finalHeight: CGFloat
+        if widthBasedHeight <= availableHeight {
+            finalWidth = maxWidth
+            finalHeight = widthBasedHeight
+        } else {
+            finalWidth = heightBasedWidth
+            finalHeight = availableHeight
+        }
+        filterView.snp.remakeConstraints { make in
+            make.centerX.equalToSuperview()
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(topMargin)
+            make.width.equalTo(finalWidth)
+            make.height.equalTo(finalHeight)
+        }
+        view.layoutIfNeeded()
     }
 
     private func showExitEditingConfirmation(completion: @escaping (Bool) -> Void) {
+        // 检查是否有未保存的参数修改
+        let hasModifications = filterAdjustView.hasModifiedParameters()
+        
+        let message = hasModifications 
+            ? "确定要退出编辑模式吗？您对滤镜参数的修改将会丢失。"
+            : "确定要退出编辑模式吗？"
+        
         SCAlert.show(
             title: "退出编辑",
-            message: "确定要退出编辑模式吗？未保存的修改将会丢失。",
-            style: .warning,
+            message: message,
+            style: hasModifications ? .warning : .info,
             cancelTitle: "取消",
             confirmTitle: "退出编辑",
             completion: completion
@@ -672,10 +808,45 @@ import GPUImage
         toolbar.setEditingMode(true)
         updateUIForEditingMode(true)
         
-        // 显示滤镜选项视图和调整按钮
+        // 显示参数列表与预置滤镜
+        print("🔧 [DEBUG] 进入编辑模式，显示调整按钮")
+        print("  调整按钮当前状态: isHidden=\(adjustButton.isHidden), alpha=\(adjustButton.alpha)")
+        print("  调整按钮父视图: \(adjustButton.superview != nil ? "已添加" : "未添加")")
+        print("  调整按钮frame: \(adjustButton.frame)")
+        print("  安全区域: \(view.safeAreaLayoutGuide.layoutFrame)")
+        print("  视图bounds: \(view.bounds)")
+        
+        // 确保按钮在最前面并强制显示
+        view.bringSubviewToFront(adjustButton)
+        
+        // 立即显示按钮，不等动画
+        adjustButton.isHidden = false
+        adjustButton.alpha = 1.0
+        
         UIView.animate(withDuration: 0.3) {
+            self.parameterListView.alpha = 1
             self.filterOptionView.alpha = 1
+            self.parameterEditorView.alpha = 0
+            self.parameterEditorView.isHidden = true
             self.adjustButton.isHidden = false
+            self.adjustButton.alpha = 1.0  // 确保透明度正确
+        } completion: { _ in
+            print("🔧 [DEBUG] 动画完成后调整按钮状态: isHidden=\(self.adjustButton.isHidden), alpha=\(self.adjustButton.alpha)")
+            print("🔧 [DEBUG] 调整按钮frame: \(self.adjustButton.frame)")
+            print("🔧 [DEBUG] 调整按钮在父视图中: \(self.view.subviews.contains(self.adjustButton) ? "存在" : "不存在")")
+        }
+        
+        // 验证滤镜功能
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let isValid = self.filterView.validateFilterFunctionality()
+            if !isValid {
+                print("⚠️ [PhotoPreview] 滤镜功能验证失败，可能影响调整效果")
+            }
+        }
+        
+        // 添加提示信息
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.showFilterAdjustmentTip()
         }
     }
 
@@ -687,11 +858,19 @@ import GPUImage
             self.toolbar.setEditingMode(false)
             self.updateUIForEditingMode(false)
             
-            // 隐藏滤镜选项视图和调整按钮
+            // 隐藏编辑相关视图
             UIView.animate(withDuration: 0.3) {
                 self.filterOptionView.alpha = 0
+                self.parameterListView.alpha = 0
+                self.parameterEditorView.alpha = 0
                 self.adjustButton.isHidden = true
-                self.filterAdjustView.collapse()
+            }
+            // 确保收起滤镜调整视图
+            self.filterAdjustView.collapse()
+
+            // 退出编辑模式后刷新一次预览，确保比例正确
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.filterView.refreshLayout()
             }
         }
     }
@@ -718,25 +897,108 @@ import GPUImage
     }
     
     @objc private func handleAdjustButtonTap() {
-        // 显示抽屉视图
+        // 显示并展开滤镜调整视图
         filterAdjustView.isHidden = false
-        adjustButton.isHidden = true
         
-        // 展开动画
-        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
-            self.filterAdjustView.transform = .identity
+        // 同步当前的滤镜参数值
+        let currentParameters = filterView.getCurrentParameters()
+        filterAdjustView.updateParameters(currentParameters)
+        
+        // 展开抽屉
+        filterAdjustView.expand()
+        
+        // 在调试模式下进行功能测试
+        #if DEBUG
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.performBasicFilterTest()
         }
+        #endif
     }
     
     @objc private func handleRightSwipe() {
-        // 收起动画
-        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseIn) {
-            self.filterAdjustView.transform = CGAffineTransform(translationX: 280, y: 0)
-        } completion: { _ in
-            self.filterAdjustView.isHidden = true
-            self.adjustButton.isHidden = false
+        // 收起滤镜调整视图
+        filterAdjustView.collapse()
+    }
+    
+    /// 显示滤镜调整功能的使用提示
+    private func showFilterAdjustmentTip() {
+        // 检查是否已经显示过提示
+        let hasShownTip = UserDefaults.standard.bool(forKey: "HasShownFilterAdjustmentTip")
+        guard !hasShownTip else { return }
+        
+        // 创建提示视图
+        let tipView = UIView()
+        tipView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        tipView.layer.cornerRadius = 8
+        
+        let tipLabel = UILabel()
+        tipLabel.text = "轻按右侧按钮可调整滤镜参数"
+        tipLabel.textColor = .white
+        tipLabel.font = .systemFont(ofSize: 14)
+        tipLabel.textAlignment = .center
+        
+        tipView.addSubview(tipLabel)
+        view.addSubview(tipView)
+        
+        tipLabel.snp.makeConstraints { make in
+            make.edges.equalToSuperview().inset(12)
+        }
+        
+        tipView.snp.makeConstraints { make in
+            make.trailing.equalTo(adjustButton.snp.leading).offset(-8)
+            make.centerY.equalTo(adjustButton)
+        }
+        
+        // 动画显示
+        tipView.alpha = 0
+        UIView.animate(withDuration: 0.3) {
+            tipView.alpha = 1
+        }
+        
+        // 3秒后自动隐藏
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            UIView.animate(withDuration: 0.3, animations: {
+                tipView.alpha = 0
+            }) { _ in
+                tipView.removeFromSuperview()
+            }
+        }
+        
+        // 标记已显示
+        UserDefaults.standard.set(true, forKey: "HasShownFilterAdjustmentTip")
+    }
+    
+    /// 基本滤镜功能测试（仅调试模式）
+    #if DEBUG
+    private func performBasicFilterTest() {
+        print("🧪 [DEBUG] 开始基本滤镜功能测试...")
+        
+        // 测试亮度调整
+        print("  测试亮度调整: 0.0 → 0.3")
+        filterView.updateParameter("亮度", value: 0.3)
+        
+        // 测试对比度调整
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            print("  测试对比度调整: 1.0 → 1.5")
+            self.filterView.updateParameter("对比度", value: 1.5)
+        }
+        
+        // 测试饱和度调整
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            print("  测试饱和度调整: 1.0 → 1.3")
+            self.filterView.updateParameter("饱和度", value: 1.3)
+        }
+        
+        // 恢复默认值
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            print("  恢复默认值...")
+            self.filterView.updateParameter("亮度", value: 0.0)
+            self.filterView.updateParameter("对比度", value: 1.0)
+            self.filterView.updateParameter("饱和度", value: 1.0)
+            print("🧪 [DEBUG] 基本滤镜功能测试完成")
         }
     }
+    #endif
     
     @objc private func handleBackgroundTap(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: view)
@@ -960,8 +1222,12 @@ extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
         // 更新滤镜视图
         filterView.applyTemplate(template)
         
-        // 更新调整视图的参数
-        filterAdjustView.updateParameters(template.toParameters())
+        // 更新调整视图与参数编辑器的参数
+        let params = template.toParameters()
+        filterAdjustView.updateParameters(params)
+        if let key = currentSelectedParameter.key, let value = params[key] {
+            parameterEditorView.configure(parameter: currentSelectedParameter, currentValue: value)
+        }
         
         // 如果调整视图是展开状态，更新其显示的值
         if filterAdjustView.isExpanded {
@@ -973,38 +1239,12 @@ extension SCPhotoPreviewVC: SCFilterOptionViewDelegate {
 // MARK: - SCFilterAdjustViewDelegate
 extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
     func filterAdjustView(_ view: SCFilterAdjustView, didUpdateParameter parameter: String, value: Float) {
-        // 更新滤镜参数
-        switch parameter {
-        case "亮度":
-            filterView.updateBrightness(value)
-        case "对比度":
-            filterView.updateContrast(value)
-        case "饱和度":
-            filterView.updateSaturation(value)
-        case "曝光":
-            filterView.updateExposure(value)
-        case "高光":
-            filterView.updateHighlights(value)
-        case "阴影":
-            filterView.updateShadows(value)
-        case "颗粒感":
-            filterView.updateGrain(value)
-        case "锐度":
-            filterView.updateSharpness(value)
-        case "模糊":
-            filterView.updateBlur(value)
-        case "光晕":
-            filterView.updateGlow(value)
-        case "边缘强度":
-            filterView.updateEdgeStrength(value)
-        case "红色":
-            filterView.updateRedChannel(value)
-        case "绿色":
-            filterView.updateGreenChannel(value)
-        case "蓝色":
-            filterView.updateBlueChannel(value)
-        default:
-            print("⚠️ 未知的滤镜参数：\(parameter)")
+        // 使用统一的参数更新方法
+        filterView.updateParameter(parameter, value: value)
+        // 同步参数编辑器
+        if let p = SCFilterParameter.allCases.first(where: { $0.key == parameter }) {
+            currentSelectedParameter = p
+            parameterEditorView.configure(parameter: p, currentValue: value)
         }
     }
     
@@ -1012,12 +1252,50 @@ extension SCPhotoPreviewVC: SCFilterAdjustViewDelegate {
         // 更新调整按钮的显示状态
         adjustButton.isHidden = isExpanded
         
-        // 更新抽屉视图的位置
-        UIView.animate(withDuration: 0.3) {
-            self.filterAdjustView.transform = CGAffineTransform(
-                translationX: isExpanded ? 0 : self.filterAdjustView.bounds.width,
-                y: 0
-            )
+        // 当展开时，同步当前的滤镜参数值
+        if isExpanded {
+            let currentParameters = filterView.getCurrentParameters()
+            filterAdjustView.updateParameters(currentParameters)
+        } else {
+            // 收起时隐藏滤镜调整视图
+            filterAdjustView.isHidden = true
         }
     }
 } 
+
+// MARK: - SCParameterListViewDelegate
+extension SCPhotoPreviewVC: SCParameterListViewDelegate {
+    func parameterListView(_ view: SCParameterListView, didSelect parameter: SCFilterParameter) {
+        currentSelectedParameter = parameter
+        if parameter == .presetTemplates {
+            // 展示预置滤镜列表
+            UIView.animate(withDuration: 0.25) {
+                self.parameterEditorView.alpha = 0
+                self.parameterEditorView.isHidden = true
+                self.filterOptionView.alpha = 1
+            }
+        } else {
+            // 切换到参数编辑视图（占据原预置滤镜区域）
+            let currentValue: Float
+            if let key = parameter.key {
+                currentValue = self.filterView.getCurrentParameters()[key] ?? parameter.defaultValue
+            } else {
+                currentValue = parameter.defaultValue
+            }
+            parameterEditorView.configure(parameter: parameter, currentValue: currentValue)
+            UIView.animate(withDuration: 0.25) {
+                self.filterOptionView.alpha = 0
+                self.parameterEditorView.isHidden = false
+                self.parameterEditorView.alpha = 1
+            }
+        }
+    }
+}
+
+// MARK: - SCParameterEditorViewDelegate
+extension SCPhotoPreviewVC: SCParameterEditorViewDelegate {
+    func parameterEditorView(_ view: SCParameterEditorView, didChange value: Float, for parameter: SCFilterParameter) {
+        guard let key = parameter.key else { return }
+        filterView.updateParameter(key, value: value)
+    }
+}

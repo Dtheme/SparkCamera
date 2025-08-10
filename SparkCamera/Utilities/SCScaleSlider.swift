@@ -8,7 +8,7 @@ struct SCScaleSliderConfig {
     /// 最大值
     var maxValue: Float
     /// 步长
-    var step: Float
+    var step: Float 
     /// 默认值
     var defaultValue: Float
     
@@ -117,7 +117,7 @@ struct SCScaleSliderStyle {
             case .vertical:
                 return SCScaleSliderStyle(
                     trackColor: .clear,
-                    scaleColor: .systemGray6,
+                    scaleColor: .systemGray3,  // 改为更明显的颜色
                     thumbColor: .systemGray6,
                     thumbTintColor: SCConstants.themeColor,
                     mainScaleTextColor: .white,
@@ -243,13 +243,14 @@ class SCScaleSlider: UIView {
         self.config = config
         self.currentValue = config.defaultValue
         super.init(frame: .zero)
+        
         setupUI()
         setupGestures()
         setupAccessibility()
-        updateScalePosition(animated: false)
         
         // 初始化时更新值标签
         updateValueLabel()
+        // 注意：位置更新在drawScales完成后自动执行
     }
     
     required init?(coder: NSCoder) {
@@ -269,7 +270,7 @@ class SCScaleSlider: UIView {
         addSubview(thumbView)
         addSubview(valueLabel)
         
-        // 设置约束
+        // 设置contentView约束
         contentView.snp.makeConstraints { make in
             make.height.equalToSuperview()
             make.centerY.equalToSuperview()
@@ -278,10 +279,11 @@ class SCScaleSlider: UIView {
             let stepSize = style.scaleWidth
             let totalSize = CGFloat(totalSteps) * stepSize
             
-            // 总宽度 = 刻度总宽度 + 屏幕宽度（确保两端有足够空间）
-            make.width.equalTo(totalSize + UIScreen.main.bounds.width)
-            // 初始位置居中
-            make.centerX.equalToSuperview()
+            // 总宽度 = 刻度总宽度 + 两边缓冲区（确保两端有足够空间滑动）
+            make.width.equalTo(totalSize + UIScreen.main.bounds.width * 2)
+            
+            // 从左边开始布局，为transform提供简单的基准点
+            make.leading.equalToSuperview()
         }
         
         sliderTrack.snp.makeConstraints { make in
@@ -314,8 +316,12 @@ class SCScaleSlider: UIView {
             make.height.equalTo(20)
         }
         
-        drawScales()
-        updateValueLabel()
+        // 延迟绘制刻度，确保布局完成
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.isDrawingScales = false  // 确保可以绘制
+            self.drawScales()
+        }
     }
     
     private func setupGestures() {
@@ -331,57 +337,152 @@ class SCScaleSlider: UIView {
     }
     
     // MARK: - Drawing
+    
+    /// 调用计数器，用于调试
+    private var drawScalesCallCount = 0
+    /// 防止重复绘制的标志
+    private var isDrawingScales = false
+    
+    /// 绘制刻度线和标签
+    /// 使用简化的坐标系：刻度从左边缓冲区开始线性排列
     private func drawScales() {
+        // 防止重复调用
+        guard !isDrawingScales else { return }
+        
+        isDrawingScales = true
+        drawScalesCallCount += 1
+        
         // 清除现有的刻度
         scaleView.subviews.forEach { $0.removeFromSuperview() }
         scaleLabels.removeAll()
         
         let totalSteps = Int((config.maxValue - config.minValue) / config.step)
         let stepWidth = style.scaleWidth
+        
+        // 确保scaleView有正确的frame
+        if scaleView.frame.width == 0 {
+            isDrawingScales = false
+            return
+        }
+        
+        // 刻度从左边缓冲区开始绘制，计算简单明确
+        let totalScaleWidth = CGFloat(totalSteps) * stepWidth
         let screenWidth = UIScreen.main.bounds.width
+        let scaleStartOffset = screenWidth  // 左边留一个屏幕宽度的缓冲区
         
-        // 计算起始位置：从屏幕中心开始
-        let centerPosition = screenWidth / 2
-        
+        // 修正：确保刻度数量正确，不超过最大值
         for i in 0...totalSteps {
             let value = config.minValue + Float(i) * config.step
-            let isMainScale = abs(value.truncatingRemainder(dividingBy: 0.5)) < .ulpOfOne
             
-            let scaleView = UIView()
-            scaleView.backgroundColor = style.scaleColor
-            self.scaleView.addSubview(scaleView)
-            
-            // 计算x位置：从最小值开始
-            let x = CGFloat(i) * stepWidth + centerPosition
-            let height: CGFloat = isMainScale ? style.mainScaleHeight : style.subScaleHeight
-            
-            scaleView.snp.makeConstraints { make in
-                make.centerX.equalTo(self.scaleView.snp.left).offset(x)
-                make.centerY.equalTo(self.scaleView)
-                make.width.equalTo(1)
-                make.height.equalTo(height)
+            // 确保值不超过最大值
+            if value > config.maxValue {
+                break
             }
+            
+            // 优化主刻度判断逻辑：对于曝光补偿，每0.5一个主刻度
+            let isMainScale: Bool
+            if config.maxValue - config.minValue <= 4.0 {
+                // 对于小范围（如曝光补偿 -2.0 到 2.0），每0.5一个主刻度
+                isMainScale = abs(value.truncatingRemainder(dividingBy: 0.5)) < .ulpOfOne
+            } else {
+                // 对于大范围，每1.0一个主刻度
+                isMainScale = abs(value.truncatingRemainder(dividingBy: 1.0)) < .ulpOfOne
+            }
+            
+            let scaleLine = UIView()
+            scaleLine.backgroundColor = style.scaleColor
+            scaleView.addSubview(scaleLine)
+            
+            // 刻度从左边缓冲区开始的线性排列
+            let scaleX = scaleStartOffset + CGFloat(i) * stepWidth
+            let height: CGFloat = isMainScale ? style.mainScaleHeight : style.subScaleHeight
+            let scaleY = (scaleView.bounds.height - height) / 2
+            
+            scaleLine.frame = CGRect(
+                x: scaleX,
+                y: scaleY,
+                width: 1,
+                height: height
+            )
             
             if isMainScale {
                 let label = UILabel()
-                label.text = String(format: "%.1f", value)
+                // 优化标签格式：对于整数显示整数，对于小数显示一位小数
+                if value.truncatingRemainder(dividingBy: 1.0) == 0 {
+                    label.text = String(format: "%.0f", value)
+                } else {
+                    label.text = String(format: "%.1f", value)
+                }
                 label.font = .systemFont(ofSize: style.labelFontSize)
                 label.textColor = style.mainScaleTextColor
                 label.textAlignment = .center
-                self.scaleView.addSubview(label)
+                scaleView.addSubview(label)
                 scaleLabels.append(label)
                 
-                label.snp.makeConstraints { make in
-                    make.centerX.equalTo(scaleView)
-                    make.top.equalTo(scaleView.snp.bottom).offset(2)
-                }
+                // 使用frame布局标签
+                let labelSize = label.sizeThatFits(CGSize(width: 50, height: 20))
+                label.frame = CGRect(
+                    x: scaleX - labelSize.width / 2,
+                    y: scaleLine.frame.maxY + 2,
+                    width: labelSize.width,
+                    height: labelSize.height
+                )
             }
         }
         
-        // 初始位置：将默认值对准中心
-        let stepsFromMin = (currentValue - config.minValue) / config.step
-        let initialOffset = -CGFloat(stepsFromMin) * stepWidth
-        contentView.transform = CGAffineTransform(translationX: initialOffset, y: 0)
+        // 强制布局更新以确保刻度可见
+        scaleView.setNeedsLayout()
+        scaleView.layoutIfNeeded()
+        
+        // 绘制完成，重置防护标志
+        isDrawingScales = false
+        
+        // 绘制完成后，在下一个运行循环中对齐到中心线
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            self.alignCurrentValueToCenter()
+        }
+    }
+    
+    // MARK: - Alignment
+    
+    /// 让当前值对应的刻度位置对齐到中心线
+    /// 
+    /// 核心对齐逻辑：
+    /// 1. 计算当前值在contentView中的绝对位置
+    /// 2. 计算需要的transform偏移量，使该位置对齐到视图中心
+    /// 3. 应用CGAffineTransform实现对齐
+    /// 
+    /// - Parameter animated: 是否使用动画过渡
+    private func alignCurrentValueToCenter(animated: Bool = false) {
+        guard bounds.width > 0 else { return }
+        guard !scaleLabels.isEmpty else { return }
+        
+        // 使用与drawScales相同的坐标系计算
+        let stepWidth = style.scaleWidth
+        let screenWidth = UIScreen.main.bounds.width
+        let scaleStartOffset = screenWidth  // 刻度从左边缓冲区开始
+        
+        // 计算当前值在contentView中的位置
+        let currentStepsFromMin = (currentValue - config.minValue) / config.step
+        let currentValuePositionInContentView = scaleStartOffset + CGFloat(currentStepsFromMin) * stepWidth
+        
+        // 计算视图中心位置
+        let viewCenter = bounds.width / 2
+        
+        // 核心计算：计算让当前值对齐到中心所需的transform偏移
+        let requiredTransformOffset = viewCenter - currentValuePositionInContentView
+        
+        // 应用transform让当前值对齐到中心
+        let alignTransform = CGAffineTransform(translationX: requiredTransformOffset, y: 0)
+        
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseOut]) {
+                self.contentView.transform = alignTransform
+            }
+        } else {
+            contentView.transform = alignTransform
+        }
     }
     
     // MARK: - Gesture Handlers
@@ -398,10 +499,11 @@ class SCScaleSlider: UIView {
         case .changed:
             let stepWidth = style.scaleWidth
             let sensitivity = min(abs(gesture.velocity(in: self).x) / 1000, 2.0)
-            // 左滑尺子向左移动，数值增加
-            let valueChange = Float(translation.x / stepWidth) * config.step * Float(sensitivity)
             
-            var newValue = currentValue - valueChange  // 保持减法，因为移动方向和值的变化方向是相反的
+            // 交互逻辑：左滑增值，右滑减值（负号实现正确的方向映射）
+            let valueChange = -Float(translation.x / stepWidth) * config.step * Float(sensitivity)
+            
+            var newValue = currentValue + valueChange
             newValue = min(config.maxValue, max(config.minValue, newValue))
             
             if newValue != currentValue {
@@ -423,9 +525,11 @@ class SCScaleSlider: UIView {
         }
     }
     
+    /// 将当前值对齐到最近的步长
     private func snapToNearestStep() {
-        let steps = round(currentValue / config.step)
-        let newValue = steps * config.step
+        // 计算最接近的步数并对齐
+        let stepsFromMin = round((currentValue - config.minValue) / config.step)
+        let newValue = config.minValue + Float(stepsFromMin) * config.step
         let oldValue = currentValue
         currentValue = min(config.maxValue, max(config.minValue, newValue))
         
@@ -434,7 +538,6 @@ class SCScaleSlider: UIView {
             self.updateValueLabel()
             if oldValue != self.currentValue {
                 self.valueChangedHandler?(self.currentValue)
-                print("📏 [ScaleSlider] 对齐到最近刻度: \(self.currentValue)")
             }
         }
         
@@ -448,13 +551,8 @@ class SCScaleSlider: UIView {
         let hitTestRect = CGRect(x: location.x - 20, y: 0, width: 40, height: bounds.height)
         guard hitTestRect.contains(CGPoint(x: location.x, y: location.y)) else { return }
         
-        let stepWidth = style.scaleWidth
-        // 点击右侧，尺子向左移动（值增大）；点击左侧，尺子向右移动（值减小）
-        let steps = (location.x - centerX) / stepWidth
-        let valueChange = Float(steps) * config.step
-        
-        var newValue = currentValue + valueChange  // 点击右侧值增大，点击左侧值减小
-        newValue = min(config.maxValue, max(config.minValue, newValue))
+        // 使用新的值计算方法
+        let newValue = getValueAtPosition(location.x)
         
         if newValue != currentValue {
             currentValue = newValue
@@ -465,56 +563,45 @@ class SCScaleSlider: UIView {
         }
     }
     
-    // 新增：计算标尺中心位置对应的值
-    private func getCurrentScaleValue() -> Float {
-        let transform = contentView.transform.tx
-        let totalSteps = Int((config.maxValue - config.minValue) / config.step)
-        let stepWidth = style.scaleWidth
-        let totalSize = CGFloat(totalSteps) * stepWidth
-        
-        // 反转计算方向：保持与移动方向一致
-        let progress = transform / totalSize
-        return config.minValue + Float(progress) * (config.maxValue - config.minValue)
-    }
-    
-    // 修改：计算游标对应的刻度值
-    private func getScaleValueAtCursor() -> Float {
-        let stepWidth: CGFloat = 40.0
-        let transform = contentView.transform.tx
-        let totalSteps = Int((config.maxValue - config.minValue) / config.step)
-        let totalWidth = CGFloat(totalSteps) * stepWidth
-        
-        // 计算进度
-        let progress = -transform / totalWidth
-        // 计算对应的值
-        let value = config.minValue + Float(progress) * (config.maxValue - config.minValue)
-        
-        print("===== 游标位置分析 =====")
-        print("transform: \(transform)")
-        print("totalWidth: \(totalWidth)")
-        print("progress: \(progress)")
-        print("计算值: \(value)")
-        print("====================")
-        
-        return value
-    }
-    
     private func updateScalePosition(animated: Bool) {
+        // 直接使用对齐方法
+        alignCurrentValueToCenter(animated: animated)
+    }
+    
+    // 根据屏幕位置计算对应的值
+    private func getValueAtPosition(_ position: CGFloat) -> Float {
         let stepWidth = style.scaleWidth
+        let screenWidth = UIScreen.main.bounds.width
+        let scaleStartOffset = screenWidth  // 刻度从左边缓冲区开始
         
-        // 计算当前值相对于最小值的步数
-        let stepsFromMin = (currentValue - config.minValue) / config.step
-        let offset = -CGFloat(stepsFromMin) * stepWidth
+        // 获取当前contentView的transform偏移量
+        let currentTransformOffset = contentView.transform.tx
         
-        let transform = CGAffineTransform(translationX: offset, y: 0)
+        // 计算在contentView坐标系中的位置
+        let positionInContentView = position - currentTransformOffset
         
-        if animated {
-            UIView.animate(withDuration: Constants.animationDuration, delay: 0, options: [.curveEaseOut], animations: {
-                self.contentView.transform = transform
-            })
-        } else {
-            contentView.transform = transform
-        }
+        // 计算在刻度坐标系中的位置
+        let positionInScale = positionInContentView - scaleStartOffset
+        
+        // 计算对应的步数
+        let steps = positionInScale / stepWidth
+        
+        // 计算对应的值
+        let value = config.minValue + Float(steps) * config.step
+        
+        // 确保值在范围内
+        let clampedValue = min(config.maxValue, max(config.minValue, value))
+        
+        return clampedValue
+    }
+    
+    // 根据值计算对应的位置
+    private func getPositionForValue(_ value: Float) -> CGFloat {
+        // 对于当前的设计，特定值对应的刻度总是显示在屏幕中心
+        // 因为我们通过transform移动contentView来实现这一点
+        let centerPosition = bounds.width / 2
+        
+        return centerPosition
     }
     
     private func updateValueLabel() {
@@ -537,10 +624,14 @@ class SCScaleSlider: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         
-        // 只在第一次或尺寸改变时重绘刻度
-        if scaleView.subviews.isEmpty {
+        // 确保刻度在布局完成后重新绘制（仅在需要时）
+        let needsRedraw = scaleView.subviews.isEmpty && bounds.width > 0 && scaleView.frame.width > 0
+        
+        if needsRedraw {
+            isDrawingScales = false  // 确保可以绘制
             drawScales()
-            updateScalePosition(animated: false)
+        } else if !scaleLabels.isEmpty && bounds.width > 0 {
+            alignCurrentValueToCenter()
         }
     }
     
@@ -647,9 +738,13 @@ class SCScaleSlider: UIView {
         // 更新内容视图宽度
         let totalSteps = Int((config.maxValue - config.minValue) / config.step)
         let totalSize = CGFloat(totalSteps) * style.scaleWidth
+        
         contentView.snp.updateConstraints { make in
-            make.width.equalTo(totalSize + UIScreen.main.bounds.width)
+            make.width.equalTo(totalSize + UIScreen.main.bounds.width * 2)  // 两边缓冲区
         }
+        
+        // 重新绘制和对齐（在下次layoutSubviews中生效）
+        setNeedsLayout()
         
         // 更新位置
         updateScalePosition(animated: false)
@@ -705,9 +800,15 @@ class SCScaleSlider: UIView {
     ///   - animated: 是否动画过渡
     func setValue(_ value: Float, animated: Bool) {
         let newValue = min(config.maxValue, max(config.minValue, value))
+        
         if newValue != currentValue {
             currentValue = newValue
-            updateScalePosition(animated: animated)
+            
+            // 如果刻度已经绘制，直接重新对齐到中心
+            if !scaleLabels.isEmpty && bounds.width > 0 {
+                alignCurrentValueToCenter(animated: animated)
+            }
+            
             updateValueLabel()
             valueChangedHandler?(currentValue)
         }
@@ -717,6 +818,29 @@ class SCScaleSlider: UIView {
     /// - Parameter animated: 是否动画过渡
     func resetToDefault(animated: Bool) {
         setValue(config.defaultValue, animated: animated)
+    }
+    
+    /// 更新配置
+    /// - Parameter newConfig: 新的配置
+    func updateConfig(_ newConfig: SCScaleSliderConfig) {
+        config = newConfig
+        currentValue = newConfig.defaultValue
+        
+        // 重新设置UI
+        let totalSteps = Int((config.maxValue - config.minValue) / config.step)
+        let totalSize = CGFloat(totalSteps) * style.scaleWidth
+        
+        contentView.snp.updateConstraints { make in
+            make.width.equalTo(totalSize + UIScreen.main.bounds.width * 2)  // 两边缓冲区
+        }
+        
+        // 重新计算初始位置（在下次layoutSubviews中生效）
+        setNeedsLayout()
+        
+        // 重新绘制刻度
+        drawScales()
+        updateScalePosition(animated: false)
+        updateValueLabel()
     }
 }
 
@@ -738,6 +862,68 @@ private enum Constants {
     static let animationDuration: TimeInterval = 0.2
     /// 触感反馈
     static let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-   
 }
+
+/*
+ MARK: - 使用说明
+ 
+ SCScaleSlider 是一个通用的刻度滑块调节组件，主要用于精确调节数值的场景。
+ 
+ ## 核心功能：
+ 1. 刻度显示：支持主刻度和副刻度，主刻度显示数值标签
+ 2. 滑块交互：支持拖拽、点击、长按等手势操作
+ 3. 数值调节：支持设置最小值、最大值、步长和默认值
+ 4. 样式定制：支持多种预定义样式（默认、暗色、竖条）
+ 5. 触感反馈：提供触觉反馈增强用户体验
+ 
+ ## 交互逻辑：
+ 1. 竖线标尺固定位置：中心线始终固定在视图中心
+ 2. 左滑刻度值增大，尺子左移；右滑值减小，尺子右移
+ 3. 支持外部设置默认值，尺子范围，最大最小值和尺子步长
+ 
+ ## 使用示例：
+ 
+ ```swift
+ // 创建默认配置的滑块
+ let slider = SCScaleSlider()
+ 
+ // 创建自定义配置的滑块
+ let config = SCScaleSliderConfig(
+     minValue: -1.0,
+     maxValue: 1.0,
+     step: 0.1,
+     defaultValue: 0.0
+ )
+ let customSlider = SCScaleSlider(config: config)
+ 
+ // 设置值变化回调
+ slider.valueChangedHandler = { value in
+     print("当前值: \(value)")
+ }
+ 
+ // 设置样式
+ slider.style = .Style.dark.style
+ 
+ // 设置当前值
+ slider.setValue(0.5, animated: true)
+ 
+ // 重置到默认值
+ slider.resetToDefault(animated: true)
+ 
+ // 更新配置
+ let newConfig = SCScaleSliderConfig(
+     minValue: -2.0,
+     maxValue: 2.0,
+     step: 0.2,
+     defaultValue: 0.0
+ )
+ slider.updateConfig(newConfig)
+ ```
+ 
+ ## 注意事项：
+ 1. 确保在视图布局完成后使用，否则刻度可能不显示
+ 2. 交互逻辑：左滑值增大，右滑值减小
+ 3. 刻度会自动对齐到最近的步长
+ 4. 支持触觉反馈和无障碍访问
+ */
 

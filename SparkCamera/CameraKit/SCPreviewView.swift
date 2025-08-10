@@ -157,7 +157,7 @@ import AVFoundation
         }
         
         #if DEBUG
-        print("📸 [Zoom] \(lensName) lens maxZoomFactor set to \(self.maxZoomFactor)")
+        print("  [Zoom] \(lensName) lens maxZoomFactor set to \(self.maxZoomFactor)")
         #endif
     }
     

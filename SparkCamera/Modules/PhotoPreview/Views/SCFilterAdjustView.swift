@@ -44,22 +44,31 @@ public class SCFilterAdjustView: UIView {
         return button
     }()
     
-    // 参数配置
+    // 滤镜参数配置 - 根据GPUImage滤镜特性设计的合理范围和步长
     private let parameters: [FilterParameter] = [
-//        FilterParameter(name: "亮度", minValue: -1.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
-        FilterParameter(name: "对比度", minValue: 0.0, maxValue: 4.0, defaultValue: 1.0, step: 0.1),
-//        FilterParameter(name: "饱和度", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
-//        FilterParameter(name: "曝光", minValue: -4.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
-//        FilterParameter(name: "高光", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
-//        FilterParameter(name: "阴影", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
-//        FilterParameter(name: "颗粒感", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
-//        FilterParameter(name: "锐度", minValue: 0.0, maxValue: 4.0, defaultValue: 1.0, step: 0.1),
-//        FilterParameter(name: "模糊", minValue: 0.0, maxValue: 2.0, defaultValue: 0.0, step: 0.05),
-//        FilterParameter(name: "光晕", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
-//        FilterParameter(name: "边缘强度", minValue: 0.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
-//        FilterParameter(name: "红色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
-//        FilterParameter(name: "绿色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1),
-//        FilterParameter(name: "蓝色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.1)
+        // 基础色彩调整
+        FilterParameter(name: "亮度", minValue: -1.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+        FilterParameter(name: "对比度", minValue: 0.5, maxValue: 4.0, defaultValue: 1.0, step: 0.1),
+        FilterParameter(name: "饱和度", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.05),
+        FilterParameter(name: "曝光", minValue: -3.0, maxValue: 3.0, defaultValue: 0.0, step: 0.1),
+        
+        // 高光阴影调整
+        FilterParameter(name: "高光", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
+        FilterParameter(name: "阴影", minValue: 0.0, maxValue: 1.0, defaultValue: 1.0, step: 0.05),
+        
+        // 纹理效果
+        FilterParameter(name: "颗粒感", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+        FilterParameter(name: "锐度", minValue: -4.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
+        FilterParameter(name: "模糊", minValue: 0.0, maxValue: 2.0, defaultValue: 0.0, step: 0.05),
+        
+        // 艺术效果
+        FilterParameter(name: "光晕", minValue: 0.0, maxValue: 1.0, defaultValue: 0.0, step: 0.05),
+        FilterParameter(name: "边缘强度", minValue: 0.0, maxValue: 4.0, defaultValue: 0.0, step: 0.1),
+        
+        // RGB颜色通道调整
+        FilterParameter(name: "红色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.05),
+        FilterParameter(name: "绿色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.05),
+        FilterParameter(name: "蓝色", minValue: 0.0, maxValue: 2.0, defaultValue: 1.0, step: 0.05)
     ]
     
     private var currentValues: [String: Float] = [:]
@@ -221,11 +230,19 @@ public class SCFilterAdjustView: UIView {
     
     public func expand() {
         isExpanded = true
+        print("🔧 [FilterAdjustView] 开始展开抽屉")
+        print("  当前transform: \(self.transform)")
+        print("  当前frame: \(self.frame)")
+        
         let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeOut) {
-            self.frame.origin.x = -self.expandedWidth
+            // 滑入到正常位置（贴着屏幕右边）
+            self.transform = CGAffineTransform.identity
         }
         animator.addCompletion { [weak self] _ in
             guard let self = self else { return }
+            print("🔧 [FilterAdjustView] 抽屉展开完成")
+            print("  最终transform: \(self.transform)")
+            print("  最终frame: \(self.frame)")
             self.delegate?.filterAdjustView(self, didChangeExpandState: true)
         }
         animator.startAnimation()
@@ -233,11 +250,19 @@ public class SCFilterAdjustView: UIView {
     
     public func collapse() {
         isExpanded = false
+        print("🔧 [FilterAdjustView] 开始收起抽屉")
+        print("  当前transform: \(self.transform)")
+        print("  当前frame: \(self.frame)")
+        
         let animator = UIViewPropertyAnimator(duration: 0.3, curve: .easeOut) {
-            self.frame.origin.x = 0
+            // 滑出到屏幕右侧外面
+            self.transform = CGAffineTransform(translationX: self.bounds.width, y: 0)
         }
         animator.addCompletion { [weak self] _ in
             guard let self = self else { return }
+            print("🔧 [FilterAdjustView] 抽屉收起完成")
+            print("  最终transform: \(self.transform)")
+            print("  最终frame: \(self.frame)")
             self.delegate?.filterAdjustView(self, didChangeExpandState: false)
         }
         animator.startAnimation()
@@ -271,6 +296,22 @@ public class SCFilterAdjustView: UIView {
     public func reloadData() {
         tableView.reloadData()
     }
+    
+    /// 获取当前所有参数的值
+    public func getCurrentParameterValues() -> [String: Float] {
+        return currentValues
+    }
+    
+    /// 检查是否有参数被修改过
+    public func hasModifiedParameters() -> Bool {
+        for parameter in parameters {
+            let currentValue = currentValues[parameter.name] ?? parameter.defaultValue
+            if abs(currentValue - parameter.defaultValue) > Float.ulpOfOne {
+                return true
+            }
+        }
+        return false
+    }
 }
 
 // MARK: - UITableViewDelegate & UITableViewDataSource
@@ -282,8 +323,7 @@ extension SCFilterAdjustView: UITableViewDelegate, UITableViewDataSource {
     public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "AdjustCell", for: indexPath) as! SCFilterAdjustCell
         let parameter = parameters[indexPath.row]
-        // 打印参数内容：
-        print("parameter: \(parameter.name),\(parameter.minValue),\(parameter.maxValue),\(parameter.defaultValue)")
+        // 配置滤镜参数
 
         // 获取当前值，如果不存在则使用默认值
         let currentValue = currentValues[parameter.name] ?? parameter.defaultValue
@@ -304,7 +344,7 @@ extension SCFilterAdjustView: UITableViewDelegate, UITableViewDataSource {
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 120  // 固定高度，确保滑块和刻度显示完整
+        return 160  
     }
     
     public func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -414,9 +454,19 @@ class SCFilterAdjustCell: UITableViewCell {
         valueLabel.text = String(format: format, value)
         
         // 根据值是否为默认值调整显示样式
-        valueLabel.backgroundColor = abs(value - parameter.defaultValue) < Float.ulpOfOne
+        let isDefaultValue = abs(value - parameter.defaultValue) < Float.ulpOfOne
+        valueLabel.backgroundColor = isDefaultValue
             ? UIColor(white: 1.0, alpha: 0.15)
-            : UIColor(white: 1.0, alpha: 0.3)
+            : SCConstants.themeColor.withAlphaComponent(0.8)
+        
+        // 添加轻微动画效果
+        UIView.animate(withDuration: 0.1) {
+            self.valueLabel.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.1) {
+                self.valueLabel.transform = .identity
+            }
+        }
     }
     
     // MARK: - Configuration
@@ -442,11 +492,12 @@ class SCFilterAdjustCell: UITableViewCell {
         
         // 设置滑块约束
         slider.snp.makeConstraints { make in
-            make.top.equalTo(titleLabel.snp.bottom).offset(8)
+            make.top.equalTo(titleLabel.snp.bottom).offset(12)
             make.left.equalToSuperview().offset(20)
             make.right.equalToSuperview().offset(-20)
-            make.height.equalTo(60)
-            make.bottom.equalToSuperview().offset(-8)
+            make.height.equalTo(70)
+            // 使用 <= 以适配被 UITableView 固定的行高，避免约束冲突
+            make.bottom.lessThanOrEqualToSuperview().offset(-12)
         }
         
         // 确保当前值在有效范围内
@@ -467,15 +518,16 @@ class SCFilterAdjustCell: UITableViewCell {
             
             self.updateValueLabel(alignedValue)
             self.valueChanged?(alignedValue)
+            
+            // 添加触觉反馈（仅在值改变时）
+            if abs(alignedValue - clampedValue) < Float.ulpOfOne {
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+            }
         }
         
-        // 打印调试信息
-        print("配置滑块 - 参数：\(parameter.name)")
-        print("最小值：\(parameter.minValue)")
-        print("最大值：\(parameter.maxValue)")
-        print("默认值：\(parameter.defaultValue)")
-        print("当前值：\(clampedValue)")
-        print("步长：\(parameter.step)")
+        // 设置滑块样式为竖条模式，更适合滤镜调整
+        slider.style = .Style.vertical.style
     }
     
     override func prepareForReuse() {

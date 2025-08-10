@@ -279,10 +279,10 @@ extension SCCameraToolOptionsView: UICollectionViewDelegate {
         let selectedOption = options[indexPath.item]
         
         // 打印选择信息
-        print("📸 [ToolOptions] 用户选择了新选项")
-        print("📸 [ToolOptions] 选中索引: \(indexPath.item)")
-        print("📸 [ToolOptions] 选中选项: \(selectedOption.title)")
-        print("📸 [ToolOptions] 选中状态: \(String(describing: selectedOption.state))")
+        print("  [ToolOptions] 用户选择了新选项")
+        print("  [ToolOptions] 选中索引: \(indexPath.item)")
+        print("  [ToolOptions] 选中选项: \(selectedOption.title)")
+        print("  [ToolOptions] 选中状态: \(String(describing: selectedOption.state))")
         
         // 通知代理
         if let toolType = toolType {

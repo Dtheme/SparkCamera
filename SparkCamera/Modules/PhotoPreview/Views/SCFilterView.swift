@@ -23,6 +23,9 @@ class SCFilterView: UIView {
     private var currentPicture: GPUImagePicture?
     private var originalImage: UIImage?
     
+    // 防抖机制
+    private var updateTimer: Timer?
+    
     // 添加滤镜参数属性
     private var brightness: CGFloat = 0.0
     private var contrast: CGFloat = 1.0
@@ -222,6 +225,17 @@ class SCFilterView: UIView {
     }
     
     // MARK: - Public Methods
+    /// 刷新内部 GPUImageView 的布局，避免容器尺寸变化后出现拉伸/压缩
+    public func refreshLayout() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            let currentFillMode = self.gpuImageView.fillMode
+            // 重新赋值以触发 GPUImageView 内部的几何计算
+            self.gpuImageView.fillMode = currentFillMode
+            self.setNeedsLayout()
+            self.layoutIfNeeded()
+        }
+    }
     func setImage(_ image: UIImage) {
         self.originalImage = image
         
@@ -484,6 +498,9 @@ class SCFilterView: UIView {
     
     // MARK: - Memory Management
     deinit {
+        // 清理Timer
+        updateTimer?.invalidate()
+        
         // 清理资源
         currentPicture?.removeAllTargets()
         currentPicture = nil
@@ -514,8 +531,6 @@ class SCFilterView: UIView {
     
     // MARK: - Parameter Updates
     public func updateParameter(_ parameter: String, value: Float) {
-        print("[FilterView] 更新参数: \(parameter) = \(value)")
-        
         switch parameter {
         case "亮度":
             brightness = CGFloat(value)
@@ -549,7 +564,7 @@ class SCFilterView: UIView {
             gaussianBlurFilter?.blurRadiusInPixels = CGFloat(value * 2.0)
         case "光晕":
             glow = CGFloat(value)
-            // 光晕效果需要特殊处理
+            // 光晕效果需要特殊处理，暂时跳过
         case "边缘强度":
             edgeStrength = CGFloat(value)
             sobelEdgeFilter?.edgeStrength = CGFloat(value)
@@ -566,9 +581,62 @@ class SCFilterView: UIView {
             print("[FilterView] 未知的参数类型: \(parameter)")
         }
         
-        // 如果有图片，重新处理
-        if let picture = currentPicture {
-            picture.processImage()
+        // 使用防抖机制延迟应用滤镜，避免过于频繁的重新渲染
+        updateTimer?.invalidate()
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: false) { [weak self] _ in
+            self?.applyFilter()
         }
+    }
+    
+    /// 获取当前的滤镜参数值
+    public func getCurrentParameters() -> [String: Float] {
+        return [
+            "亮度": Float(brightness),
+            "对比度": Float(contrast),
+            "饱和度": Float(saturation),
+            "曝光": Float(exposure),
+            "高光": Float(highlights),
+            "阴影": Float(shadows),
+            "颗粒感": Float(grain),
+            "锐度": Float(sharpness),
+            "模糊": Float(blur),
+            "光晕": Float(glow),
+            "边缘强度": Float(edgeStrength),
+            "红色": Float(redChannel),
+            "绿色": Float(greenChannel),
+            "蓝色": Float(blueChannel)
+        ]
+    }
+    
+    /// 验证滤镜功能是否正常工作
+    public func validateFilterFunctionality() -> Bool {
+        print("🔍 [FilterView] 开始验证滤镜功能...")
+        
+        // 检查滤镜对象是否正确初始化
+        let filterChecks = [
+            ("亮度滤镜", brightnessFilter != nil),
+            ("对比度滤镜", contrastFilter != nil),
+            ("饱和度滤镜", saturationFilter != nil),
+            ("曝光滤镜", exposureFilter != nil),
+            ("高光阴影滤镜", highlightsFilter != nil),
+            ("锐度滤镜", sharpenFilter != nil),
+            ("模糊滤镜", gaussianBlurFilter != nil),
+            ("RGB滤镜", rgbFilter != nil)
+        ]
+        
+        var allFiltersValid = true
+        for (name, isValid) in filterChecks {
+            let status = isValid ? "✅" : "❌"
+            print("  \(status) \(name): \(isValid ? "已初始化" : "未初始化")")
+            if !isValid { allFiltersValid = false }
+        }
+        
+        // 检查当前图片是否加载
+        let hasImage = currentPicture != nil
+        print("  \(hasImage ? "✅" : "❌") 图片加载: \(hasImage ? "已加载" : "未加载")")
+        if !hasImage { allFiltersValid = false }
+        
+        print("🔍 [FilterView] 滤镜功能验证\(allFiltersValid ? "通过" : "失败")")
+        return allFiltersValid
     }
 } 

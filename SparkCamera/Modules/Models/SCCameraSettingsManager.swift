@@ -33,7 +33,7 @@ class SCCameraSettingsManager {
     }
     
     private init() {
-        print("📸 [Settings] 开始初始化设置管理器")
+        print("  [Settings] 开始初始化设置管理器")
         
         // 获取文档目录
         guard let documentsURL = try? FileManager.default.url(for: .documentDirectory, 
@@ -44,7 +44,7 @@ class SCCameraSettingsManager {
         }
         
         let realmURL = documentsURL.appendingPathComponent("SparkCamera.realm")
-        print("📸 [Settings] Realm 文件路径: \(realmURL.path)")
+        print("  [Settings] Realm 文件路径: \(realmURL.path)")
         
         // 配置 Realm
         let config = Realm.Configuration(
@@ -68,8 +68,8 @@ class SCCameraSettingsManager {
             }
         )
         
-        print("📸 [Settings] 当前 App 版本：\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")")
-        print("📸 [Settings] 当前数据库版本：\(Self.currentSchemaVersion)")
+        print("  [Settings] 当前 App 版本：\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知")")
+        print("  [Settings] 当前数据库版本：\(Self.currentSchemaVersion)")
         
         // 设置默认配置
         Realm.Configuration.defaultConfiguration = config
@@ -77,7 +77,7 @@ class SCCameraSettingsManager {
         // 初始化 Realm
         do {
             realm = try Realm()
-            print("📸 [Settings] Realm 初始化成功")
+            print("  [Settings] Realm 初始化成功")
         } catch let error as NSError {
             print("⚠️ [Settings] Realm 初始化失败: \(error.localizedDescription)")
             print("⚠️ [Settings] 错误代码: \(error.code)")
@@ -86,23 +86,23 @@ class SCCameraSettingsManager {
             // 尝试删除现有的 Realm 文件
             do {
                 try FileManager.default.removeItem(at: realmURL)
-                print("📸 [Settings] 已删除旧的 Realm 文件")
+                print("  [Settings] 已删除旧的 Realm 文件")
                 
                 // 重新创建 Realm
                 realm = try Realm()
-                print("📸 [Settings] Realm 重新创建成功")
+                print("  [Settings] Realm 重新创建成功")
             } catch {
                 print("❌ [Settings] 无法删除或重新创建 Realm: \(error)")
                 // 使用内存数据库作为后备方案
                 let memoryConfig = Realm.Configuration(inMemoryIdentifier: "SparkCameraTemp")
                 realm = try! Realm(configuration: memoryConfig)
-                print("📸 [Settings] 已切换到内存数据库")
+                print("  [Settings] 已切换到内存数据库")
             }
         }
         
         // 加载或创建默认设置
         loadSettings()
-        print("📸 [Settings] 设置管理器初始化完成")
+        print("  [Settings] 设置管理器初始化完成")
     }
     
     // MARK: - 公共方法
@@ -257,7 +257,7 @@ class SCCameraSettingsManager {
     // MARK: - Device Management
     func setCurrentDevice(_ device: AVCaptureDevice) {
         self.currentDevice = device
-        print("📸 [Settings] 更新当前设备：\(device.localizedName)")
+        print("  [Settings] 更新当前设备：\(device.localizedName)")
     }
     
     func getCurrentDevice() -> AVCaptureDevice? {
@@ -423,7 +423,7 @@ class SCCameraSettingsManager {
         
         public var description: String {
             return """
-            📸 [Camera Settings]
+              [Camera Settings]
             - 闪光灯: \(flashState.title)
             - 比例: \(ratioState.title)
             - 定时器: \(timerState.title)

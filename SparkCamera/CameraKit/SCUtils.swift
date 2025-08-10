@@ -55,12 +55,12 @@ private extension UIDeviceOrientation {
 @objc public class SCUtils: NSObject {
     
     @objc public static func cropAndScale(_ image: UIImage, width: Int, height: Int, orientation: UIDeviceOrientation, mirrored: Bool) -> UIImage? {
-        print("📸 [Utils] ===== 开始处理图片 =====")
-        print("📸 [Utils] 输入参数:")
-        print("📸 [Utils] - 目标尺寸: \(width) x \(height)")
-        print("📸 [Utils] - 目标比例: \(Double(width)/Double(height))")
-        print("📸 [Utils] - 设备方向: \(orientation.rawValue)")
-        print("📸 [Utils] - 是否镜像: \(mirrored)")
+        print("  [Utils] ===== 开始处理图片 =====")
+        print("  [Utils] 输入参数:")
+        print("  [Utils] - 目标尺寸: \(width) x \(height)")
+        print("  [Utils] - 目标比例: \(Double(width)/Double(height))")
+        print("  [Utils] - 设备方向: \(orientation.rawValue)")
+        print("  [Utils] - 是否镜像: \(mirrored)")
         
         // 1. 获取图片的原始信息
         guard let cgImage = image.cgImage else {
@@ -69,10 +69,10 @@ private extension UIDeviceOrientation {
         }
         
         let imageSize = image.size
-        print("📸 [Utils] 原始图片信息:")
-        print("📸 [Utils] - 尺寸: \(imageSize.width) x \(imageSize.height)")
-        print("📸 [Utils] - 比例: \(imageSize.width/imageSize.height)")
-        print("📸 [Utils] - 方向: \(image.imageOrientation.rawValue)")
+        print("  [Utils] 原始图片信息:")
+        print("  [Utils] - 尺寸: \(imageSize.width) x \(imageSize.height)")
+        print("  [Utils] - 比例: \(imageSize.width/imageSize.height)")
+        print("  [Utils] - 方向: \(image.imageOrientation.rawValue)")
         
         // 2. 确定目标尺寸和方向
         let targetRatio: CGFloat
@@ -99,10 +99,10 @@ private extension UIDeviceOrientation {
             default:
                 targetRatio = 4.0/3.0
             }
-            print("📸 [Utils] 使用预设比例: \(targetRatio)")
+            print("  [Utils] 使用预设比例: \(targetRatio)")
         } else {
             targetRatio = CGFloat(width) / CGFloat(height)
-            print("📸 [Utils] 使用指定比例: \(targetRatio)")
+            print("  [Utils] 使用指定比例: \(targetRatio)")
         }
         
         // 3. 计算目标尺寸
@@ -118,14 +118,14 @@ private extension UIDeviceOrientation {
             targetSize = CGSize(width: maxDimension / targetRatio,
                               height: maxDimension)
         }
-        print("📸 [Utils] 计算的目标尺寸: \(targetSize.width) x \(targetSize.height)")
+        print("  [Utils] 计算的目标尺寸: \(targetSize.width) x \(targetSize.height)")
         
         // 4. 创建绘图上下文
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = true
         
-        print("📸 [Utils] 最终渲染尺寸: \(targetSize.width) x \(targetSize.height)")
+        print("  [Utils] 最终渲染尺寸: \(targetSize.width) x \(targetSize.height)")
         let renderer = UIGraphicsImageRenderer(size: targetSize, format: format)
         
         let result = renderer.image { context in
@@ -155,7 +155,7 @@ private extension UIDeviceOrientation {
             default:
                 rotationAngle += 0
             }
-            print("📸 [Utils] EXIF旋转角度: \(rotationAngle/(.pi/2))π/2")
+            print("  [Utils] EXIF旋转角度: \(rotationAngle/(.pi/2))π/2")
             
             // 2. 处理设备方向
             switch orientation {
@@ -170,20 +170,20 @@ private extension UIDeviceOrientation {
             default:
                 rotationAngle += .pi/2
             }
-            print("📸 [Utils] 设备方向旋转角度: \(rotationAngle/(.pi/2))π/2")
+            print("  [Utils] 设备方向旋转角度: \(rotationAngle/(.pi/2))π/2")
             
             // 应用旋转
             context.cgContext.rotate(by: rotationAngle)
             
             // 3. 处理镜像
             if mirrored {
-                print("📸 [Utils] 应用镜像变换")
+                print("  [Utils] 应用镜像变换")
                 context.cgContext.scaleBy(x: -1, y: 1)
             }
             
             // 4. 处理EXIF镜像
             if image.imageOrientation.isMirrored {
-                print("📸 [Utils] 应用EXIF镜像变换")
+                print("  [Utils] 应用EXIF镜像变换")
                 context.cgContext.scaleBy(x: -1, y: 1)
             }
             
@@ -196,7 +196,7 @@ private extension UIDeviceOrientation {
                 drawRect = CGRect(x: -targetSize.width/2, y: -targetSize.height/2,
                                 width: targetSize.width, height: targetSize.height)
             }
-            print("📸 [Utils] 绘制区域: \(drawRect)")
+            print("  [Utils] 绘制区域: \(drawRect)")
             
             context.cgContext.draw(cgImage, in: drawRect)
             
@@ -204,11 +204,11 @@ private extension UIDeviceOrientation {
             context.cgContext.restoreGState()
         }
         
-        print("📸 [Utils] 处理完成:")
-        print("📸 [Utils] - 最终尺寸: \(result.size.width) x \(result.size.height)")
-        print("📸 [Utils] - 最终比例: \(result.size.width/result.size.height)")
-        print("📸 [Utils] - 最终方向: \(result.imageOrientation.rawValue)")
-        print("📸 [Utils] ===== 处理完成 =====")
+        print("  [Utils] 处理完成:")
+        print("  [Utils] - 最终尺寸: \(result.size.width) x \(result.size.height)")
+        print("  [Utils] - 最终比例: \(result.size.width/result.size.height)")
+        print("  [Utils] - 最终方向: \(result.imageOrientation.rawValue)")
+        print("  [Utils] ===== 处理完成 =====")
         
         return result
     }

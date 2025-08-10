@@ -89,7 +89,7 @@ import UIKit
     
     override public var description: String {
         return """
-        📸 [Photo Info]
+          [Photo Info]
         - 尺寸: \(width) x \(height)
         - 宽高比: \(aspectRatio)
         - 是否横向: \(isLandscape)

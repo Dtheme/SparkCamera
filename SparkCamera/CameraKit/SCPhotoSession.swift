@@ -97,7 +97,7 @@ extension SCSession.FlashMode {
     
     @objc public var resolution: CGSize = .zero {
         didSet {
-            print("📸 [Photo Session] 设置分辨率: \(resolution.width) x \(resolution.height)")
+            print("  [Photo Session] 设置分辨率: \(resolution.width) x \(resolution.height)")
             
             // 防止递归设置
             guard resolution != oldValue else { return }
@@ -107,7 +107,7 @@ extension SCSession.FlashMode {
                let device = videoInput?.device {
                 let maxResolution = device.activeFormat.highResolutionStillImageDimensions
                 let size = min(CGFloat(maxResolution.width), CGFloat(maxResolution.height))
-                print("📸 [Photo Session] 使用设备最大分辨率: \(size) x \(size)")
+                print("  [Photo Session] 使用设备最大分辨率: \(size) x \(size)")
                 self.resolution = CGSize(width: size, height: size)
                 return
             }
@@ -117,18 +117,18 @@ extension SCSession.FlashMode {
             
             // 计算目标比例
             let targetAspectRatio = resolution.width / resolution.height
-            print("📸 [Photo Session] 目标比例: \(targetAspectRatio)")
+            print("  [Photo Session] 目标比例: \(targetAspectRatio)")
             
             // 根据目标比例选择合适的预设
             if abs(targetAspectRatio - 3.0/4.0) < 0.01 {
                 session.sessionPreset = .photo
-                print("📸 [Photo Session] 设置会话预设为: photo (3:4)")
+                print("  [Photo Session] 设置会话预设为: photo (3:4)")
             } else if abs(targetAspectRatio - 9.0/16.0) < 0.01 {
                 session.sessionPreset = .hd1920x1080
-                print("📸 [Photo Session] 设置会话预设为: 1920x1080 (16:9)")
+                print("  [Photo Session] 设置会话预设为: 1920x1080 (16:9)")
             } else if abs(targetAspectRatio - 1.0) < 0.01 {
                 session.sessionPreset = .high
-                print("📸 [Photo Session] 设置会话预设为: high (1:1)")
+                print("  [Photo Session] 设置会话预设为: high (1:1)")
             }
             
             // 配置照片输出
@@ -141,10 +141,10 @@ extension SCSession.FlashMode {
             
             session.commitConfiguration()
             
-            print("📸 [Photo Session] 会话配置完成")
-            print("📸 [Photo Session] - 会话预设: \(session.sessionPreset.rawValue)")
+            print("  [Photo Session] 会话配置完成")
+            print("  [Photo Session] - 会话预设: \(session.sessionPreset.rawValue)")
             if let photoOutput = self.photoOutput {
-                print("📸 [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
+                print("  [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
             }
         }
     }
@@ -158,13 +158,13 @@ extension SCSession.FlashMode {
         
         // 配置照片输出
         photoOutput.isHighResolutionCaptureEnabled = true
-        print("📸 [Photo Session] 初始化照片输出:")
-        print("📸 [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
+        print("  [Photo Session] 初始化照片输出:")
+        print("  [Photo Session] - 高分辨率拍摄: \(photoOutput.isHighResolutionCaptureEnabled)")
         
         // 添加照片输出
         if session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
-            print("📸 [Photo Session] 照片输出已添加到会话")
+            print("  [Photo Session] 照片输出已添加到会话")
         } else {
             print("⚠️ [Photo Session] 无法添加照片输出到会话")
         }
@@ -228,17 +228,17 @@ extension SCSession.FlashMode {
             // 如果方向发生变化，更新当前方向
             if orientation != self.currentDeviceOrientation {
                 self.currentDeviceOrientation = orientation
-                print("📸 [Orientation] 设备方向更新: \(orientation.rawValue)")
+                print("  [Orientation] 设备方向更新: \(orientation.rawValue)")
             }
         }
         
-        print("📸 [Orientation] 开始监听设备方向")
+        print("  [Orientation] 开始监听设备方向")
     }
     
     deinit {
         // 停止运动更新
         motionManager.stopDeviceMotionUpdates()
-        print("📸 [Orientation] 停止监听设备方向")
+        print("  [Orientation] 停止监听设备方向")
     }
     
     // 回调闭包
@@ -269,8 +269,8 @@ extension SCSession.FlashMode {
         photoSettings.isHighResolutionPhotoEnabled = photoOutput.isHighResolutionCaptureEnabled
         
         // 开始拍照
-        print("📸 [Photo Session] 开始拍照...")
-        print("📸 [Photo Session] - 高分辨率拍摄: \(photoSettings.isHighResolutionPhotoEnabled)")
+        print("  [Photo Session] 开始拍照...")
+        print("  [Photo Session] - 高分辨率拍摄: \(photoSettings.isHighResolutionPhotoEnabled)")
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
     }
     
@@ -310,7 +310,7 @@ extension SCSession.FlashMode {
             // 设置对焦点
             if device.isFocusPointOfInterestSupported {
                 device.focusPointOfInterest = point
-                print("📸 [Focus] 设置对焦点：\(point)")
+                print("  [Focus] 设置对焦点：\(point)")
             }
             
             // 根据当前模式设置对焦
@@ -345,7 +345,7 @@ extension SCSession.FlashMode {
                 self?.focusState = .focused
             }
             
-            print("📸 [Focus] 对焦模式：\(focusMode)")
+            print("  [Focus] 对焦模式：\(focusMode)")
             
         } catch {
             print("⚠️ [Focus] 设置对焦失败: \(error.localizedDescription)")
@@ -368,20 +368,20 @@ extension SCSession.FlashMode {
     // 设置对焦模式
     public func setFocusMode(_ mode: SCFocusMode) {
         focusMode = mode
-        print("📸 [Focus] 切换对焦模式：\(mode)")
+        print("  [Focus] 切换对焦模式：\(mode)")
     }
     
     // 锁定当前对焦
     public func lockFocus() {
         setFocusMode(.locked)
         focusState = .locked
-        print("📸 [Focus] 锁定对焦")
+        print("  [Focus] 锁定对焦")
     }
     
     // 解锁对焦
     public func unlockFocus() {
         setFocusMode(.continuous)
-        print("📸 [Focus] 解锁对焦")
+        print("  [Focus] 解锁对焦")
     }
     
     @available(iOS 11.0, *)
@@ -398,12 +398,12 @@ extension SCSession.FlashMode {
             return
         }
         
-        print("📸 [Photo Session] 照片信息:")
-        print("📸 [Photo Session] - 数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
+        print("  [Photo Session] 照片信息:")
+        print("  [Photo Session] - 数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
         
         // 获取照片分辨率
         if let cgImage = UIImage(data: imageData)?.cgImage {
-            print("📸 [Photo Session] - 实际分辨率: \(cgImage.width) x \(cgImage.height)")
+            print("  [Photo Session] - 实际分辨率: \(cgImage.width) x \(cgImage.height)")
         }
         
         // 处理照片数据
@@ -429,8 +429,8 @@ extension SCSession.FlashMode {
     }
     
     func processPhotoData(_ data: Data) {
-        print("📸 [Photo Session] ===== 处理照片数据 =====")
-        print("📸 [Photo Session] - 数据大小: \(Double(data.count) / 1024.0 / 1024.0) MB")
+        print("  [Photo Session] ===== 处理照片数据 =====")
+        print("  [Photo Session] - 数据大小: \(Double(data.count) / 1024.0 / 1024.0) MB")
         
         guard let image = UIImage(data: data) else {
             print("❌ [Photo Session] 无法从数据创建图像")
@@ -438,9 +438,9 @@ extension SCSession.FlashMode {
             return
         }
         
-        print("📸 [Photo Session] 原始图片信息:")
-        print("📸 [Photo Session] - 尺寸: \(image.size.width) x \(image.size.height)")
-        print("📸 [Photo Session] - 方向: \(image.imageOrientation.rawValue)")
+        print("  [Photo Session] 原始图片信息:")
+        print("  [Photo Session] - 尺寸: \(image.size.width) x \(image.size.height)")
+        print("  [Photo Session] - 方向: \(image.imageOrientation.rawValue)")
         
         // 异步处理图像
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -448,7 +448,7 @@ extension SCSession.FlashMode {
             
             // 获取当前设备方向
             let deviceOrientation = self.currentDeviceOrientation
-            print("📸 [Photo Process] 设备方向: \(deviceOrientation.rawValue)")
+            print("  [Photo Process] 设备方向: \(deviceOrientation.rawValue)")
             
             // 确定图片方向
             let imageOrientation: UIImage.Orientation = {
@@ -508,13 +508,13 @@ extension SCSession.FlashMode {
                 }
             }()
             
-            print("📸 [Photo Process] 目标图片方向: \(imageOrientation.rawValue)")
+            print("  [Photo Process] 目标图片方向: \(imageOrientation.rawValue)")
             
             // 1. 创建正确方向的图片
             let cgImage = image.cgImage!
             let orientedImage = UIImage(cgImage: cgImage, scale: image.scale, orientation: imageOrientation)
             
-            print("📸 [Photo Process] 调整方向后的图片尺寸: \(orientedImage.size.width) x \(orientedImage.size.height)")
+            print("  [Photo Process] 调整方向后的图片尺寸: \(orientedImage.size.width) x \(orientedImage.size.height)")
             
             // 2. 确定目标裁剪比例
             enum CropAspectRatio: CGFloat {
@@ -555,8 +555,8 @@ extension SCSession.FlashMode {
                 }
             }()
             
-            print("📸 [Photo Process] 预览比例: \(previewRatio) [resolution]:\(self.resolution)")
-            print("📸 [Photo Process] 目标裁剪比例: \(targetRatio.description) (\(targetRatio.rawValue))")
+            print("  [Photo Process] 预览比例: \(previewRatio) [resolution]:\(self.resolution)")
+            print("  [Photo Process] 目标裁剪比例: \(targetRatio.description) (\(targetRatio.rawValue))")
             
             // 3. 计算裁剪区域
             let cropRect: CGRect = {
@@ -569,10 +569,10 @@ extension SCSession.FlashMode {
                 let effectiveHeight = isRotated ? imageWidth : imageHeight
                 let currentRatio = effectiveWidth / effectiveHeight
                 
-                print("📸 [Photo Process] 图片信息:")
-                print("📸 [Photo Process] - 原始尺寸: \(imageWidth) x \(imageHeight)")
-                print("📸 [Photo Process] - 有效尺寸: \(effectiveWidth) x \(effectiveHeight)")
-                print("📸 [Photo Process] - 当前比例: \(currentRatio)")
+                print("  [Photo Process] 图片信息:")
+                print("  [Photo Process] - 原始尺寸: \(imageWidth) x \(imageHeight)")
+                print("  [Photo Process] - 有效尺寸: \(effectiveWidth) x \(effectiveHeight)")
+                print("  [Photo Process] - 当前比例: \(currentRatio)")
                 
                 // 检查是否需要裁剪
                 let needsCrop: Bool = {
@@ -594,7 +594,7 @@ extension SCSession.FlashMode {
                 }()
                 
                 if !needsCrop {
-                    print("📸 [Photo Process] 图片比例已匹配目标比例 \(targetRatio.description)，无需裁剪")
+                    print("  [Photo Process] 图片比例已匹配目标比例 \(targetRatio.description)，无需裁剪")
                     return CGRect(origin: .zero, size: orientedImage.size)
                 }
                 
@@ -633,15 +633,15 @@ extension SCSession.FlashMode {
                     }
                 }
                 
-                print("📸 [Photo Process] 裁剪信息:")
-                print("📸 [Photo Process] - 目标比例: \(targetAspectRatio)")
-                print("📸 [Photo Process] - 裁剪区域: \(rect)")
+                print("  [Photo Process] 裁剪信息:")
+                print("  [Photo Process] - 目标比例: \(targetAspectRatio)")
+                print("  [Photo Process] - 裁剪区域: \(rect)")
                 
                 return rect
             }()
             
-            print("📸 [Photo Process] 裁剪区域: \(cropRect)")
-            print("📸 [Photo Process] 裁剪后宽高比: \(cropRect.width / cropRect.height)")
+            print("  [Photo Process] 裁剪区域: \(cropRect)")
+            print("  [Photo Process] 裁剪后宽高比: \(cropRect.width / cropRect.height)")
 //#warning("测试代码")
 //#if DEBUG//debug代码
 //            let debugImageInfo: [String: Any] = [
@@ -660,7 +660,7 @@ extension SCSession.FlashMode {
 //#endif
             // 4. 执行裁剪
             if cropRect == CGRect(origin: .zero, size: orientedImage.size) {
-                print("📸 [Photo Process] 无需裁剪，使用原始图片")
+                print("  [Photo Process] 无需裁剪，使用原始图片")
                 let photoInfo = SCPhotoInfo(image: orientedImage)
                 print(photoInfo.description)
                 DispatchQueue.main.async {
@@ -683,14 +683,14 @@ extension SCSession.FlashMode {
                     width: width,
                     height: height
                 )
-                print("📸 [Photo Process] 调整后的裁剪区域: \(adjustedCropRect)")
-                print("📸 [Photo Process] - x偏移: \(xOffset), y偏移: \(yOffset)")
-                print("📸 [Photo Process] - 宽度: \(width), 高度: \(height)")
+                print("  [Photo Process] 调整后的裁剪区域: \(adjustedCropRect)")
+                print("  [Photo Process] - x偏移: \(xOffset), y偏移: \(yOffset)")
+                print("  [Photo Process] - 宽度: \(width), 高度: \(height)")
             } else {
                 adjustedCropRect = cropRect
-                print("📸 [Photo Process] 保持原始裁剪区域: \(adjustedCropRect)")
-                print("📸 [Photo Process] - x偏移: \(cropRect.minX), y偏移: \(cropRect.minY)")
-                print("📸 [Photo Process] - 宽度: \(cropRect.width), 高度: \(cropRect.height)")
+                print("  [Photo Process] 保持原始裁剪区域: \(adjustedCropRect)")
+                print("  [Photo Process] - x偏移: \(cropRect.minX), y偏移: \(cropRect.minY)")
+                print("  [Photo Process] - 宽度: \(cropRect.width), 高度: \(cropRect.height)")
             }
             
             guard let croppedCGImage = orientedImage.cgImage?.cropping(to: adjustedCropRect) else {
@@ -712,7 +712,7 @@ extension SCSession.FlashMode {
             
             DispatchQueue.main.async {
                 self.captureCallback?(finalImage, photoInfo.dictionary)
-                print("📸 [Photo Session] ===== 照片处理完成 =====")
+                print("  [Photo Session] ===== 照片处理完成 =====")
             }
         }
     }
@@ -770,8 +770,8 @@ extension SCSession.FlashMode {
                 }
             }
             
-            print("📸 [Photo Session] 照片输出已添加到会话")
-            print("📸 [Photo Session] - 高分辨率拍摄: \(newPhotoOutput.isHighResolutionCaptureEnabled)")
+            print("  [Photo Session] 照片输出已添加到会话")
+            print("  [Photo Session] - 高分辨率拍摄: \(newPhotoOutput.isHighResolutionCaptureEnabled)")
         } else {
             print("⚠️ [Photo Session] 无法添加照片输出到会话")
         }
@@ -802,7 +802,7 @@ extension SCSession.FlashMode {
                         targetSize = CGSize(width: maxSize * 0.75, height: maxSize)
                     }
                     
-                    print("📸 [Photo Session] 根据比例模式[\(ratioMode)]设置初始分辨率: \(targetSize.width) x \(targetSize.height)")
+                    print("  [Photo Session] 根据比例模式[\(ratioMode)]设置初始分辨率: \(targetSize.width) x \(targetSize.height)")
                     self.resolution = targetSize
                 }
             }
@@ -866,7 +866,7 @@ extension SCSession.FlashMode {
                                 targetSize = CGSize(width: maxSize * 0.75, height: maxSize)
                             }
                             
-                            print("📸 [Preview Setup] 根据比例模式[\(ratioMode)]设置分辨率: \(targetSize.width) x \(targetSize.height)")
+                            print("  [Preview Setup] 根据比例模式[\(ratioMode)]设置分辨率: \(targetSize.width) x \(targetSize.height)")
                             self.resolution = targetSize
                         }
                         print("⏱️ [Preview Setup] Setup completed: +\(Date().timeIntervalSince(startTime))s")
@@ -1062,8 +1062,8 @@ extension SCSession.FlashMode {
                 
                 // 应用曝光值
                 device.setExposureTargetBias(clampedValue)
-                print("📸 [Exposure] 设置曝光值：\(clampedValue) (原始值：\(value))")
-                print("📸 [Exposure] 设备支持范围：[\(minExposure), \(maxExposure)]")
+                print("  [Exposure] 设置曝光值：\(clampedValue) (原始值：\(value))")
+                print("  [Exposure] 设备支持范围：[\(minExposure), \(maxExposure)]")
                 
                 // 等待曝光调整生效
                 device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
@@ -1177,7 +1177,7 @@ extension SCSession.FlashMode {
     // MARK: - Shutter Speed Control
     public func setShutterSpeed(_ value: Float, completion: ((Bool) -> Void)? = nil) -> Bool {
         guard let device = videoInput?.device else {
-            print("📸 [Shutter Speed] 无法获取相机设备")
+            print("  [Shutter Speed] 无法获取相机设备")
             completion?(false)
             return false
         }
@@ -1190,7 +1190,7 @@ extension SCSession.FlashMode {
                 if value == 0 {
                     // 值为0时，切换到自动曝光模式
                     device.exposureMode = .continuousAutoExposure
-                    print("📸 [Shutter Speed] 切换到自动曝光模式")
+                    print("  [Shutter Speed] 切换到自动曝光模式")
                     device.unlockForConfiguration()
                     completion?(true)
                     return true
@@ -1206,24 +1206,24 @@ extension SCSession.FlashMode {
                     // 将快门速度值转换为 CMTime
                     // value 表示秒数，例如 value = 0.001 表示 1/1000 秒
                     let seconds = value
-                    print("📸 [Shutter Speed] 设置快门速度：\(seconds)秒 (1/\(Int(1/seconds))秒)")
+                    print("  [Shutter Speed] 设置快门速度：\(seconds)秒 (1/\(Int(1/seconds))秒)")
                     let shutterSpeed = CMTimeMakeWithSeconds(Float64(seconds), preferredTimescale: 1000000)
                     
                     // 获取设备支持的快门速度范围
                     let minDuration = device.activeFormat.minExposureDuration
                     let maxDuration = device.activeFormat.maxExposureDuration
-                    print("📸 [Shutter Speed] 设备支持的快门速度范围：[\(CMTimeGetSeconds(minDuration))秒, \(CMTimeGetSeconds(maxDuration))秒]")
+                    print("  [Shutter Speed] 设备支持的快门速度范围：[\(CMTimeGetSeconds(minDuration))秒, \(CMTimeGetSeconds(maxDuration))秒]")
                     
                     // 确保快门速度在有效范围内
                     let clampedDuration = min(max(shutterSpeed, minDuration), maxDuration)
                     
                     // 使用固定的 ISO 值
                     let baseISO = device.activeFormat.minISO
-                    print("📸 [Shutter Speed] 使用固定 ISO 值：\(baseISO)")
+                    print("  [Shutter Speed] 使用固定 ISO 值：\(baseISO)")
                     
                     // 设置曝光时间和 ISO
                     device.setExposureModeCustom(duration: clampedDuration, iso: baseISO) { _ in
-                        print("📸 [Shutter Speed] 设置完成 - 快门速度: \(CMTimeGetSeconds(clampedDuration))秒, ISO: \(baseISO)")
+                        print("  [Shutter Speed] 设置完成 - 快门速度: \(CMTimeGetSeconds(clampedDuration))秒, ISO: \(baseISO)")
                         completion?(true)
                     }
                 }
@@ -1237,7 +1237,7 @@ extension SCSession.FlashMode {
                 return false
             }
         } catch {
-            print("📸 [Shutter Speed] 设置失败: \(error.localizedDescription)")
+            print("  [Shutter Speed] 设置失败: \(error.localizedDescription)")
             completion?(false)
             return false
         }

@@ -231,13 +231,13 @@
 {
     runSynchronouslyOnVideoProcessingQueue(^{
         CGFloat heightScaling, widthScaling;
-        
-        CGSize currentViewSize = self.bounds.size;
+        // 避免在 GPUImage 的后台队列访问 UIView 的 bounds，改用在帧缓冲创建时记录的尺寸
+        CGSize currentViewSize = boundsSizeAtFrameBufferEpoch;
         
         //    CGFloat imageAspectRatio = inputImageSize.width / inputImageSize.height;
         //    CGFloat viewAspectRatio = currentViewSize.width / currentViewSize.height;
         
-        CGRect insetRect = AVMakeRectWithAspectRatioInsideRect(inputImageSize, self.bounds);
+        CGRect insetRect = AVMakeRectWithAspectRatioInsideRect(inputImageSize, CGRectMake(0, 0, currentViewSize.width, currentViewSize.height));
         
         switch(_fillMode)
         {
@@ -248,8 +248,8 @@
             }; break;
             case kGPUImageFillModePreserveAspectRatio:
             {
-                widthScaling = insetRect.size.width / currentViewSize.width;
-                heightScaling = insetRect.size.height / currentViewSize.height;
+                widthScaling = currentViewSize.width / insetRect.size.width;
+                heightScaling = currentViewSize.height / insetRect.size.height;
             }; break;
             case kGPUImageFillModePreserveAspectRatioAndFill:
             {
