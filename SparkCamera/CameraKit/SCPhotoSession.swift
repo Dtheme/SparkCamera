@@ -7,6 +7,7 @@
 
 import UIKit
 import AVFoundation
+import AVFoundation.AVCapturePhotoOutput
 import CoreMotion
 
 // MARK: - Focus Enums
@@ -148,6 +149,11 @@ extension SCSession.FlashMode {
             }
         }
     }
+
+    // 能力检测：是否支持 RAW 捕获
+    public var isRawPhotoCaptureSupported: Bool {
+        return !(photoOutput?.availableRawPhotoPixelFormatTypes.isEmpty ?? true)
+    }
     
     @objc public init(position: CameraPosition = .back, detection: CameraDetection = .none) {
         super.init()
@@ -254,8 +260,16 @@ extension SCSession.FlashMode {
             return
         }
         
-        // 配置照片设置
-        let photoSettings = AVCapturePhotoSettings()
+        // 配置照片设置（根据自动保存RAW/JPEG策略决定是否附带 RAW）
+        let settingsManager = SCCameraSettingsManager.shared
+        let wantRaw = (settingsManager.autoSaveMode == 2) && !(photoOutput.availableRawPhotoPixelFormatTypes.isEmpty)
+        let photoSettings: AVCapturePhotoSettings
+        if wantRaw, let rawType = photoOutput.availableRawPhotoPixelFormatTypes.first {
+            let processedFormat: [String: Any] = [AVVideoCodecKey: AVVideoCodecType.jpeg]
+            photoSettings = AVCapturePhotoSettings(rawPixelFormatType: OSType(rawType), processedFormat: processedFormat)
+        } else {
+            photoSettings = AVCapturePhotoSettings()
+        }
         
         // 检查并设置闪光灯
         if let device = self.videoInput?.device,
@@ -394,22 +408,19 @@ extension SCSession.FlashMode {
             return
         }
         
-        guard let imageData = photo.fileDataRepresentation() else {
-            print("❌ [Photo Session] 无法获取图片数据")
-            self.errorCallback?(SCError.error("Cannot get photo file data representation"))
-            return
+        // 拿到系统生成的 processed 图片（JPEG/HEIC）
+        if let imageData = photo.fileDataRepresentation() {
+            print("  [Photo Session] Processed 照片数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
+            self.processPhotoData(imageData)
         }
         
-        print("  [Photo Session] 照片信息:")
-        print("  [Photo Session] - 数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
-        
-        // 获取照片分辨率
-        if let cgImage = UIImage(data: imageData)?.cgImage {
-            print("  [Photo Session] - 实际分辨率: \(cgImage.width) x \(cgImage.height)")
+        // 若包含 RAW，则在这里获取 RAW DNG 数据
+        if photo.isRawPhoto {
+            if let dngFileData = photo.fileDataRepresentation() {
+                print("  [Photo Session] RAW(DNG) 数据大小: \(Double(dngFileData.count) / 1024.0 / 1024.0) MB")
+                // TODO: 后续在这里缓存 RAW 数据，并在 didFinishCaptureFor 中与 JPEG 一起保存到相册
+            }
         }
-        
-        // 处理照片数据
-        self.processPhotoData(imageData)
     }
     
     public func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photoSampleBuffer: CMSampleBuffer?, previewPhoto previewPhotoSampleBuffer: CMSampleBuffer?, resolvedSettings: AVCaptureResolvedPhotoSettings, bracketSettings: AVCaptureBracketedStillImageSettings?, error: Error?) {

@@ -58,6 +58,11 @@ class SCCameraSettingsManager {
                         if oldObject != nil && !oldObject!.objectSchema.properties.contains(where: { $0.name == "isAutoSaveEnabled" }) {
                             newObject!["isAutoSaveEnabled"] = false
                         }
+                        if oldObject != nil && !oldObject!.objectSchema.properties.contains(where: { $0.name == "autoSaveMode" }) {
+                            // 迁移策略：若旧字段 isAutoSaveEnabled = true，则 autoSaveMode 设为 1(JPEG)，否则为 0(关闭)
+                            let enabled = (oldObject?["isAutoSaveEnabled"] as? Bool) ?? false
+                            newObject!["autoSaveMode"] = enabled ? 1 : 0
+                        }
                     }
                 }
             },
@@ -147,6 +152,19 @@ class SCCameraSettingsManager {
         set {
             try? realm.write {
                 currentSettings?.isAutoSaveEnabled = newValue
+                currentSettings?.updateTimestamp()
+            }
+        }
+    }
+
+    // 自动保存模式：0 关闭，1 JPEG，2 RAW
+    var autoSaveMode: Int {
+        get { return currentSettings?.autoSaveMode ?? 0 }
+        set {
+            try? realm.write {
+                currentSettings?.autoSaveMode = newValue
+                // 兼容旧字段：当模式为非0时视为开启
+                currentSettings?.isAutoSaveEnabled = (newValue != 0)
                 currentSettings?.updateTimestamp()
             }
         }
@@ -393,6 +411,7 @@ class SCCameraSettingsManager {
         
         // 获取其他设置
         let isAutoSaveEnabled = self.isAutoSaveEnabled
+        let autoSaveMode = self.autoSaveMode
         let isFocusLocked = self.isFocusLocked
         let focusMode = self.focusMode
         

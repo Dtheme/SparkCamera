@@ -43,6 +43,8 @@ class SCCameraSettings: Object {
     
     // 自动保存照片
     @Persisted var isAutoSaveEnabled: Bool = false
+    // 自动保存模式：0 关闭，1 JPEG，2 RAW
+    @Persisted var autoSaveMode: Int = 0
     
     // 上次更新时间
     @Persisted var lastUpdated: Date = Date()
@@ -61,6 +63,7 @@ class SCCameraSettings: Object {
         settings.focusMode = 1  // 连续对焦
         settings.isFocusLocked = false
         settings.isAutoSaveEnabled = false  // 默认关闭自动保存
+        settings.autoSaveMode = 0
         settings.lastUpdated = Date()
         return settings
     }

@@ -12,6 +12,192 @@ import AVFoundation
 import CoreMotion
 import Photos
 
+// MARK: - AutoSave Selector View
+final class SCAutoSaveSelectorView: UIView {
+    enum Mode: Int {
+        case off = 0
+        case jpeg = 1
+        case raw = 2
+        
+        var title: String {
+            switch self {
+            case .off: return "不自动保存"
+            case .jpeg: return "保存 JPEG"
+            case .raw: return "保存 RAW"
+            }
+        }
+        
+        var iconName: String {
+            switch self {
+            case .off: return "nosign"
+            case .jpeg: return "photo.on.rectangle"
+            case .raw: return "doc"
+            }
+        }
+    }
+    
+    var onSelect: ((Mode) -> Void)?
+    var currentMode: Mode = .off { didSet { updateSelection() } }
+    
+    private let container = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
+    private var rowViews: [Mode: UIControl] = [:]
+    
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+    }
+    
+    func present(anchor: UIView, in parent: UIView) {
+        if superview == nil { parent.addSubview(self) }
+        alpha = 0
+        transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+        
+        let anchorFrame = anchor.convert(anchor.bounds, to: parent)
+        let margin: CGFloat = 12
+        let preferredYAbove = anchorFrame.minY - 10 - 140
+        let placeAbove = preferredYAbove > parent.safeAreaInsets.top + margin
+        
+        snp.remakeConstraints { make in
+            make.width.equalTo(220)
+            make.centerX.equalTo(anchor.snp.centerX)
+            if placeAbove {
+                make.bottom.equalTo(anchor.snp.top).offset(-10)
+            } else {
+                make.top.equalTo(anchor.snp.bottom).offset(10)
+            }
+        }
+        parent.layoutIfNeeded()
+        
+        UIView.animate(withDuration: 0.18, delay: 0, options: [.curveEaseOut]) {
+            self.alpha = 1
+            self.transform = .identity
+        }
+    }
+    
+    private func setupUI() {
+        backgroundColor = .clear
+        layer.masksToBounds = false
+        
+        addSubview(container)
+        container.layer.cornerRadius = 14
+        container.clipsToBounds = true
+        container.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        
+        let content = UIStackView()
+        content.axis = .vertical
+        content.alignment = .fill
+        content.distribution = .fill
+        content.spacing = 0
+        container.contentView.addSubview(content)
+        content.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
+        
+        let titleLabel = UILabel()
+        titleLabel.text = "自动保存"
+        titleLabel.textColor = .white
+        titleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        titleLabel.textAlignment = .center
+        titleLabel.backgroundColor = UIColor.black.withAlphaComponent(0.25)
+        titleLabel.heightAnchor.constraint(equalToConstant: 36).isActive = true
+        content.addArrangedSubview(titleLabel)
+        
+        let optionsContainer = UIStackView()
+        optionsContainer.axis = .vertical
+        optionsContainer.alignment = .fill
+        optionsContainer.distribution = .fillEqually
+        optionsContainer.spacing = 0
+        content.addArrangedSubview(optionsContainer)
+        
+        func makeRow(_ mode: Mode) -> UIControl {
+            let row = UIControl()
+            row.backgroundColor = .clear
+            row.snp.makeConstraints { make in
+                make.height.equalTo(48)
+            }
+            
+            let icon = UIImageView(image: UIImage(systemName: mode.iconName))
+            icon.tintColor = .white
+            icon.contentMode = .scaleAspectFit
+            row.addSubview(icon)
+            icon.snp.makeConstraints { make in
+                make.left.equalToSuperview().offset(14)
+                make.centerY.equalToSuperview()
+                make.width.height.equalTo(20)
+            }
+            
+            let label = UILabel()
+            label.text = mode.title
+            label.textColor = .white
+            label.font = .systemFont(ofSize: 15, weight: .medium)
+            row.addSubview(label)
+            label.snp.makeConstraints { make in
+                make.left.equalTo(icon.snp.right).offset(10)
+                make.centerY.equalToSuperview()
+            }
+            
+            let check = UIImageView(image: UIImage(systemName: "checkmark"))
+            check.tintColor = SCConstants.themeColor
+            check.isHidden = true
+            row.addSubview(check)
+            check.snp.makeConstraints { make in
+                make.right.equalToSuperview().offset(-14)
+                make.centerY.equalToSuperview()
+                make.width.height.equalTo(16)
+            }
+            
+            row.addTarget(self, action: #selector(rowTapped(_:)), for: .touchUpInside)
+            row.tag = mode.rawValue
+            
+            let sep = UIView()
+            sep.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+            row.addSubview(sep)
+            sep.snp.makeConstraints { make in
+                make.left.equalTo(label)
+                make.right.equalToSuperview()
+                make.bottom.equalToSuperview()
+                make.height.equalTo(0.5)
+            }
+            
+            rowViews[mode] = row
+            return row
+        }
+        
+        optionsContainer.addArrangedSubview(makeRow(.off))
+        optionsContainer.addArrangedSubview(makeRow(.jpeg))
+        optionsContainer.addArrangedSubview(makeRow(.raw))
+        
+        let bottomSpacer = UIView()
+        bottomSpacer.backgroundColor = .clear
+        bottomSpacer.heightAnchor.constraint(equalToConstant: 6).isActive = true
+        content.addArrangedSubview(bottomSpacer)
+        
+        updateSelection()
+    }
+    
+    private func updateSelection() {
+        for (mode, row) in rowViews {
+            let isSelected = (mode == currentMode)
+            let checks = row.subviews.compactMap { $0 as? UIImageView }
+            checks.last?.isHidden = !isSelected
+            row.backgroundColor = isSelected ? UIColor.white.withAlphaComponent(0.06) : .clear
+        }
+    }
+    
+    @objc private func rowTapped(_ sender: UIControl) {
+        guard let mode = Mode(rawValue: sender.tag) else { return }
+        currentMode = mode
+        onSelect?(mode)
+    }
+}
+
 class SCCameraVC: UIViewController {
     
     // MARK: - Properties
@@ -47,7 +233,7 @@ class SCCameraVC: UIViewController {
         return label
     }()
     
-    // 添加自动保存按钮
+    // 添加自动保存按钮（点击展开：不自动保存 / 保存JPEG / 保存RAW）
     private lazy var autoSaveButton: UIButton = {
         let button = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
@@ -58,6 +244,7 @@ class SCCameraVC: UIViewController {
         button.addTarget(self, action: #selector(toggleAutoSave), for: .touchUpInside)
         return button
     }()
+    private var autoSaveSelector: SCAutoSaveSelectorView?
     
     // MARK: - UI Components
     private lazy var closeButton: UIButton = {
@@ -893,10 +1080,17 @@ class SCCameraVC: UIViewController {
         print("  [Original Image] 方向: \(image.imageOrientation.rawValue)")
         print("  [Original Image] 比例: \(image.scale)")
         
-        // 如果开启了自动保存，先保存照片
-        if SCCameraSettingsManager.shared.isAutoSaveEnabled {
-            print("  [Auto Save] 自动保存已开启，准备保存原始图片")
+        // 自动保存策略
+        let autoMode = SCCameraSettingsManager.shared.autoSaveMode // 0 关闭，1 JPEG，2 RAW
+        switch autoMode {
+        case 1:
+            print("  [Auto Save] 模式=JPEG，保存原始UIImage到相册")
             UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        case 2:
+            // RAW 将在引入 RAW 管线后由回调侧以 DNG 数据写入相册
+            print("  [Auto Save] 模式=RAW，当前为占位，等待RAW(DNG)捕获实现后保存")
+        default:
+            break
         }
         
         // 创建照片信息
@@ -1379,31 +1573,85 @@ class SCCameraVC: UIViewController {
     
     // 添加自动保存相关方法
     private func updateAutoSaveButtonState() {
-        let isAutoSaveEnabled = SCCameraSettingsManager.shared.isAutoSaveEnabled
-        let imageName = isAutoSaveEnabled ? "square.and.arrow.down.fill" : "square.and.arrow.down"
+        let mode = SCCameraSettingsManager.shared.autoSaveMode // 0 关闭，1 JPEG，2 RAW
+        let imageName: String
+        switch mode {
+        case 1:
+            imageName = "square.and.arrow.down.fill" // JPEG
+        case 2:
+            imageName = "doc" // RAW（用通用图标区分）
+        default:
+            imageName = "square.and.arrow.down" // 关闭
+        }
         let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
         autoSaveButton.setImage(UIImage(systemName: imageName, withConfiguration: config), for: .normal)
-        autoSaveButton.tintColor = isAutoSaveEnabled ? SCConstants.themeColor : .white
+        autoSaveButton.tintColor = (mode == 0) ? .white : SCConstants.themeColor
+        autoSaveButton.accessibilityLabel = {
+            switch mode {
+            case 1: return "自动保存：JPEG"
+            case 2: return "自动保存：RAW"
+            default: return "自动保存：关闭"
+            }
+        }()
     }
     
     @objc private func toggleAutoSave() {
-        // 切换自动保存状态
-        let newState = !SCCameraSettingsManager.shared.isAutoSaveEnabled
-        SCCameraSettingsManager.shared.isAutoSaveEnabled = newState
-        
-        // 更新按钮状态
-        updateAutoSaveButtonState()
-        
-        // 触觉反馈
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
-        
-        // 显示提示
-        let message = newState ? "已开启自动保存原图" : "已关闭自动保存原图"
-        let view = MessageView.viewFromNib(layout: .statusLine)
-        view.configureTheme(newState ? .success : .info)
-        view.configureContent(title: "", body: message)
-        SwiftMessages.show(view: view)
+        if autoSaveSelector == nil {
+            autoSaveSelector = SCAutoSaveSelectorView()
+        }
+        guard let selector = autoSaveSelector else { return }
+        selector.currentMode = SCAutoSaveSelectorView.Mode(rawValue: SCCameraSettingsManager.shared.autoSaveMode) ?? .off
+        selector.onSelect = { [weak self] mode in
+            guard let self = self else { return }
+            // 设备不支持 RAW 时拦截
+            if mode == .raw, let session = self.photoSession, session.isRawPhotoCaptureSupported == false {
+                SwiftMessages.showErrorMessage("该设备不支持 RAW 拍摄")
+                return
+            }
+            SCCameraSettingsManager.shared.autoSaveMode = mode.rawValue
+            self.updateAutoSaveButtonState()
+            self.dismissAutoSaveSelector()
+            self.showAutoSaveToast(for: mode)
+        }
+        // 半透明背景关闭
+        if selector.superview == nil {
+            let dim = UIControl()
+            dim.backgroundColor = UIColor.black.withAlphaComponent(0.01)
+            dim.addTarget(self, action: #selector(dismissAutoSaveSelector), for: .touchUpInside)
+            dim.frame = self.view.bounds
+            dim.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+            dim.tag = 0xACDC
+            self.view.addSubview(dim)
+            self.view.addSubview(selector)
+        }
+        selector.present(anchor: autoSaveButton, in: self.view)
+    }
+
+    @objc private func dismissAutoSaveSelector() {
+        self.view.viewWithTag(0xACDC)?.removeFromSuperview()
+        UIView.animate(withDuration: 0.15, animations: {
+            self.autoSaveSelector?.alpha = 0
+            self.autoSaveSelector?.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+        }) { _ in
+            self.autoSaveSelector?.removeFromSuperview()
+            self.autoSaveSelector?.alpha = 1
+            self.autoSaveSelector?.transform = .identity
+        }
+    }
+
+    private func showAutoSaveToast(for mode: SCAutoSaveSelectorView.Mode) {
+        switch mode {
+        case .off:
+            SwiftMessages.showSuccessMessage("已关闭自动保存")
+        case .jpeg:
+            SwiftMessages.showSuccessMessage("将自动保存当前拍摄的原图（JPEG）")
+        case .raw:
+            SwiftMessages.showSuccessMessage("将自动保存当前拍摄的原图（RAW + JPEG）")
+            let view = MessageView.viewFromNib(layout: .statusLine)
+            view.configureTheme(.warning)
+            view.configureContent(title: "提示", body: "RAW 文件体积较大，将占用更多存储空间")
+            SwiftMessages.show(view: view)
+        }
     }
     
     func updateAspectRatio(_ state: SCRatioState) {
