@@ -1603,14 +1603,27 @@ class SCCameraVC: UIViewController {
         selector.currentMode = SCAutoSaveSelectorView.Mode(rawValue: SCCameraSettingsManager.shared.autoSaveMode) ?? .off
         selector.onSelect = { [weak self] mode in
             guard let self = self else { return }
-            // 设备不支持 RAW 时拦截
-            if mode == .raw, let session = self.photoSession, session.isRawPhotoCaptureSupported == false {
-                SwiftMessages.showErrorMessage("该设备不支持 RAW 拍摄")
-                return
-            }
             SCCameraSettingsManager.shared.autoSaveMode = mode.rawValue
             self.updateAutoSaveButtonState()
             self.dismissAutoSaveSelector()
+            // 若当前暂不支持 RAW，尝试自动切换到后置广角 1x 以启用 RAW
+            if mode == .raw, let session = self.photoSession, session.isRawPhotoCaptureSupported == false {
+                let targetLens = SCLensModel(name: "1x", type: .builtInWideAngleCamera)
+                self.cameraManager.switchCamera(to: targetLens) { [weak self] _ in
+                    guard let self = self else { return }
+                    // 等待会话完成重配后再检查一次
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        if self.photoSession.isRawPhotoCaptureSupported {
+                            SwiftMessages.showSuccessMessage("已切换到后置广角以支持 RAW 拍摄")
+                        } else {
+                            let view = MessageView.viewFromNib(layout: .statusLine)
+                            view.configureTheme(.info)
+                            view.configureContent(title: "提示", body: "当前设备或格式暂不支持 RAW，已保留设置，尝试更换镜头/分辨率或在真机上测试")
+                            SwiftMessages.show(view: view)
+                        }
+                    }
+                }
+            }
             self.showAutoSaveToast(for: mode)
         }
         // 半透明背景关闭

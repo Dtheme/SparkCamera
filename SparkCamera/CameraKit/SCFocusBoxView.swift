@@ -47,7 +47,12 @@ class SCFocusBoxView: UIView {
     }
     
     private func updateCornerPath() {
-        let rect = focusBox.bounds.insetBy(dx: lineWidth/2, dy: lineWidth/2)
+        var rect = focusBox.bounds.insetBy(dx: lineWidth/2, dy: lineWidth/2)
+        // 兼容性校验：CGRect 无 isFinite，可使用 isNull/isInfinite + 宽高 NaN/无效判断
+        if rect.isNull || rect.isInfinite || rect.width.isNaN || rect.height.isNaN || rect.width.isInfinite || rect.height.isInfinite || rect.width <= 0 || rect.height <= 0 {
+            // 回退到固定尺寸，避免传入 NaN/无效值导致 CoreGraphics 报错
+            rect = CGRect(x: 0, y: 0, width: boxSize - lineWidth, height: boxSize - lineWidth)
+        }
         let path = UIBezierPath()
         let cl = cornerLength
         
