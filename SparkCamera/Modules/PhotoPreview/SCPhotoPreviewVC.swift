@@ -9,6 +9,7 @@ import UIKit
 import SwiftMessages
 import SnapKit
 import GPUImage
+import Photos
 
 @objc class SCPhotoPreviewVC: UIViewController {
     
@@ -85,7 +86,7 @@ import GPUImage
         
         // 添加通知监听，用于自动保存成功后更新状态
         NotificationCenter.default.addObserver(self,
-            selector: #selector(handlePhotoSaved),
+            selector: #selector(handlePhotoSavedNotification(_:)),
             name: NSNotification.Name("PhotoSavedToAlbum"),
             object: nil)
     }
@@ -709,11 +710,72 @@ import GPUImage
     }
     
     // MARK: - Notification Handlers
-    @objc private func handlePhotoSaved() {
+    @objc private func handlePhotoSavedNotification(_ note: Notification) {
         // 更新保存状态
         photoInfo.isSavedToAlbum = true
-        // 更新信息视图
         infoView?.updateSaveState(isSaved: true)
+        let format = (note.userInfo?["format"] as? String) ?? ""
+        let localId = (note.userInfo?["assetLocalId"] as? String) ?? ""
+        // 展示带操作的提示：RAW 模式提供“导出 RAW”
+        let view = MessageView.viewFromNib(layout: .cardView)
+        view.configureTheme(.success)
+        let title = format.isEmpty ? "保存成功" : "保存成功（\(format)）"
+        view.configureContent(title: title, body: localId.isEmpty ? "照片已保存到相册" : "可以导出 RAW 原始文件")
+        if format.contains("RAW"), !localId.isEmpty {
+            view.button?.setTitle("导出 RAW", for: .normal)
+            view.button?.isHidden = false
+            view.buttonTapHandler = { [weak self] _ in
+                self?.exportRawWith(localId: localId)
+            }
+        } else {
+            view.button?.isHidden = true
+        }
+        var config = SwiftMessages.Config()
+        config.presentationStyle = .top
+        config.duration = .seconds(seconds: 3)
+        SwiftMessages.show(config: config, view: view)
+    }
+
+    private func exportRawWith(localId: String) {
+        let assets = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
+        guard let asset = assets.firstObject else {
+            SwiftMessages.showErrorMessage("未找到 RAW 资源")
+            return
+        }
+        let resources = PHAssetResource.assetResources(for: asset)
+        guard let rawRes = resources.first(where: {
+            $0.type == .alternatePhoto ||
+            $0.uniformTypeIdentifier.lowercased().contains("dng") ||
+            $0.uniformTypeIdentifier.lowercased().contains("raw") ||
+            $0.originalFilename.lowercased().hasSuffix(".dng")
+        }) else {
+            SwiftMessages.showErrorMessage("该资源未包含 RAW 文件")
+            return
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("dng")
+        let opt = PHAssetResourceRequestOptions()
+        opt.isNetworkAccessAllowed = true
+        PHAssetResourceManager.default().writeData(for: rawRes, toFile: url, options: opt) { [weak self] err in
+            DispatchQueue.main.async {
+                if let err = err {
+                    SwiftMessages.showErrorMessage("导出失败：\(err.localizedDescription)")
+                } else {
+                    self?.presentShareSheet(fileURL: url)
+                }
+            }
+        }
+    }
+
+    private func presentShareSheet(fileURL: URL) {
+        let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+        if let pop = activityVC.popoverPresentationController {
+            pop.sourceView = view
+            pop.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            pop.permittedArrowDirections = []
+        }
+        present(activityVC, animated: true)
     }
 
     // MARK: - Editing Mode

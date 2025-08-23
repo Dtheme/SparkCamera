@@ -30,6 +30,9 @@ import UIKit
     /// 是否已保存到相册
     public var isSavedToAlbum: Bool = false
     
+    /// 拍照格式（例如："JPEG"、"RAW"、"RAW+JPEG"）
+    public var captureFormat: String = "JPEG"
+    
     // MARK: - Initialization
     
     /// 使用UIImage初始化
@@ -65,7 +68,8 @@ import UIKit
             "width": width,
             "height": height,
             "orientation": orientation.rawValue,
-            "isSavedToAlbum": isSavedToAlbum
+            "isSavedToAlbum": isSavedToAlbum,
+            "format": captureFormat
         ]
     }
     
@@ -82,6 +86,7 @@ import UIKit
         
         let info = SCPhotoInfo(width: width, height: height, orientation: orientation)
         info.isSavedToAlbum = dict["isSavedToAlbum"] as? Bool ?? false
+        if let fmt = dict["format"] as? String { info.captureFormat = fmt }
         return info
     }
     
@@ -94,6 +99,7 @@ import UIKit
         - 宽高比: \(aspectRatio)
         - 是否横向: \(isLandscape)
         - 方向: \(orientation.rawValue)
+        - 格式: \(captureFormat)
         - 已保存到相册: \(isSavedToAlbum)
         """
     }

@@ -1087,14 +1087,25 @@ class SCCameraVC: UIViewController {
             print("  [Auto Save] 模式=JPEG，保存原始UIImage到相册")
             UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
         case 2:
-            // RAW 将在引入 RAW 管线后由回调侧以 DNG 数据写入相册
-            print("  [Auto Save] 模式=RAW，当前为占位，等待RAW(DNG)捕获实现后保存")
+            // RAW+JPEG 的相册写入由 SCPhotoSession 的回调统一完成
+            print("  [Auto Save] 模式=RAW，由会话回调统一保存 RAW+JPEG 到相册")
         default:
             break
         }
         
         // 创建照片信息
         let photoInfo = SCPhotoInfo(image: image)
+        // 推断拍摄格式：依据自动保存模式与会话缓存到相册的数据
+        if SCCameraSettingsManager.shared.autoSaveMode == 2 {
+            if let session = photoSession {
+                // 简化：若 RAW 模式，则显示 RAW+JPEG；若后续需要更精确，可在会话写入成功回调中下发真实结果
+                photoInfo.captureFormat = "RAW+JPEG"
+            } else {
+                photoInfo.captureFormat = "RAW"
+            }
+        } else {
+            photoInfo.captureFormat = "JPEG"
+        }
         print(photoInfo.description)
         
         let photoPreviewVC = SCPhotoPreviewVC(image: image, photoInfo: photoInfo)
@@ -1606,15 +1617,33 @@ class SCCameraVC: UIViewController {
             SCCameraSettingsManager.shared.autoSaveMode = mode.rawValue
             self.updateAutoSaveButtonState()
             self.dismissAutoSaveSelector()
-            // 若当前暂不支持 RAW，尝试自动切换到后置广角 1x 以启用 RAW
+            if mode == .raw {
+                // RAW 模式下，强制一次 RAW 友好会话配置
+                self.photoSession.ensureRawCapableConfiguration()
+                // 打印一次会话输出的 RAW 列表，便于诊断（改为安全访问器，避免 KVC 崩溃）
+                print("  [Diagnostics] 当前可用 RAW 像素格式: \(self.photoSession.availableRawPixelFormats)")
+            }
+            // 若当前暂不支持 RAW，尝试自动切换到后置广角 1x 并轮询确认，减少误判
             if mode == .raw, let session = self.photoSession, session.isRawPhotoCaptureSupported == false {
                 let targetLens = SCLensModel(name: "1x", type: .builtInWideAngleCamera)
                 self.cameraManager.switchCamera(to: targetLens) { [weak self] _ in
                     guard let self = self else { return }
-                    // 等待会话完成重配后再检查一次
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    // 切镜头完成后再次确保 RAW 友好预设
+                    self.photoSession.ensureRawCapableConfiguration()
+                    @MainActor func pollRawSupport(attemptsLeft: Int) {
+                        // 如果会话尚未运行，先等一等
+                        if let s = self.photoSession, s.session.isRunning == false {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                                pollRawSupport(attemptsLeft: max(attemptsLeft - 1, 0))
+                            }
+                            return
+                        }
                         if self.photoSession.isRawPhotoCaptureSupported {
                             SwiftMessages.showSuccessMessage("已切换到后置广角以支持 RAW 拍摄")
+                        } else if attemptsLeft > 0 {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                pollRawSupport(attemptsLeft: attemptsLeft - 1)
+                            }
                         } else {
                             let view = MessageView.viewFromNib(layout: .statusLine)
                             view.configureTheme(.info)
@@ -1622,6 +1651,8 @@ class SCCameraVC: UIViewController {
                             SwiftMessages.show(view: view)
                         }
                     }
+                    // 最多轮询 10 次（约 2s）
+                    pollRawSupport(attemptsLeft: 10)
                 }
             }
             self.showAutoSaveToast(for: mode)

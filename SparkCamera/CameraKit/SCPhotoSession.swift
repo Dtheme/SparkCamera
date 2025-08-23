@@ -7,6 +7,7 @@
 
 import UIKit
 import AVFoundation
+import Photos
 import AVFoundation.AVCapturePhotoOutput
 import CoreMotion
 
@@ -95,6 +96,26 @@ extension SCSession.FlashMode {
     
     private var isPreviewLayerSetup = false
     private var isSessionRunning = false
+    // MARK: - Pending capture buffers for RAW+JPEG pairing
+    private var pendingProcessedImageData: Data?
+    private var pendingRawDNGData: Data?
+
+    // 在 RAW 模式下，强制为相机会话设置 RAW 友好的预设（.photo）
+    @objc public func ensureRawCapableConfiguration() {
+        session.beginConfiguration()
+        if session.canSetSessionPreset(.photo) {
+            session.sessionPreset = .photo
+            print("  [Photo Session] ensureRawCapableConfiguration -> 使用 .photo 预设以支持 RAW/ProRAW")
+        }
+        session.commitConfiguration()
+    }
+
+    // 对外只读：当前可用 RAW 像素格式列表（便于诊断）
+    @objc public var availableRawPixelFormats: [NSNumber] {
+        guard let output = self.photoOutput else { return [] }
+        let arr = output.availableRawPhotoPixelFormatTypes as NSArray
+        return arr.compactMap { $0 as? NSNumber }
+    }
     
     @objc public var resolution: CGSize = .zero {
         didSet {
@@ -120,16 +141,22 @@ extension SCSession.FlashMode {
             let targetAspectRatio = resolution.width / resolution.height
             print("  [Photo Session] 目标比例: \(targetAspectRatio)")
             
-            // 根据目标比例选择合适的预设
-            if abs(targetAspectRatio - 3.0/4.0) < 0.01 {
+            // 根据目标比例选择合适的预设；RAW 模式下强制使用 .photo 以启用 RAW/ProRAW 能力
+            let isRawMode = (SCCameraSettingsManager.shared.autoSaveMode == 2)
+            if isRawMode {
                 session.sessionPreset = .photo
-                print("  [Photo Session] 设置会话预设为: photo (3:4)")
-            } else if abs(targetAspectRatio - 9.0/16.0) < 0.01 {
-                session.sessionPreset = .hd1920x1080
-                print("  [Photo Session] 设置会话预设为: 1920x1080 (16:9)")
-            } else if abs(targetAspectRatio - 1.0) < 0.01 {
-                session.sessionPreset = .high
-                print("  [Photo Session] 设置会话预设为: high (1:1)")
+                print("  [Photo Session] RAW 模式，强制会话预设为: photo")
+            } else {
+                if abs(targetAspectRatio - 3.0/4.0) < 0.01 {
+                    session.sessionPreset = .photo
+                    print("  [Photo Session] 设置会话预设为: photo (3:4)")
+                } else if abs(targetAspectRatio - 9.0/16.0) < 0.01 {
+                    session.sessionPreset = .hd1920x1080
+                    print("  [Photo Session] 设置会话预设为: 1920x1080 (16:9)")
+                } else if abs(targetAspectRatio - 1.0) < 0.01 {
+                    session.sessionPreset = .high
+                    print("  [Photo Session] 设置会话预设为: high (1:1)")
+                }
             }
             
             // 配置照片输出
@@ -150,9 +177,10 @@ extension SCSession.FlashMode {
         }
     }
 
-    // 能力检测：是否支持 RAW 捕获
+    // 能力检测：是否支持 RAW（Bayer）
     public var isRawPhotoCaptureSupported: Bool {
-        return !(photoOutput?.availableRawPhotoPixelFormatTypes.isEmpty ?? true)
+        guard let output = photoOutput else { return false }
+        return output.availableRawPhotoPixelFormatTypes.isEmpty == false
     }
     
     @objc public init(position: CameraPosition = .back, detection: CameraDetection = .none) {
@@ -255,18 +283,24 @@ extension SCSession.FlashMode {
         self.captureCallback = callback
         self.errorCallback = error
         
+        // 开始本次拍摄前清空上一轮缓存
+        pendingProcessedImageData = nil
+        pendingRawDNGData = nil
+
         guard let photoOutput = self.photoOutput else {
             error(SCError.error("Photo output not available"))
             return
         }
         
-        // 配置照片设置（根据自动保存RAW/JPEG策略决定是否附带 RAW）
+        // 配置照片设置（根据自动保存RAW/JPEG策略决定是否附带 RAW/ProRAW）
         let settingsManager = SCCameraSettingsManager.shared
-        let wantRaw = (settingsManager.autoSaveMode == 2) && !(photoOutput.availableRawPhotoPixelFormatTypes.isEmpty)
+        let wantRaw = (settingsManager.autoSaveMode == 2)
         let photoSettings: AVCapturePhotoSettings
         if wantRaw, let rawType = photoOutput.availableRawPhotoPixelFormatTypes.first {
+            // Bayer RAW + JPEG
             let processedFormat: [String: Any] = [AVVideoCodecKey: AVVideoCodecType.jpeg]
             photoSettings = AVCapturePhotoSettings(rawPixelFormatType: OSType(rawType), processedFormat: processedFormat)
+            print("  [Photo Session] 准备拍摄 RAW(Bayer)+JPEG, rawType=\(rawType)")
         } else {
             photoSettings = AVCapturePhotoSettings()
         }
@@ -285,6 +319,7 @@ extension SCSession.FlashMode {
         // 开始拍照
         print("  [Photo Session] 开始拍照...")
         print("  [Photo Session] - 高分辨率拍摄: \(photoSettings.isHighResolutionPhotoEnabled)")
+        print("  [Photo Session] - RAW像素格式列表: \(photoOutput.availableRawPhotoPixelFormatTypes)")
         photoOutput.capturePhoto(with: photoSettings, delegate: self)
     }
     
@@ -408,17 +443,25 @@ extension SCSession.FlashMode {
             return
         }
         
-        // 拿到系统生成的 processed 图片（JPEG/HEIC）
-        if let imageData = photo.fileDataRepresentation() {
-            print("  [Photo Session] Processed 照片数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
-            self.processPhotoData(imageData)
-        }
-        
-        // 若包含 RAW，则在这里获取 RAW DNG 数据
+        // iOS 会分别回调 processed 与 RAW。RAW 帧不要走 UIImage 解析。
         if photo.isRawPhoto {
-            if let dngFileData = photo.fileDataRepresentation() {
+            if SCCameraSettingsManager.shared.autoSaveMode == 2, let dngFileData = photo.fileDataRepresentation() {
+                pendingRawDNGData = dngFileData
                 print("  [Photo Session] RAW(DNG) 数据大小: \(Double(dngFileData.count) / 1024.0 / 1024.0) MB")
-                // TODO: 后续在这里缓存 RAW 数据，并在 didFinishCaptureFor 中与 JPEG 一起保存到相册
+            } else {
+                print("  [Photo Session] RAW 帧未获取到数据或非 RAW 模式")
+            }
+            return
+        } else {
+            // processed (HEIC/JPEG) 数据
+            if let imageData = photo.fileDataRepresentation() {
+                if SCCameraSettingsManager.shared.autoSaveMode == 2 {
+                    pendingProcessedImageData = imageData
+                }
+                print("  [Photo Session] Processed 照片数据大小: \(Double(imageData.count) / 1024.0 / 1024.0) MB")
+                self.processPhotoData(imageData)
+            } else {
+                print("  [Photo Session] 未获取到 processed 照片数据")
             }
         }
     }
@@ -439,6 +482,90 @@ extension SCSession.FlashMode {
         }
 
         self.processPhotoData(data)
+    }
+
+    @available(iOS 11.0, *)
+    public func photoOutput(_ output: AVCapturePhotoOutput, didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings, error: Error?) {
+        if let error = error {
+            print("❌ [Photo Session] 拍摄结束回调错误: \(error.localizedDescription)")
+        }
+        let autoMode = SCCameraSettingsManager.shared.autoSaveMode // 0 关闭，1 JPEG，2 RAW
+        defer {
+            // 清理缓存，准备下次拍摄
+            pendingProcessedImageData = nil
+            pendingRawDNGData = nil
+        }
+        guard autoMode == 2 else { return } // 仅在 RAW 自动保存模式下由会话落盘
+
+        let jpegData = pendingProcessedImageData
+        let dngData = pendingRawDNGData
+        if jpegData == nil && dngData == nil {
+            print("⚠️ [Photo Session] 未捕获到可保存的数据 (JPEG/RAW 均为空)")
+            return
+        }
+
+        // 请求相册权限并写入
+        PHPhotoLibrary.requestAuthorization { status in
+            guard status == .authorized || status == .limited else {
+                print("⚠️ [Photo Save] 相册访问被拒绝")
+                return
+            }
+            var createdLocalId: String?
+            PHPhotoLibrary.shared().performChanges({
+                let req = PHAssetCreationRequest.forAsset()
+                let placeholder = req.placeholderForCreatedAsset
+                // 使用文件方式提供资源，提升兼容性，避免 3300
+                let ts = Int(Date().timeIntervalSince1970)
+                let tmpDir = FileManager.default.temporaryDirectory
+                if let dng = dngData, let jpeg = jpegData {
+                    let jpgURL = tmpDir.appendingPathComponent("IMG_\(ts)").appendingPathExtension("JPG")
+                    let dngURL = tmpDir.appendingPathComponent("IMG_\(ts)").appendingPathExtension("DNG")
+                    try? jpeg.write(to: jpgURL, options: .atomic)
+                    try? dng.write(to: dngURL, options: .atomic)
+                    let jpgOpt = PHAssetResourceCreationOptions()
+                    jpgOpt.originalFilename = jpgURL.lastPathComponent
+                    jpgOpt.shouldMoveFile = true
+                    req.addResource(with: .photo, fileURL: jpgURL, options: jpgOpt)
+                    let dngOpt = PHAssetResourceCreationOptions()
+                    dngOpt.originalFilename = dngURL.lastPathComponent
+                    dngOpt.shouldMoveFile = true
+                    req.addResource(with: .alternatePhoto, fileURL: dngURL, options: dngOpt)
+                } else if let dng = dngData { // 仅 RAW
+                    let dngURL = tmpDir.appendingPathComponent("IMG_\(ts)").appendingPathExtension("DNG")
+                    try? dng.write(to: dngURL, options: .atomic)
+                    let dngOpt = PHAssetResourceCreationOptions()
+                    dngOpt.originalFilename = dngURL.lastPathComponent
+                    dngOpt.shouldMoveFile = true
+                    req.addResource(with: .photo, fileURL: dngURL, options: dngOpt)
+                } else if let jpeg = jpegData { // 仅 JPEG
+                    let jpgURL = tmpDir.appendingPathComponent("IMG_\(ts)").appendingPathExtension("JPG")
+                    try? jpeg.write(to: jpgURL, options: .atomic)
+                    let jpgOpt = PHAssetResourceCreationOptions()
+                    jpgOpt.originalFilename = jpgURL.lastPathComponent
+                    jpgOpt.shouldMoveFile = true
+                    req.addResource(with: .photo, fileURL: jpgURL, options: jpgOpt)
+                }
+                req.creationDate = Date()
+                createdLocalId = placeholder?.localIdentifier
+            }, completionHandler: { success, err in
+                DispatchQueue.main.async {
+                    if success {
+                        let savedDesc: String = {
+                            if dngData != nil && jpegData != nil { return "RAW+JPEG" }
+                            if dngData != nil { return "RAW" }
+                            return "JPEG"
+                        }()
+                        print("✅ [Photo Save] \(savedDesc) 已保存到相册")
+                        var info: [String: Any] = ["format": savedDesc]
+                        if let id = createdLocalId { info["assetLocalId"] = id }
+                        NotificationCenter.default.post(name: NSNotification.Name("PhotoSavedToAlbum"), object: nil, userInfo: info)
+                    } else {
+                        let nsErr = err as NSError?
+                        print("❌ [Photo Save] 保存失败: \(err?.localizedDescription ?? "unknown")  userInfo=\(nsErr?.userInfo ?? [:])")
+                    }
+                }
+            })
+        }
     }
     
     func processPhotoData(_ data: Data) {
