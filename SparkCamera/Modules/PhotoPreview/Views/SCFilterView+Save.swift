@@ -28,6 +28,18 @@ private extension SCFilterView {
 extension SCFilterView {
     // 保存图片到相册
     func saveToAlbum(completion: @escaping (Bool, Error?) -> Void) {
+        // RAW 自动保存模式：会话已写入 RAW+JPEG，避免在预览页再次写入
+        if SCCameraSettingsManager.shared.autoSaveMode == 2 {
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("PhotoSavedToAlbum"),
+                    object: nil,
+                    userInfo: ["format": "RAW+JPEG"]
+                )
+                completion(true, nil)
+            }
+            return
+        }
         // 检查相册权限
         PHPhotoLibrary.requestAuthorization { [weak self] status in
             guard let self = self else {

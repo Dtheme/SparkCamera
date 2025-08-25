@@ -35,9 +35,9 @@ class SCPhotoInfoView: UIView, UICollectionViewDataSource, UICollectionViewDeleg
         buildItems()
         
         // 添加通知监听
-        NotificationCenter.default.addObserver(self,
+        NotificationCenter.default.addObserver(self, 
             selector: #selector(handlePhotoSaved(_:)),
-            name: NSNotification.Name("PhotoSavedToAlbum"),
+            name: NSNotification.Name("PhotoSavedToAlbum"), 
             object: nil)
     }
     
@@ -80,12 +80,12 @@ class SCPhotoInfoView: UIView, UICollectionViewDataSource, UICollectionViewDeleg
         items.removeAll()
         // 1. 分辨率
         items.append(InfoItem(icon: "photo",
-                               title: "分辨率",
+            title: "分辨率",
                                value: String(format: "%.0f×%.0f", photoInfo.width, photoInfo.height),
                                valueColor: .white))
         // 2. 方向
         items.append(InfoItem(icon: "rotate.right",
-                               title: "方向",
+            title: "方向",
                                value: photoInfo.isLandscape ? "横向" : "竖向",
                                valueColor: .white))
         // 3. 大小
@@ -104,8 +104,8 @@ class SCPhotoInfoView: UIView, UICollectionViewDataSource, UICollectionViewDeleg
         // 4. 原图保存状态
         saveIndex = items.count
         items.append(InfoItem(icon: photoInfo.isSavedToAlbum ? "checkmark.circle.fill" : "circle",
-                               title: "原图",
-                               value: photoInfo.isSavedToAlbum ? "已保存" : "未保存",
+            title: "原图",
+            value: photoInfo.isSavedToAlbum ? "已保存" : "未保存",
                                valueColor: photoInfo.isSavedToAlbum ? .systemGreen : .white))
         // 5. 格式
         formatIndex = items.count
@@ -242,4 +242,4 @@ class SCPhotoInfoView: UIView, UICollectionViewDataSource, UICollectionViewDeleg
             valueLabel.textColor = valueColor
         }
     }
-}
+} 

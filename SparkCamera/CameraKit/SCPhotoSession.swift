@@ -514,7 +514,7 @@ extension SCSession.FlashMode {
             PHPhotoLibrary.shared().performChanges({
                 let req = PHAssetCreationRequest.forAsset()
                 let placeholder = req.placeholderForCreatedAsset
-                // 使用文件方式提供资源，提升兼容性，避免 3300
+                // 使用文件 URL 方式写入资源，提升兼容性，避免 3300
                 let ts = Int(Date().timeIntervalSince1970)
                 let tmpDir = FileManager.default.temporaryDirectory
                 if let dng = dngData, let jpeg = jpegData {
@@ -530,7 +530,7 @@ extension SCSession.FlashMode {
                     dngOpt.originalFilename = dngURL.lastPathComponent
                     dngOpt.shouldMoveFile = true
                     req.addResource(with: .alternatePhoto, fileURL: dngURL, options: dngOpt)
-                } else if let dng = dngData { // 仅 RAW
+                } else if let dng = dngData { // 仅 RAW（DNG 作为主资源）
                     let dngURL = tmpDir.appendingPathComponent("IMG_\(ts)").appendingPathExtension("DNG")
                     try? dng.write(to: dngURL, options: .atomic)
                     let dngOpt = PHAssetResourceCreationOptions()
@@ -556,12 +556,32 @@ extension SCSession.FlashMode {
                             return "JPEG"
                         }()
                         print("✅ [Photo Save] \(savedDesc) 已保存到相册")
+                        // 详细校验：枚举资源，确认是否包含 DNG（alternatePhoto）
+                        if let id = createdLocalId {
+                            let assets = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+                            if let asset = assets.firstObject {
+                                let resources = PHAssetResource.assetResources(for: asset)
+                                print("  [Photo Save] 资源列表(\(resources.count))：")
+                                var hasDNG = false
+                                for res in resources {
+                                    let uti = res.uniformTypeIdentifier
+                                    print("    - type=\(res.type.rawValue) uti=\(uti) filename=\(res.originalFilename)")
+                                    let utiLower = uti.lowercased()
+                                    if res.type == .alternatePhoto || utiLower.contains("dng") || utiLower.contains("raw") {
+                                        hasDNG = true
+                                    }
+                                }
+                                if hasDNG == false && dngData != nil {
+                                    print("⚠️ [Photo Save] 该资源未枚举到 DNG/RAW 附件，若需单独可见的 DNG，可使用‘导出 RAW’功能或改为单独创建 DNG 资源。")
+                                }
+                            }
+                        }
                         var info: [String: Any] = ["format": savedDesc]
                         if let id = createdLocalId { info["assetLocalId"] = id }
                         NotificationCenter.default.post(name: NSNotification.Name("PhotoSavedToAlbum"), object: nil, userInfo: info)
                     } else {
                         let nsErr = err as NSError?
-                        print("❌ [Photo Save] 保存失败: \(err?.localizedDescription ?? "unknown")  userInfo=\(nsErr?.userInfo ?? [:])")
+                        print("❌ [Photo Save] 保存失败: \(err?.localizedDescription ?? "unknown") userInfo=\(nsErr?.userInfo ?? [:])")
                     }
                 }
             })

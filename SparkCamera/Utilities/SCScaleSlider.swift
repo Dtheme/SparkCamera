@@ -396,10 +396,9 @@ class SCScaleSlider: UIView {
         let mainInterval = max(niceNumber(rawInterval, round: true), config.step)
         let stepsPerLabel = max(1, Int(round(mainInterval / config.step)))
 
-        // 根据主刻度间隔决定小刻度间隔（可见性适中）
         let stepsPerMinor = max(1, stepsPerLabel / 5)
 
-        // 修正：确保刻度数量正确，不超过最大值
+        // 刻度数量正确，不超过最大值
         for i in 0...totalSteps {
             let value = config.minValue + Float(i) * config.step
 
