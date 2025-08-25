@@ -22,8 +22,8 @@ final class SCAutoSaveSelectorView: UIView {
         var title: String {
             switch self {
             case .off: return "不自动保存"
-            case .jpeg: return "保存 JPEG"
-            case .raw: return "保存 RAW"
+            case .jpeg: return "自动保存 JPEG"
+            case .raw: return "自动保存 JPEG+RAW"
             }
         }
         
@@ -233,7 +233,7 @@ class SCCameraVC: UIViewController {
         return label
     }()
     
-    // 添加自动保存按钮（点击展开：不自动保存 / 保存JPEG / 保存RAW）
+    // 添加自动保存按钮（点击展开：不自动保存 / 保存 JPEG / 保存RAW）
     private lazy var autoSaveButton: UIButton = {
         let button = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)

@@ -579,6 +579,7 @@ extension SCSession.FlashMode {
                         var info: [String: Any] = ["format": savedDesc]
                         if let id = createdLocalId { info["assetLocalId"] = id }
                         NotificationCenter.default.post(name: NSNotification.Name("PhotoSavedToAlbum"), object: nil, userInfo: info)
+                        print("[Photo Session] 已发出 PhotoSavedToAlbum 通知 format=\(savedDesc) id=\(createdLocalId ?? "-")")
                     } else {
                         let nsErr = err as NSError?
                         print("❌ [Photo Save] 保存失败: \(err?.localizedDescription ?? "unknown") userInfo=\(nsErr?.userInfo ?? [:])")

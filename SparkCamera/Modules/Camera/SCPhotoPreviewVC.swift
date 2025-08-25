@@ -58,12 +58,6 @@ private func setupGestures() {
 
 // MARK: - Actions
 private func saveImageToAlbum() {
-    // RAW 自动保存模式：会话已写入 RAW+JPEG，避免重复保存
-    if SCCameraSettingsManager.shared.autoSaveMode == 2 {
-        SwiftMessages.showSuccessMessage("RAW+JPEG 已保存到相册", title: "保存成功")
-        self.dismiss(animated: true)
-        return
-    }
     // 显示进度条
     progressView.isHidden = false
     progressView.progress = 0

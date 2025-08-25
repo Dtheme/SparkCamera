@@ -37,6 +37,7 @@ import Photos
     private var isStatusBarHidden = false
     private var progressView: UIProgressView!
     private var progressBackgroundView: UIVisualEffectView?
+    private var didRegisterPhotoSavedObserver = false
     
     // 添加内存管理相关属性
     private var isViewVisible = false
@@ -60,6 +61,7 @@ import Photos
         self.image = image
         self.photoInfo = photoInfo
         super.init(nibName: nil, bundle: nil)
+        registerPhotoSavedObserverIfNeeded()
     }
     
     required init?(coder: NSCoder) {
@@ -85,6 +87,13 @@ import Photos
         processImageInBackground()
         
         // 添加通知监听，用于自动保存成功后更新状态
+        registerPhotoSavedObserverIfNeeded()
+        print("[PhotoPreview] 已注册 PhotoSavedToAlbum 监听")
+    }
+
+    private func registerPhotoSavedObserverIfNeeded() {
+        guard didRegisterPhotoSavedObserver == false else { return }
+        didRegisterPhotoSavedObserver = true
         NotificationCenter.default.addObserver(self,
             selector: #selector(handlePhotoSavedNotification(_:)),
             name: NSNotification.Name("PhotoSavedToAlbum"),
@@ -97,6 +106,10 @@ import Photos
         animateAppearance()
         // 在安全区域与最终布局稳定后，按比例重新应用一次，避免初次进入时全屏铺满
         applyAspectLayout(isEditing: isEditingMode)
+        // 兜底：若错过了会话发出的保存通知，这里主动探测最近的 RAW+JPEG 资源
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.reconcileAutoSaveIfNotificationMissed()
+        }
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -428,39 +441,8 @@ import Photos
     
     // MARK: - Actions
     @objc private func confirm() {
-        // RAW 自动保存模式：会话已写入 RAW+JPEG，避免重复保存
-        if SCCameraSettingsManager.shared.autoSaveMode == 2 {
-            SwiftMessages.showSuccessMessage("RAW+JPEG 已保存到相册", title: "保存成功")
-            self.dismiss(animated: true)
-            return
-        }
-        // 显示进度条
-        progressView.isHidden = false
-        progressView.progress = 0
-        
-        // 添加触觉反馈
-        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-        feedbackGenerator.prepare()
-        
-        // 模拟保存进度
-        var progress: Float = 0
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] timer in
-            guard let self = self else {
-                timer.invalidate()
-                return
-            }
-            
-            progress += 0.1
-            self.progressView.progress = min(progress, 1.0)
-            
-            if progress >= 1.0 {
-                timer.invalidate()
-                feedbackGenerator.impactOccurred()
-                
-                // 保存照片到相册
-                UIImageWriteToSavedPhotosAlbum(self.image, self, #selector(self.image(_:didFinishSavingWithError:contextInfo:)), nil)
-            }
-        }
+        print("[PhotoPreview] 点击完成，保存滤镜后的 JPEG")
+        saveImageToAlbum()
     }
     
     @objc private func cancel() {
@@ -668,12 +650,6 @@ import Photos
     }
     
     private func saveImageToAlbum() {
-        // RAW 自动保存模式：会话已写入 RAW+JPEG，避免重复保存
-        if SCCameraSettingsManager.shared.autoSaveMode == 2 {
-            SwiftMessages.showSuccessMessage("RAW+JPEG 已保存到相册", title: "保存成功")
-            self.dismiss(animated: true)
-            return
-        }
         // 显示进度条
         progressView.isHidden = false
         progressView.setProgress(0.3, animated: true)
@@ -723,6 +699,7 @@ import Photos
     
     // MARK: - Notification Handlers
     @objc private func handlePhotoSavedNotification(_ note: Notification) {
+        print("[PhotoPreview] 收到 PhotoSavedToAlbum: userInfo=\(note.userInfo ?? [:])")
         // 更新保存状态
         photoInfo.isSavedToAlbum = true
         infoView?.updateSaveState(isSaved: true)
@@ -788,6 +765,36 @@ import Photos
             pop.permittedArrowDirections = []
         }
         present(activityVC, animated: true)
+    }
+
+    /// 若进入预览时错过了会话的保存通知，则尝试从相册中探测最近创建的 RAW+JPEG 资源并更新 UI
+    private func reconcileAutoSaveIfNotificationMissed() {
+        guard SCCameraSettingsManager.shared.autoSaveMode == 2, photoInfo.isSavedToAlbum == false else { return }
+        let status = PHPhotoLibrary.authorizationStatus()
+        guard status == .authorized || status == .limited else { return }
+        let opts = PHFetchOptions()
+        opts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        opts.fetchLimit = 20
+        let assets = PHAsset.fetchAssets(with: .image, options: opts)
+        var matched: PHAsset?
+        assets.enumerateObjects { asset, _, stop in
+            if let date = asset.creationDate, Date().timeIntervalSince(date) < 60 {
+                let resources = PHAssetResource.assetResources(for: asset)
+                let hasRaw = resources.contains { res in
+                    res.type == .alternatePhoto || res.uniformTypeIdentifier.lowercased().contains("raw") || res.uniformTypeIdentifier.lowercased().contains("dng")
+                }
+                if hasRaw {
+                    matched = asset
+                    stop.pointee = true
+                }
+            }
+        }
+        guard let asset = matched else { return }
+        print("[PhotoPreview] 兜底匹配到最近 RAW+JPEG 资源 id=\(asset.localIdentifier)")
+        photoInfo.isSavedToAlbum = true
+        infoView?.updateSaveState(isSaved: true)
+        let userInfo: [String: Any] = ["format": "RAW+JPEG", "assetLocalId": asset.localIdentifier]
+        handlePhotoSavedNotification(Notification(name: NSNotification.Name("PhotoSavedToAlbum"), object: nil, userInfo: userInfo))
     }
 
     // MARK: - Editing Mode
@@ -1194,12 +1201,6 @@ extension SCPhotoPreviewVC: SCPhotoPreviewToolbarDelegate {
     }
     
     func toolbarDidTapConfirm(_ toolbar: SCPhotoPreviewToolbar) {
-        // RAW 自动保存模式：由会话已写入 RAW+JPEG，这里不再写入，直接结束
-        if SCCameraSettingsManager.shared.autoSaveMode == 2 {
-            SwiftMessages.showSuccessMessage("RAW+JPEG 已保存到相册", title: "保存成功")
-            self.dismiss(animated: true)
-            return
-        }
         if isEditingMode {
             // 退出编辑模式
             self.isEditingMode = false

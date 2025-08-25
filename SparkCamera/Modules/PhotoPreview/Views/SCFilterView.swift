@@ -109,52 +109,84 @@ class SCFilterView: UIView {
         print("- 原始图片尺寸: \(image.size)")
         print("- 是否有滤镜模板: \(filterTemplate != nil)")
         
-        // 如果没有滤镜模板，直接返回原图
-        if filterTemplate == nil {
-            print("[FilterView] 无滤镜模板，返回原图")
+        // 若没有模板且所有参数为默认值，直接返回原图；否则构建自定义滤镜链
+        let isDefault = (filterTemplate == nil) && allFiltersAtDefaultValues()
+        if isDefault {
+            print("[FilterView] 无模板且参数为默认值，返回原图")
             completion(image)
             return
         }
-        
+
         // 创建新的图片对象和输出目标
         let pictureOutput = GPUImagePicture(image: image)!
         let outputFilter = GPUImageFilter()
-        
-        // 配置输出
         outputFilter.useNextFrameForImageCapture()
-        
-        // 应用滤镜模板
+
         if let template = filterTemplate {
-            print("[FilterView] 应用滤镜模板: \(template.name)")
+            // 使用模板链
+            print("[FilterView] 应用滤镜模板: \(template.name) (用于导出)")
             template.applyFilter(to: pictureOutput, output: outputFilter)
         } else {
-            print("[FilterView] 无滤镜模板，直接连接输出")
-            pictureOutput.addTarget(outputFilter)
+            // 根据当前参数构建导出链（与预览链一致，但使用新的滤镜实例）
+            var last: GPUImageOutput = pictureOutput
+
+            func append<T: GPUImageFilter>(_ make: () -> T) {
+                let f = make()
+                last.addTarget(f)
+                last = f
+            }
+
+            if brightness != 0.0 {
+                append { let f = GPUImageBrightnessFilter(); f.brightness = brightness; return f }
+            }
+            if contrast != 1.0 {
+                append { let f = GPUImageContrastFilter(); f.contrast = contrast; return f }
+            }
+            if saturation != 1.0 {
+                append { let f = GPUImageSaturationFilter(); f.saturation = saturation; return f }
+            }
+            if exposure != 0.0 {
+                append { let f = GPUImageExposureFilter(); f.exposure = exposure; return f }
+            }
+            if (highlights != 1.0 || shadows != 0.0) {
+                append { let f = GPUImageHighlightShadowFilter(); f.highlights = highlights; f.shadows = shadows; return f }
+            }
+            if sharpness != 0.0 {
+                append { let f = GPUImageSharpenFilter(); f.sharpness = sharpness; return f }
+            }
+            if blur > 0.0 {
+                append { let f = GPUImageGaussianBlurFilter(); f.blurRadiusInPixels = blur; return f }
+            }
+            if (redChannel != 1.0 || greenChannel != 1.0 || blueChannel != 1.0) {
+                append { let f = GPUImageRGBFilter(); f.red = redChannel; f.green = greenChannel; f.blue = blueChannel; return f }
+            }
+
+            if edgeStrength > 0.0 {
+                // 轮廓叠加
+                let sobel = GPUImageSobelEdgeDetectionFilter()
+                sobel.edgeStrength = edgeStrength
+                let blend = GPUImageDissolveBlendFilter()
+                blend.mix = min(1.0, edgeStrength / 5.0)
+                last.addTarget(sobel)
+                last.addTarget(blend, atTextureLocation: 0)
+                sobel.addTarget(blend, atTextureLocation: 1)
+                last = blend
+            }
+
+            last.addTarget(outputFilter)
         }
-        
+
         // 处理图像并在完成后获取结果
         pictureOutput.processImage { [weak self] in
             guard self != nil else { return }
-            
-            // 获取处理后的图像
             if let processedImage = outputFilter.imageFromCurrentFramebuffer() {
-                print("[FilterView] 成功获取处理后的图片:")
-                print("- 处理后图片尺寸: \(processedImage.size)")
-                print("- 处理后图片scale: \(processedImage.scale)")
-                print("- 处理后图片orientation: \(processedImage.imageOrientation.rawValue)")
-                
-                // 清理资源
+                print("[FilterView] 成功获取处理后的图片(导出)")
                 pictureOutput.removeAllTargets()
                 outputFilter.removeAllTargets()
-                
-                DispatchQueue.main.async {
-                    completion(processedImage)
-                }
+                DispatchQueue.main.async { completion(processedImage) }
             } else {
-                print("[FilterView] 获取处理后的图片失败")
-                DispatchQueue.main.async {
-                    completion(nil)
-                }
+                print("[FilterView] 获取处理后的图片失败(导出)")
+                DispatchQueue.main.async { completion(nil) }
             }
         }
     }
