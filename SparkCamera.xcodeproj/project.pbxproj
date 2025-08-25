@@ -48,11 +48,10 @@
 		783345CE2D2BC01700CD3D67 /* SCScaleSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 783345CD2D2BC01700CD3D67 /* SCScaleSlider.swift */; };
 		78436AA92E487A4000F39649 /* SCFilterOptionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436A9F2E487A4000F39649 /* SCFilterOptionView.swift */; };
 		78436AAA2E487A4000F39649 /* SCPhotoPreviewToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA52E487A4000F39649 /* SCPhotoPreviewToolbar.swift */; };
-        /* removed duplicate SCPhotoPreviewVC.swift in Sources for fileRef 78436A9D */
 		78436AAC2E487A4000F39649 /* SCFilterView+Save.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA12E487A4000F39649 /* SCFilterView+Save.swift */; };
 		78436AAD2E487A4000F39649 /* SCFilterParameter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436A9A2E487A4000F39649 /* SCFilterParameter.swift */; };
 		78436AAE2E487A4000F39649 /* SCPhotoInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA42E487A4000F39649 /* SCPhotoInfoView.swift */; };
-		78436AAF2E487A4000F39649 /* SCPhotoPreviewVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA62E487A4000F39649 /* SCPhotoPreviewVC.swift */; };
+		78436AAF2E487A4000F39649 /* ../SCPhotoPreviewVC.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA62E487A4000F39649 /* ../SCPhotoPreviewVC.swift */; };
 		78436AB02E487A4000F39649 /* SCFilterTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436A9B2E487A4000F39649 /* SCFilterTemplate.swift */; };
 		78436AB12E487A4000F39649 /* SCPhotoZoomView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA72E487A4000F39649 /* SCPhotoZoomView.swift */; };
 		78436AB22E487A4000F39649 /* SCParameterEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78436AA22E487A4000F39649 /* SCParameterEditorView.swift */; };
@@ -116,7 +115,6 @@
 		78436A992E487A4000F39649 /* SCCustomFilterManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCCustomFilterManager.swift; sourceTree = "<group>"; };
 		78436A9A2E487A4000F39649 /* SCFilterParameter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCFilterParameter.swift; sourceTree = "<group>"; };
 		78436A9B2E487A4000F39649 /* SCFilterTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCFilterTemplate.swift; sourceTree = "<group>"; };
-        /* removed duplicate file reference 78436A9D for SCPhotoPreviewVC.swift */
 		78436A9E2E487A4000F39649 /* SCFilterAdjustView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCFilterAdjustView.swift; sourceTree = "<group>"; };
 		78436A9F2E487A4000F39649 /* SCFilterOptionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCFilterOptionView.swift; sourceTree = "<group>"; };
 		78436AA02E487A4000F39649 /* SCFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCFilterView.swift; sourceTree = "<group>"; };
@@ -125,7 +123,7 @@
 		78436AA32E487A4000F39649 /* SCParameterListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCParameterListView.swift; sourceTree = "<group>"; };
 		78436AA42E487A4000F39649 /* SCPhotoInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCPhotoInfoView.swift; sourceTree = "<group>"; };
 		78436AA52E487A4000F39649 /* SCPhotoPreviewToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCPhotoPreviewToolbar.swift; sourceTree = "<group>"; };
-        78436AA62E487A4000F39649 /* SCPhotoPreviewVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../SCPhotoPreviewVC.swift; sourceTree = "<group>"; };
+		78436AA62E487A4000F39649 /* ../SCPhotoPreviewVC.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../SCPhotoPreviewVC.swift; sourceTree = "<group>"; };
 		78436AA72E487A4000F39649 /* SCPhotoZoomView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SCPhotoZoomView.swift; sourceTree = "<group>"; };
 		78463F532D2F7C2000D7FA4C /* SCConstants.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; name = SCConstants.swift; path = SparkCamera/Utilities/SCConstants.swift; sourceTree = SOURCE_ROOT; };
 		7868A8B92D140E8F00CBB2FB /* SparkCamera.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SparkCamera.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -268,7 +266,6 @@
 			isa = PBXGroup;
 			children = (
 				78436A9C2E487A4000F39649 /* Models */,
-                /* removed duplicate SCPhotoPreviewVC.swift fileRef 78436A9D */
 				78436AA82E487A4000F39649 /* Views */,
 			);
 			path = PhotoPreview;
@@ -347,7 +344,7 @@
 				78436AA32E487A4000F39649 /* SCParameterListView.swift */,
 				78436AA42E487A4000F39649 /* SCPhotoInfoView.swift */,
 				78436AA52E487A4000F39649 /* SCPhotoPreviewToolbar.swift */,
-				78436AA62E487A4000F39649 /* SCPhotoPreviewVC.swift */,
+				78436AA62E487A4000F39649 /* ../SCPhotoPreviewVC.swift */,
 				78436AA72E487A4000F39649 /* SCPhotoZoomView.swift */,
 			);
 			path = Views;
@@ -374,20 +371,20 @@
 		7868A9142D1412D700CBB2FB /* SparkCamera */ = {
 			isa = PBXGroup;
 			children = (
-				7822E17D2D40DC2C006186D1 /* Modules */,
-				7822C4372D379F5800849682 /* Extensions */,
-				780DDCB42D268365000CA610 /* CameraKit */,
-				780DDC212D267B66000CA610 /* Utilities */,
 				7868A90B2D1412D700CBB2FB /* AppDelegate.swift */,
 				7868A90C2D1412D700CBB2FB /* Assets.xcassets */,
-				780D50FB2D27BC090014A9E1 /* Resource */,
+				780DDCB42D268365000CA610 /* CameraKit */,
+				7822C4372D379F5800849682 /* Extensions */,
 				7868A90D2D1412D700CBB2FB /* Info.plist */,
 				7868A90F2D1412D700CBB2FB /* LaunchScreen.storyboard */,
 				7868A9112D1412D700CBB2FB /* Main.storyboard */,
+				7822E17D2D40DC2C006186D1 /* Modules */,
 				7868A9122D1412D700CBB2FB /* Podfile */,
 				7817491D2D1D2DE700521F2D /* ProFont-Bold.ttf */,
 				7817491E2D1D2DE700521F2D /* ProFont-regular.ttf */,
+				780D50FB2D27BC090014A9E1 /* Resource */,
 				7868A9132D1412D700CBB2FB /* SceneDelegate.swift */,
+				780DDC212D267B66000CA610 /* Utilities */,
 			);
 			path = SparkCamera;
 			sourceTree = "<group>";
@@ -538,11 +535,10 @@
 				780DDCD62D268365000CA610 /* SCLensModel.swift in Sources */,
 				78436AA92E487A4000F39649 /* SCFilterOptionView.swift in Sources */,
 				78436AAA2E487A4000F39649 /* SCPhotoPreviewToolbar.swift in Sources */,
-                /* removed duplicate SCPhotoPreviewVC.swift in Sources 78436AAB */
 				78436AAC2E487A4000F39649 /* SCFilterView+Save.swift in Sources */,
 				78436AAD2E487A4000F39649 /* SCFilterParameter.swift in Sources */,
 				78436AAE2E487A4000F39649 /* SCPhotoInfoView.swift in Sources */,
-                78436AAF2E487A4000F39649 /* SCPhotoPreviewVC.swift in Sources */,
+				78436AAF2E487A4000F39649 /* ../SCPhotoPreviewVC.swift in Sources */,
 				78436AB02E487A4000F39649 /* SCFilterTemplate.swift in Sources */,
 				78436AB12E487A4000F39649 /* SCPhotoZoomView.swift in Sources */,
 				78436AB22E487A4000F39649 /* SCParameterEditorView.swift in Sources */,
